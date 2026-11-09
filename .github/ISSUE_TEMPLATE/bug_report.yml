@@ -1,0 +1,42 @@
+name: Bug report
+description: Something does not work as it should.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open a new note
+        2. Select a paragraph and press Ctrl+K
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where
+      options:
+        - Browser (Edge or Chrome)
+        - Browser (other)
+        - Windows desktop app
+        - Phone or tablet
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: e.g. 0.1.0, or the commit you built from
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Screenshots, the AI model you used, error messages from the browser console.

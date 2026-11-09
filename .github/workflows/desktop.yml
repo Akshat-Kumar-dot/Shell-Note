@@ -1,0 +1,41 @@
+name: Desktop
+
+on:
+  push:
+    branches: [main]
+    paths: ['apps/desktop/**', 'apps/web/**', 'packages/**', 'pnpm-lock.yaml', '.github/workflows/desktop.yml']
+  pull_request:
+    paths: ['apps/desktop/**', 'apps/web/**', 'packages/**', 'pnpm-lock.yaml', '.github/workflows/desktop.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    name: Rust build check and licences
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: rustup toolchain install stable --profile minimal
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+      - name: The web app the desktop app carries
+        run: node apps/desktop/run.mjs web-build
+      - name: Licences of every Rust package
+        run: |
+          pnpm licences:rust
+          git diff --exit-code -- apps/desktop/licences/third-party-rust.txt
+      - run: cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml --locked
