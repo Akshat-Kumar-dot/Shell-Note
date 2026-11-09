@@ -1,0 +1,63 @@
+[package]
+name = "shellnote"
+version = "0.1.0"
+description = "shellnote as an installed app"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[lib]
+# The library is what the phone apps load later; on Windows, main.rs starts it.
+name = "shellnote_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+# Exact versions, each at least seven days old when chosen; their licences are checked by scripts/licences-rust.mjs.
+tauri-build = { version = "=2.7.2", features = [] }
+
+[dependencies]
+tauri = { version = "=2.12.3", features = [] }
+serde = { version = "1", features = ["derive"] }
+# What the VS Code companion writes (src/place.rs): the version Tauri already brings (MIT OR Apache-2.0).
+serde_json = "=1.0.154"
+
+[target.'cfg(windows)'.dependencies]
+# Windows' own speech recognizer, for the AI box's microphone (src/speech.rs), and other programs' windows kept on a
+# panel (src/apps.rs) with their live picture (src/picture.rs), and the snap window of the app's own title bar
+# (src/titlebar.rs): the version Tauri already uses, with the parts of it these need (no new crate).
+windows = { version = "=0.62.2", features = [
+  "Foundation",
+  "Globalization",
+  "Graphics",
+  "Graphics_Capture",
+  "Graphics_DirectX",
+  "Graphics_DirectX_Direct3D11",
+  "Graphics_Imaging",
+  "Media_Ocr",
+  "Media_SpeechRecognition",
+  "Storage_Streams",
+  "Wdk_System_Threading",
+  "Win32_Foundation",
+  "Win32_Graphics_Direct3D",
+  "Win32_Graphics_Direct3D11",
+  "Win32_Graphics_Dwm",
+  "Win32_Graphics_Dxgi",
+  "Win32_Graphics_Dxgi_Common",
+  "Win32_Graphics_Gdi",
+  "Win32_Security",
+  "Win32_System_Com",
+  "Win32_System_LibraryLoader",
+  "Win32_System_Ole",
+  "Win32_System_Threading",
+  "Win32_System_Variant",
+  "Win32_System_WinRT",
+  "Win32_System_WinRT_Direct3D11",
+  "Win32_System_WinRT_Graphics_Capture",
+  "Win32_UI_Accessibility",
+  "Win32_UI_HiDpi",
+  "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_WindowsAndMessaging",
+] }
+# WebView2's shared buffers, a program's live picture given to the page with no copy (src/picture.rs): the crate
+# Tauri already brings, at its locked version (MIT).
+webview2-com = "=0.39.1"
