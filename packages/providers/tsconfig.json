@@ -1,0 +1,9 @@
+{
+  // Providers talk to servers with fetch, which browsers and Node both have.
+  // Node's types declare it for the checker.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["src", "test"]
+}

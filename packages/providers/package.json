@@ -1,0 +1,14 @@
+{
+  "name": "@shellnote/providers",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Model adapters for ShellNote: any OpenAI-compatible server, such as LM Studio, Ollama, llama.cpp or OpenRouter.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@shellnote/core": "workspace:*"
+  }
+}
