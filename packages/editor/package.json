@@ -33,7 +33,7 @@
     "@tiptap/extension-highlight": "3.31.3",
     "@tiptap/extension-italic": "3.31.3",
     "@tiptap/extension-strike": "3.31.3",
-    "@tiptap/pm": "3.31.3",
+    "@tiptap/pm": "3.32.2",
     "@shellnote/core": "workspace:*",
     "lucide-react": "1.50.0",
     "mermaid": "11.17.2",
