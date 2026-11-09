@@ -1,0 +1,10 @@
+{
+  // The app runs in the browser; its configs, unit tests and end-to-end tests run in Node.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client", "node"]
+  },
+  "include": ["src", "e2e", "agent", "test", "perf", "vite.config.ts", "playwright.config.ts", "playwright.agent.config.ts"]
+}
