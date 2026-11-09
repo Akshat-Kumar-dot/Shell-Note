@@ -1,0 +1,19 @@
+{
+  "name": "shellnote-companion",
+  "displayName": "ShellNote Companion",
+  "description": "Tells ShellNote the file and line this window is at, so a line of notes written beside it can go back there. Stays on this computer: no network, no port.",
+  "version": "0.1.0",
+  "publisher": "shellnote",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": ["Other"],
+  "main": "./extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "extensionKind": ["ui"],
+  "capabilities": {
+    "untrustedWorkspaces": { "supported": true },
+    "virtualWorkspaces": true
+  }
+}
