@@ -1,0 +1,51 @@
+{
+  "name": "shellnote",
+  "private": true,
+  "description": "A notes app for typing, handwriting and drawing on real pages, with an AI that changes only what you select.",
+  "homepage": "https://shellnote.app",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Akshat-Kumar-dot/Shell-Note.git"
+  },
+  "author": "Akshat Kumar",
+  "type": "module",
+  "license": "MIT OR Apache-2.0",
+  "packageManager": "pnpm@10.34.5",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev": "vite apps/web",
+    "build": "vite build apps/web",
+    "app": "vite build apps/web && vite preview apps/web",
+    "e2e": "playwright test -c apps/web/playwright.config.ts",
+    "lint": "eslint .",
+    "typecheck": "tsc -p packages/core/tsconfig.json && tsc -p packages/core/test/tsconfig.json && tsc -p packages/providers/tsconfig.json && tsc -p packages/editor/tsconfig.json && tsc -p apps/web/tsconfig.json",
+    "check": "pnpm typecheck && pnpm lint && pnpm test",
+    "rules": "node scripts/build-rules.mjs",
+    "font-licences": "node scripts/font-licences.mjs",
+    "licences": "node scripts/licences.mjs",
+    "perf:ui": "tsx apps/web/perf/ui.ts",
+    "desktop": "node apps/desktop/run.mjs dev",
+    "desktop:build": "node apps/desktop/run.mjs build",
+    "desktop:smoke": "node apps/desktop/run.mjs smoke",
+    "desktop:e2e": "node apps/desktop/run.mjs e2e",
+    "desktop:apps": "node apps/desktop/run.mjs apps",
+    "companion": "node apps/vscode-companion/pack.mjs",
+    "licences:rust": "node scripts/licences-rust.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.63.0",
+    "@types/node": "^22.20.4",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.70.1",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.2"
+  }
+}

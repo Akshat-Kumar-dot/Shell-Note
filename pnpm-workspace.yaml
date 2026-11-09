@@ -1,0 +1,13 @@
+packages:
+  - packages/*
+  - apps/*
+
+# Supply-chain safety: never install a package version published less than
+# 7 days ago (value in minutes). Freshly hijacked versions are usually caught
+# and pulled within that time.
+minimumReleaseAge: 10080
+
+# Security fixes for packages others bring (pnpm audit, 24 October 2026): Mermaid
+# cleans its drawings with DOMPurify, and 3.4.16 and older let some markup past it.
+overrides:
+  dompurify: ^3.4.17
