@@ -1,0 +1,3833 @@
+/*
+ * How ShellNote draws a page. A document stores tokens, never real sizes or
+ * colours; this sheet maps them. Pages use real units (mm,
+ * pt), since a page is drawn at its true size and zoomed as a whole.
+ */
+
+/*
+ * The app's own surfaces, as tokens, in light and dark: one accent colour, soft
+ * shadows, rounded corners. Dark applies when the system asks for it, unless
+ * the person chose Light, or when they chose Dark. The paper is not one of
+ * these: it always stays white, as it prints.
+ */
+:root {
+  --ui-font: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --ui-bg: #f5f6f8;
+  --ui-surface: #ffffff;
+  --ui-surface-2: #f1f3f6;
+  --ui-hover: #eef0f4;
+  --ui-border: #e4e7ec;
+  --ui-border-strong: #cfd4dc;
+  --ui-text: #1c1d21;
+  --ui-text-2: #555b65;
+  --ui-text-3: #7d838d;
+  --ui-accent: #5b5bd6;
+  --ui-accent-hover: #4b4bc4;
+  --ui-accent-soft: #ececfc;
+  --ui-accent-text: #4141b8;
+  --ui-on-accent: #ffffff;
+  --ui-folder: #eef0fd;
+  --ui-desk: #e9ebef;
+  --ui-danger: #d23b3b;
+  --ui-ok: #2e8540;
+  --ui-warn: #e3a008;
+  --ui-warn-bg: #fff5dc;
+  --ui-warn-text: #7a4e00;
+  --ui-info-bg: #eef0fd;
+  --ui-info-text: #2f3a8f;
+  --ui-error-bg: #fde8e8;
+  --ui-error-text: #8f1d1d;
+  --ui-toast: #24262c;
+  --ui-toast-text: #f4f5f7;
+  --ui-toast-action: #b9bbff;
+  --ui-shadow-1: 0 1px 2px rgb(16 24 40 / 0.05), 0 1px 3px rgb(16 24 40 / 0.06);
+  --ui-shadow-2: 0 6px 16px rgb(16 24 40 / 0.1), 0 2px 4px rgb(16 24 40 / 0.06);
+  --ui-shadow-3: 0 16px 40px rgb(16 24 40 / 0.16), 0 4px 10px rgb(16 24 40 / 0.08);
+  --ui-shadow-card: 0 1px 2px rgb(16 24 40 / 0.08), 0 4px 14px rgb(16 24 40 / 0.07);
+  color-scheme: light;
+}
+:root[data-theme='dark'] {
+  --ui-bg: #16171a;
+  --ui-surface: #1f2024;
+  --ui-surface-2: #26272c;
+  --ui-hover: #2d2e34;
+  --ui-border: #313238;
+  --ui-border-strong: #464851;
+  --ui-text: #ececf0;
+  --ui-text-2: #b4b7bf;
+  --ui-text-3: #8d919b;
+  --ui-accent: #8b8ef0;
+  --ui-accent-hover: #9fa2f5;
+  --ui-accent-soft: #2a2b4a;
+  --ui-accent-text: #bcbeff;
+  --ui-on-accent: #15162b;
+  --ui-folder: #26274a;
+  --ui-desk: #111214;
+  --ui-danger: #f06464;
+  --ui-ok: #5cc27a;
+  --ui-warn: #f0b429;
+  --ui-warn-bg: #3a2f12;
+  --ui-warn-text: #f5d38a;
+  --ui-info-bg: #24264a;
+  --ui-info-text: #c6c8ff;
+  --ui-error-bg: #3d1d1d;
+  --ui-error-text: #ffb8b8;
+  --ui-toast: #ececf0;
+  --ui-toast-text: #16171a;
+  --ui-toast-action: #4141b8;
+  --ui-shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --ui-shadow-2: 0 6px 16px rgb(0 0 0 / 0.45);
+  --ui-shadow-3: 0 16px 40px rgb(0 0 0 / 0.55);
+  --ui-shadow-card: 0 1px 2px rgb(0 0 0 / 0.5), 0 4px 14px rgb(0 0 0 / 0.35);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ui-bg: #16171a;
+    --ui-surface: #1f2024;
+    --ui-surface-2: #26272c;
+    --ui-hover: #2d2e34;
+    --ui-border: #313238;
+    --ui-border-strong: #464851;
+    --ui-text: #ececf0;
+    --ui-text-2: #b4b7bf;
+    --ui-text-3: #8d919b;
+    --ui-accent: #8b8ef0;
+    --ui-accent-hover: #9fa2f5;
+    --ui-accent-soft: #2a2b4a;
+    --ui-accent-text: #bcbeff;
+    --ui-on-accent: #15162b;
+    --ui-folder: #26274a;
+    --ui-desk: #111214;
+    --ui-danger: #f06464;
+    --ui-ok: #5cc27a;
+    --ui-warn: #f0b429;
+    --ui-warn-bg: #3a2f12;
+    --ui-warn-text: #f5d38a;
+    --ui-info-bg: #24264a;
+    --ui-info-text: #c6c8ff;
+    --ui-error-bg: #3d1d1d;
+    --ui-error-text: #ffb8b8;
+    --ui-toast: #ececf0;
+    --ui-toast-text: #16171a;
+    --ui-toast-action: #4141b8;
+    --ui-shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
+    --ui-shadow-2: 0 6px 16px rgb(0 0 0 / 0.45);
+    --ui-shadow-3: 0 16px 40px rgb(0 0 0 / 0.55);
+    --ui-shadow-card: 0 1px 2px rgb(0 0 0 / 0.5), 0 4px 14px rgb(0 0 0 / 0.35);
+    color-scheme: dark;
+  }
+}
+
+.nw-desk {
+  height: 100%;
+  overflow: auto;
+  background: var(--ui-desk);
+}
+/* The Select tool draws a box over anything on the page, so the pointer is a crosshair everywhere and no text is picked up. */
+.nw-desk[data-tool='select'],
+.nw-desk[data-tool='select'] * {
+  cursor: crosshair !important;
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* With the Free cursor, a click on empty paper starts writing there. */
+.nw-desk[data-tool='free'] .nw-page {
+  cursor: text;
+}
+
+.nw-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
+}
+/* Under the last page: a new page, like it. */
+.nw-add-page {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 56px;
+  border: 2px dashed var(--ui-border);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ui-text-2);
+  font: 600 14px var(--ui-font);
+  cursor: pointer;
+}
+.nw-add-page:hover,
+.nw-add-page:focus-visible {
+  border-color: var(--ui-accent, #4f6bd8);
+  color: var(--ui-text);
+}
+
+.nw-page-slot {
+  position: relative;
+  flex: none;
+}
+
+.nw-page-zoom {
+  transform-origin: 0 0;
+}
+
+/* The tokens' real values, for the page and for the toolbar's swatches. */
+:root {
+  --nw-ink: #1d1d22;
+  --nw-gray: #6b7079;
+  --nw-red: #c62828;
+  --nw-orange: #d9640a;
+  --nw-yellow: #a88400;
+  --nw-green: #2e7d32;
+  --nw-blue: #1f5fbf;
+  --nw-purple: #7a3db8;
+  --nw-paper: #fff;
+  --nw-rule: #c9d7e8;
+  --nw-highlight: #fff1a1;
+  /* The highlighter's named colours: bright and light, as highlighter ink is, where the text colours are dark. */
+  --nw-hl-ink: #a7adb5;
+  --nw-hl-gray: #c9ccd1;
+  --nw-hl-red: #ff8a9a;
+  --nw-hl-orange: #ffb35c;
+  --nw-hl-yellow: #ffe845;
+  --nw-hl-green: #8ee08e;
+  --nw-hl-blue: #7cc4ff;
+  --nw-hl-purple: #cfa6ff;
+  --nw-sans: system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --nw-serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+  --nw-mono: 'Cascadia Mono', Consolas, 'SF Mono', 'Courier New', monospace;
+  --nw-hand: 'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive;
+}
+
+.nw-page {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--nw-paper);
+  box-shadow:
+    0 1px 3px rgb(0 0 0 / 0.16),
+    0 6px 18px rgb(0 0 0 / 0.07);
+  color: var(--nw-ink);
+  font-family: var(--nw-sans);
+  font-size: 11pt;
+  line-height: 1.45;
+}
+
+/* Page backgrounds: lines every 8 mm, a 5 mm grid, or 5 mm dots. */
+.nw-page[data-bg='ruled'] {
+  background-image: repeating-linear-gradient(to bottom, transparent 0 7.75mm, var(--nw-rule) 7.75mm 8mm);
+}
+.nw-page[data-bg='grid'] {
+  background-image:
+    linear-gradient(var(--nw-rule) 0.2mm, transparent 0.2mm),
+    linear-gradient(90deg, var(--nw-rule) 0.2mm, transparent 0.2mm);
+  background-size: 5mm 5mm;
+}
+.nw-page[data-bg='dots'] {
+  background-image: radial-gradient(circle, var(--nw-rule) 0.35mm, transparent 0.45mm);
+  background-size: 5mm 5mm;
+}
+
+/* Blocks placed on the page. Frames grow with their text; the others fill their box. */
+.nw-free {
+  position: absolute;
+  box-sizing: border-box;
+}
+[data-free] > :first-child {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+/* ----- text blocks ----- */
+
+.nw-text {
+  margin: 0 0 0.35em calc(var(--nw-indent, 0) * 6mm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.nw-text[data-role='h1'] {
+  font-size: 20pt;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-block: 0.2em 0.45em;
+}
+.nw-text[data-role='h2'] {
+  font-size: 15pt;
+  font-weight: 700;
+  line-height: 1.25;
+  margin-block: 0.3em 0.35em;
+}
+.nw-text[data-role='h3'] {
+  font-size: 12.5pt;
+  font-weight: 700;
+  margin-block: 0.3em 0.25em;
+}
+.nw-text[data-role='li'],
+.nw-text[data-role='oli'],
+.nw-text[data-role='todo'] {
+  position: relative;
+  padding-left: 6mm;
+  margin-bottom: 0.15em;
+}
+.nw-text[data-role='li']::before {
+  content: '•';
+  position: absolute;
+  left: 1.6mm;
+}
+.nw-text[data-role='li'][data-indent='1']::before {
+  content: '◦';
+}
+.nw-text[data-role='li'][data-indent='2']::before {
+  content: '▪';
+}
+.nw-text[data-role='oli']::before {
+  content: attr(data-number) '.';
+  position: absolute;
+  left: 0;
+  width: 4.6mm;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.nw-text[data-role='todo']::before {
+  content: '☐';
+  position: absolute;
+  left: 0.6mm;
+}
+.nw-text[data-role='todo'][data-done]::before {
+  content: '☑';
+}
+.nw-text[data-role='todo'][data-done] {
+  color: var(--nw-gray);
+  text-decoration: line-through;
+}
+.nw-text[data-role='quote'] {
+  border-left: 0.8mm solid var(--nw-rule);
+  padding-left: 4mm;
+  font-style: italic;
+}
+
+/* Style tokens come after the roles, so a size set on a heading wins. */
+.nw-text[data-size='s'] {
+  font-size: 9pt;
+}
+.nw-text[data-size='m'] {
+  font-size: 11pt;
+}
+.nw-text[data-size='l'] {
+  font-size: 14pt;
+}
+.nw-text[data-size='xl'] {
+  font-size: 18pt;
+}
+.nw-text[data-font='sans'] {
+  font-family: var(--nw-sans);
+}
+.nw-text[data-font='serif'] {
+  font-family: var(--nw-serif);
+}
+.nw-text[data-font='mono'] {
+  font-family: var(--nw-mono);
+}
+.nw-text[data-font='hand'] {
+  font-family: var(--nw-hand);
+}
+/* Words with a size or font of their own (file format version 2), drawn as a line of that size or font would be. Library fonts match any [data-font] (fonts.css). */
+.nw-page span[data-size='s'] {
+  font-size: 9pt;
+}
+.nw-page span[data-size='m'] {
+  font-size: 11pt;
+}
+.nw-page span[data-size='l'] {
+  font-size: 14pt;
+}
+.nw-page span[data-size='xl'] {
+  font-size: 18pt;
+}
+.nw-page span[data-font='sans'] {
+  font-family: var(--nw-sans);
+}
+.nw-page span[data-font='serif'] {
+  font-family: var(--nw-serif);
+}
+.nw-page span[data-font='mono'] {
+  font-family: var(--nw-mono);
+}
+.nw-page span[data-font='hand'] {
+  font-family: var(--nw-hand);
+}
+/* Subscript and superscript keep the line's height, as in Word. */
+.nw-page sub,
+.nw-page sup {
+  position: relative;
+  font-size: 75%;
+  line-height: 0;
+  vertical-align: baseline;
+}
+.nw-page sup {
+  top: -0.5em;
+}
+.nw-page sub {
+  bottom: -0.25em;
+}
+.nw-text[data-align='center'] {
+  text-align: center;
+}
+.nw-text[data-align='right'] {
+  text-align: right;
+}
+
+/* Colours, for whole blocks and for coloured words alike. */
+.nw-page [data-color='ink'] {
+  color: var(--nw-ink);
+}
+.nw-page [data-color='gray'] {
+  color: var(--nw-gray);
+}
+.nw-page [data-color='red'] {
+  color: var(--nw-red);
+}
+.nw-page [data-color='orange'] {
+  color: var(--nw-orange);
+}
+.nw-page [data-color='yellow'] {
+  color: var(--nw-yellow);
+}
+.nw-page [data-color='green'] {
+  color: var(--nw-green);
+}
+.nw-page [data-color='blue'] {
+  color: var(--nw-blue);
+}
+.nw-page [data-color='purple'] {
+  color: var(--nw-purple);
+}
+
+/* ----- inline marks ----- */
+
+.nw-page mark {
+  background: var(--nw-highlight);
+  color: inherit;
+  padding: 0 0.1em;
+}
+.nw-page code {
+  font-family: var(--nw-mono);
+  font-size: 0.92em;
+  background: rgb(0 0 0 / 0.05);
+  padding: 0 0.2em;
+  border-radius: 0.6mm;
+}
+.nw-page a {
+  color: var(--nw-blue);
+}
+.nw-math-inline {
+  font-family: var(--nw-serif);
+  font-style: italic;
+  background: rgb(31 95 191 / 0.07);
+  padding: 0 0.15em;
+  border-radius: 0.6mm;
+}
+
+/* ----- other blocks: math is a placeholder until its phase; diagrams are drawn by Mermaid ----- */
+
+.nw-math {
+  margin: 0.4em 0;
+  padding: 2mm 3mm;
+  text-align: center;
+}
+.nw-math code {
+  background: none;
+}
+.nw-math-value {
+  color: var(--nw-gray);
+}
+.nw-diagram {
+  position: relative;
+  margin: 0.4em 0;
+  padding: 2mm 3mm;
+  border: 0.3mm dashed var(--nw-rule);
+  border-radius: 1mm;
+}
+.nw-diagram pre {
+  margin: 0;
+  font: 9pt/1.35 var(--nw-mono);
+  white-space: pre-wrap;
+}
+/* A diagram placed on the page fills its box, keeping its shape: resizing the box resizes the drawing. Mermaid caps its own width, so that cap gives way. */
+.nw-free[data-free='diagram'] .nw-diagram {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+.nw-free[data-free='diagram'] .nw-diagram > div,
+.nw-free[data-free='diagram'] .nw-diagram-svg {
+  width: 100%;
+  height: 100%;
+}
+.nw-free[data-free='diagram'] .nw-diagram-svg svg {
+  width: 100%;
+  height: 100%;
+  max-width: none !important;
+}
+/* Drawn: Mermaid's picture at its own size, up to the width it has, with no dashed edge. */
+.nw-diagram[data-drawn] {
+  border-color: transparent;
+}
+.nw-diagram-svg {
+  display: flex;
+  justify-content: center;
+}
+.nw-diagram-svg svg {
+  max-width: 100%;
+  height: auto;
+}
+/* ----- pictures ----- */
+
+/* In a frame's text: the picture at its own size, up to the frame's width, with the caption under it. */
+.nw-image {
+  margin: 0.4em 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.nw-image-pic {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+}
+.nw-image-pic img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+/* Placed on the page: the picture fills its box, and the caption hangs below it. */
+[data-free] .nw-image-pic {
+  width: 100%;
+  height: 100%;
+}
+[data-free] .nw-image > .nw-caption {
+  position: absolute;
+  top: 100%;
+  left: 0;
+}
+.nw-caption {
+  position: relative;
+  width: 100%;
+  margin-top: 1.5mm;
+  color: var(--nw-gray);
+  font-size: 9.5pt;
+  line-height: 1.35;
+  text-align: center;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.nw-caption .ProseMirror {
+  outline: none;
+}
+/* An empty caption shows a hint while it is being written, and nothing otherwise. */
+.nw-caption .ProseMirror[data-empty]::before,
+.nw-image[data-empty][data-editing] > .nw-caption::before,
+.nw-table[data-empty][data-editing] > .nw-caption::before {
+  content: 'Add a caption';
+  position: absolute;
+  left: 0;
+  right: 0;
+  color: #9aa0a8;
+  pointer-events: none;
+}
+.nw-image[data-empty]:not([data-editing]) > .nw-caption,
+.nw-table[data-empty]:not([data-editing]) > .nw-caption {
+  display: none;
+}
+
+/* ----- tables ----- */
+
+.nw-table {
+  margin: 0.5em 0;
+}
+/* The grid: as wide as it was made (its share of the frame), each column at its own share (tableView.ts). */
+.nw-grid {
+  position: relative;
+  max-width: 100%;
+}
+.nw-table table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.nw-table td,
+.nw-table th {
+  padding: 1mm 1.5mm;
+  border: 0.3mm solid #c9d0d9;
+  vertical-align: top;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.nw-table th {
+  background: #f1f4f8;
+  font-weight: 600;
+}
+/* The looks besides the grid. The paper is white in every theme, so these colours are fixed. */
+.nw-grid[data-look='lines'] td,
+.nw-grid[data-look='lines'] th {
+  border-width: 0 0 0.3mm;
+  background: none;
+}
+.nw-grid[data-look='lines'] tr:first-child > * {
+  border-top: 0.5mm solid #1d1d22;
+}
+.nw-grid[data-look='lines'] tr:last-child > * {
+  border-bottom: 0.5mm solid #1d1d22;
+}
+.nw-grid[data-look='banded'] td,
+.nw-grid[data-look='banded'] th {
+  border-color: #dde2e8;
+}
+.nw-grid[data-look='banded'] tr:nth-child(even) > * {
+  background: #eef2f7;
+}
+.nw-grid[data-look='header'] td,
+.nw-grid[data-look='header'] th {
+  border-width: 0 0 0.3mm;
+  border-color: #c9d0d9;
+}
+.nw-grid[data-look='header'] tr:first-child > * {
+  border-color: #1f4e8c;
+  background: #1f4e8c;
+  color: #fff;
+  font-weight: 600;
+}
+/* Cells chosen together, by dragging across them or with Shift and the arrow keys: tinted over any look. */
+.nw-table .selectedCell {
+  box-shadow: inset 0 0 0 100vmax rgb(31 95 191 / 0.14);
+}
+/* The handles: ⊕ to choose or move the table (or a diagram), a border between columns, the corner for the width. They keep their size at any zoom. */
+.nw-table-handle,
+.nw-object-handle,
+.nw-table-corner {
+  position: absolute;
+  z-index: 2;
+  display: none;
+  box-sizing: border-box;
+  border: calc(1px / var(--nw-zoom, 1)) solid #1f5fbf;
+  background: #fff;
+  color: #1f5fbf;
+}
+.nw-table-handle,
+.nw-object-handle {
+  left: calc(-30px / var(--nw-zoom, 1));
+  top: calc(-30px / var(--nw-zoom, 1));
+  width: calc(26px / var(--nw-zoom, 1));
+  height: calc(26px / var(--nw-zoom, 1));
+  align-items: center;
+  justify-content: center;
+  border-radius: calc(5px / var(--nw-zoom, 1));
+  cursor: grab;
+}
+.nw-table-handle svg,
+.nw-object-handle svg {
+  width: calc(16px / var(--nw-zoom, 1));
+  height: calc(16px / var(--nw-zoom, 1));
+}
+.nw-table-corner {
+  right: calc(-6px / var(--nw-zoom, 1));
+  bottom: calc(-6px / var(--nw-zoom, 1));
+  width: calc(12px / var(--nw-zoom, 1));
+  height: calc(12px / var(--nw-zoom, 1));
+  border-radius: calc(2px / var(--nw-zoom, 1));
+  cursor: ew-resize;
+}
+.nw-table:hover .nw-table-handle,
+.nw-table[data-editing] .nw-table-handle,
+.nw-table[data-chosen] .nw-table-handle,
+.nw-diagram:hover .nw-object-handle,
+.nw-diagram[data-chosen] .nw-object-handle {
+  display: flex;
+}
+.nw-table:hover .nw-table-corner,
+.nw-table[data-editing] .nw-table-corner,
+.nw-table[data-chosen] .nw-table-corner,
+.nw-grid[data-resizing] .nw-table-corner {
+  display: block;
+}
+.nw-col-borders {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.nw-col-border {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: calc(9px / var(--nw-zoom, 1));
+  transform: translateX(-50%);
+  pointer-events: auto;
+  cursor: col-resize;
+}
+.nw-col-border:hover,
+.nw-grid[data-resizing] .nw-col-border:active {
+  background: linear-gradient(to right, transparent calc(50% - 1px), #1f5fbf calc(50% - 1px) calc(50% + 1px), transparent calc(50% + 1px));
+}
+/* A table chosen whole: outlined, as a picture is. */
+.nw-frame .nw-table[data-chosen] {
+  background: none;
+  box-shadow: none;
+}
+.nw-frame .nw-table[data-chosen] > .nw-grid {
+  outline: 0.5mm solid rgb(31 95 191 / 0.55);
+  outline-offset: 0.5mm;
+}
+/* A table or diagram being dragged, and the line showing where it would go. */
+.nw-table[data-dragging],
+.nw-diagram[data-dragging] {
+  opacity: 0.45;
+}
+body[data-dragging] * {
+  cursor: grabbing !important;
+}
+.nw-drop-line {
+  position: fixed;
+  z-index: 1000;
+  height: 3px;
+  border-radius: 2px;
+  background: #1f5fbf;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+.nw-image-missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-height: 20mm;
+  padding: 2mm;
+  box-sizing: border-box;
+  background: repeating-linear-gradient(45deg, #f1f3f6 0 3mm, #e8ecf1 3mm 6mm);
+  color: var(--nw-gray);
+  font-size: 9pt;
+  text-align: center;
+}
+.nw-ink {
+  display: block;
+  overflow: visible;
+}
+/* Handwriting: its highlighter strokes, multiplied with the words behind them, and its ink, in two layers the size of the page,
+   placed by the page's corner (blocks.tsx InkView). Only the ink itself takes a press, so the drawing never covers words or links. */
+[data-free='ink'] > .nw-ink {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+.nw-ink-under {
+  mix-blend-mode: multiply;
+}
+/* A press reaches handwriting only where there is ink, so the words under it and around it stay easy to click; once chosen, its whole box moves. */
+.nw-box[data-free='ink'] {
+  pointer-events: none;
+}
+.nw-box[data-free='ink'] .nw-ink:not(.nw-ink-under) path {
+  pointer-events: visibleStroke;
+}
+.nw-box[data-free='ink'][data-selected] {
+  pointer-events: auto;
+}
+
+/* ----- editing ----- */
+
+/* A block placed on the page: drag it to move it; a picture's or a diagram's corners resize it. Handles keep their size on screen at any zoom. */
+.nw-box {
+  cursor: move;
+  touch-action: none;
+  outline: none;
+}
+.nw-box[data-selected] {
+  outline: calc(1.5px / var(--nw-zoom, 1)) solid #1f5fbf;
+}
+.nw-box .nw-caption {
+  cursor: text;
+}
+/* Pictures, tables and formulas in a frame, chosen whole. */
+.nw-frame [data-chosen] {
+  border-radius: 0.6mm;
+  background: rgb(31 95 191 / 0.1);
+  box-shadow: 0 0 0 0.6mm rgb(31 95 191 / 0.1);
+}
+/* Chosen words: only the words, as Word shows them, whether a line is chosen whole or a Select box holds part of it. */
+.nw-frame .nw-chosen-words {
+  border-radius: 0.4mm;
+  background: rgb(31 95 191 / 0.18);
+}
+/* Where the caret last was, while nothing else is chosen: the toolbar acts there. */
+.nw-frame .nw-last-caret {
+  display: inline-block;
+  width: 0;
+  height: 1.15em;
+  margin-right: -1.5px;
+  border-left: 1.5px solid #9aa0a6;
+  vertical-align: -0.2em;
+  pointer-events: none;
+}
+.nw-frame .nw-last-selection {
+  background: rgb(120 124 130 / 0.22);
+}
+/* An empty line chosen whole: a mark the width of a letter at its start. */
+.nw-frame [data-chosen-empty]::before {
+  content: '';
+  display: inline-block;
+  width: 0.5em;
+  height: 1em;
+  vertical-align: -0.15em;
+  border-radius: 0.4mm;
+  background: rgb(31 95 191 / 0.18);
+}
+/* A Select box's place on the page, kept until something else is selected. */
+.nw-region {
+  position: absolute;
+  box-sizing: border-box;
+  border: calc(1.5px / var(--nw-zoom, 1)) dashed #1f5fbf;
+  pointer-events: none;
+}
+/* The Select box being drawn. */
+.nw-marquee {
+  position: absolute;
+  box-sizing: border-box;
+  border: calc(1px / var(--nw-zoom, 1)) solid #1f5fbf;
+  background: rgb(31 95 191 / 0.08);
+  pointer-events: none;
+}
+/* The caret put by a click on bare paper, before the frame is made; once it is, the frame's own editor shows the words. */
+.nw-draft .ProseMirror {
+  outline: none;
+}
+.nw-draft[data-made] {
+  opacity: 0;
+}
+.nw-handle {
+  position: absolute;
+  width: calc(10px / var(--nw-zoom, 1));
+  height: calc(10px / var(--nw-zoom, 1));
+  box-sizing: border-box;
+  border: calc(1.5px / var(--nw-zoom, 1)) solid #1f5fbf;
+  border-radius: calc(2px / var(--nw-zoom, 1));
+  background: #fff;
+  transform: translate(-50%, -50%);
+}
+.nw-handle[data-corner='nw'] {
+  left: 0;
+  top: 0;
+  cursor: nwse-resize;
+}
+.nw-handle[data-corner='ne'] {
+  left: 100%;
+  top: 0;
+  cursor: nesw-resize;
+}
+.nw-handle[data-corner='sw'] {
+  left: 0;
+  top: 100%;
+  cursor: nesw-resize;
+}
+.nw-handle[data-corner='se'] {
+  left: 100%;
+  top: 100%;
+  cursor: nwse-resize;
+}
+
+.nw-frame .ProseMirror {
+  outline: none;
+}
+/* A selected math, image or diagram block. */
+.nw-frame .ProseMirror-selectednode {
+  outline: 0.5mm solid rgb(31 95 191 / 0.45);
+  outline-offset: 0.5mm;
+}
+/* For a picture, the outline goes round the picture rather than the whole line. */
+.nw-frame .nw-image.ProseMirror-selectednode {
+  outline: none;
+}
+.nw-frame .nw-image.ProseMirror-selectednode > .nw-image-pic {
+  outline: 0.5mm solid rgb(31 95 191 / 0.45);
+  outline-offset: 0.5mm;
+}
+
+/* ----- scrollbars: everywhere in the theme's colours, slim, with no arrows and no track (the
+   system's own is a thick grey bar). Wide enough to take with a pen; the thumb is the middle of it. ----- */
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 5px;
+  background: var(--ui-border-strong) padding-box;
+}
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--ui-text-3);
+}
+/* Firefox has none of those, and the standard's two instead. */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--ui-border-strong) transparent;
+  }
+}
+
+/* Buttons and bars are never text to pick up, whatever the tool; what is typed in them still is. */
+button,
+.appbar,
+.nw-bar,
+.nw-bar-strip,
+.nw-dock-title,
+.nw-video-bar,
+.nw-side-tabs {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.appbar input,
+.nw-bar input {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* ----- the bars: the tool strip in the app bar, and the floating format bar ----- */
+
+.nw-toolstrip,
+.nw-formatbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--ui-text);
+  font: 14px/1.2 var(--ui-font);
+}
+.nw-formatbar {
+  min-width: 0;
+  padding: 5px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 16px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-2);
+}
+.nw-group {
+  display: inline-flex;
+  /* A group too wide for its bar wraps too, as beside a wide video: the bar never reaches past the note. */
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 2px;
+}
+.nw-sep {
+  width: 1px;
+  height: 24px;
+  margin: 0 6px;
+  background: var(--ui-border);
+}
+
+/* ----- the bars that move: along the top, down a side, along the bottom, or floating as a box ----- */
+
+.nw-bar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+}
+.nw-bar[data-dir='column'] {
+  flex-direction: column;
+}
+.nw-bar-grip {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  /* 40 pixels, as every button of the bars, for a finger or a pen. */
+  width: 40px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ui-text-3, var(--ui-text-2));
+  cursor: grab;
+  touch-action: none;
+}
+.nw-bar[data-dir='column'] .nw-bar-grip svg {
+  transform: rotate(90deg);
+}
+.nw-bar-grip:hover {
+  background: var(--ui-hover);
+  color: var(--ui-text);
+}
+/* Down a side: the bar's groups one under another. */
+.nw-bar[data-dir='column'] .nw-toolstrip,
+.nw-bar[data-dir='column'] .nw-formatbar,
+.nw-bar[data-dir='column'] .nw-group,
+.nw-bar[data-dir='column'] .nw-tools {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+.nw-bar[data-dir='column'] .nw-sep {
+  width: 24px;
+  height: 1px;
+  margin: 6px 0;
+}
+.nw-bar[data-dir='column'] .nw-formatbar {
+  padding: 8px 5px;
+}
+/* Down a side, the eraser's two choices one over the other, their words on two lines: they hung off both edges of the strip. */
+.nw-bar[data-dir='column'] .nw-formatbar > .nw-segmented {
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 46px;
+  padding: 2px;
+}
+.nw-bar[data-dir='column'] .nw-formatbar > .nw-segmented button {
+  flex: none;
+  height: auto;
+  min-height: 36px;
+  padding: 4px 0;
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: normal;
+}
+/* Down a side, a menu shows as its sign, 44 pixels wide, its menu still opening with every name: the select itself
+   lies over the sign, unseen. */
+.nw-select-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.nw-select-short {
+  display: none;
+}
+.nw-bar[data-dir='column'] .nw-select-wrap {
+  width: 44px;
+  height: 36px;
+}
+.nw-bar[data-dir='column'] .nw-select-short {
+  box-sizing: border-box;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.nw-bar[data-dir='column'] .nw-select-wrap > select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.nw-bar[data-dir='column'] .nw-select-wrap:focus-within .nw-select-short {
+  outline: 2px solid var(--ui-accent, #4f6bd8);
+  outline-offset: 1px;
+}
+/* A table's two menu buttons, an icon and an arrow, within the strip's width. */
+.nw-bar[data-dir='column'] .nw-menu-anchor .nw-ibtn {
+  width: 44px;
+  min-width: 44px;
+  padding: 0;
+}
+/* Floating: a box of its own over the workspace, like Windows Ink's bar. */
+.nw-bar[data-at='float'] {
+  position: absolute;
+  z-index: 45;
+  padding: 4px;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow-3);
+}
+.nw-bar[data-at='float'] .nw-formatbar {
+  border: 0;
+  box-shadow: none;
+}
+/* A bar with a menu open comes over the others: a menu was drawn under another floating bar (found 6 November 2026). */
+.nw-bar:has(.nw-popover, .nw-font-library, .nw-table-grid, .nw-dropdown) {
+  z-index: 46;
+}
+.nw-bar-menu {
+  display: grid;
+  gap: 2px;
+  min-width: 190px;
+  padding: 6px;
+}
+.nw-bar-place {
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ui-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.nw-bar-place:hover {
+  background: var(--ui-hover);
+}
+.nw-bar-place[aria-checked='true'] {
+  background: var(--ui-accent-soft, rgb(79 107 216 / 14%));
+}
+/* The strips the bars sit in, beside or under the panels. A side strip is a multiple of 4 pixels wide, so the panels
+   beside it start on a whole screen pixel at 100 to 200 % (the pen needs it). */
+.nw-bar-strip {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  gap: 8px;
+  align-items: center;
+  overflow: hidden;
+  background: var(--ui-surface);
+}
+/* Down a side it scrolls only up and down, when the window is shorter than the bar, with a slim thumb seen only with the
+   pointer over the strip. */
+.nw-bar-strip[data-side='left'],
+.nw-bar-strip[data-side='right'] {
+  flex-direction: column;
+  width: 68px;
+  padding: 8px 0;
+  overflow: hidden auto;
+}
+/* Too short for its bars (layout/stripFit.ts): first shorter buttons, then bars in more columns, side by side. */
+.nw-bar-strip[data-fit='short'] :is(.nw-ibtn, .nw-tool, .nw-select-wrap):not(:is(.nw-popover, .nw-font-library, .nw-table-grid, .nw-dropdown) *) {
+  height: 32px;
+}
+.nw-bar-strip[data-fit='short'] > .nw-bar > .nw-bar-grip {
+  height: 28px;
+}
+.nw-bar-strip[data-fit='short'] > .nw-bar > * > .nw-sep {
+  margin: 3px 0;
+}
+.nw-bar-strip[data-fit='short'] > .nw-bar > :is(.nw-toolstrip, .nw-formatbar) {
+  gap: 1px;
+}
+.nw-bar-strip[data-fit='short'] > .nw-bar > .nw-formatbar {
+  padding-block: 4px;
+}
+.nw-bar-strip[data-fit='columns'] {
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: center;
+  padding-inline: 4px;
+}
+.nw-bar-strip[data-fit='columns'] > .nw-bar {
+  flex: none;
+  max-width: none;
+}
+.nw-bar-strip::-webkit-scrollbar {
+  width: 6px;
+}
+.nw-bar-strip::-webkit-scrollbar-thumb {
+  border-width: 1px;
+  background-color: transparent;
+}
+.nw-bar-strip:hover::-webkit-scrollbar-thumb {
+  background-color: var(--ui-border-strong);
+}
+.nw-bar-strip[data-side='left'] {
+  border-right: 1px solid var(--ui-border);
+}
+.nw-bar-strip[data-side='right'] {
+  border-left: 1px solid var(--ui-border);
+}
+.nw-bar-strip[data-side='bottom'] {
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 4px 8px;
+  border-top: 1px solid var(--ui-border);
+}
+
+/* Buttons: 40 px, for a finger or a pen as well as a mouse. */
+.nw-ibtn,
+.nw-tool,
+.nw-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ui-text-2);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+.nw-ibtn:hover:not(:disabled),
+.nw-tool:hover:not(:disabled),
+.nw-chip:hover:not(:disabled) {
+  background: var(--ui-hover);
+  color: var(--ui-text);
+}
+.nw-ibtn[aria-pressed='true'],
+.nw-ibtn[aria-checked='true'],
+.nw-chip[aria-pressed='true'],
+.nw-ibtn[aria-expanded='true'] {
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent-text);
+}
+.nw-ibtn:disabled,
+.nw-chip:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+.nw-text-btn {
+  min-width: 40px;
+  font-size: 13px;
+  font-weight: 650;
+}
+.nw-chip {
+  padding: 0 12px;
+  border: 1px solid var(--ui-border);
+}
+
+/* The tools: tiles in a tray, the one in use filled with the accent. The greyed ones wait for phase 3. */
+.nw-tools {
+  gap: 3px;
+  padding: 3px;
+  border-radius: 14px;
+  background: var(--ui-surface-2);
+}
+.nw-tool {
+  width: 44px;
+  padding: 0;
+}
+.nw-tool[aria-checked='true'] {
+  background: var(--ui-accent);
+  color: var(--ui-on-accent);
+  box-shadow: var(--ui-shadow-1);
+}
+.nw-tool[aria-checked='true']:hover {
+  background: var(--ui-accent-hover);
+  color: var(--ui-on-accent);
+}
+
+.nw-select {
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+  cursor: pointer;
+}
+.nw-select:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Colours: round swatches, each a 40 px target in the colour panel. */
+.nw-swatch {
+  position: relative;
+  width: 28px;
+  min-width: 28px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.nw-swatch::before {
+  content: '';
+  position: absolute;
+  inset: 10px 4px;
+  border-radius: 50%;
+  background: var(--swatch);
+  /* A thin ring, so the dark ink swatch shows on a dark bar too. */
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.12),
+    0 0 0 1px var(--ui-border-strong);
+}
+.nw-swatch[aria-pressed='true']::before {
+  box-shadow:
+    0 0 0 2px var(--ui-surface),
+    0 0 0 4px var(--ui-accent);
+}
+.nw-swatch:hover:not(:disabled)::before {
+  filter: brightness(0.92);
+}
+.nw-swatch:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+.nw-swatch[data-swatch='ink'] {
+  --swatch: var(--nw-ink);
+}
+.nw-swatch[data-swatch='gray'] {
+  --swatch: var(--nw-gray);
+}
+.nw-swatch[data-swatch='red'] {
+  --swatch: var(--nw-red);
+}
+.nw-swatch[data-swatch='orange'] {
+  --swatch: var(--nw-orange);
+}
+.nw-swatch[data-swatch='yellow'] {
+  --swatch: var(--nw-yellow);
+}
+.nw-swatch[data-swatch='green'] {
+  --swatch: var(--nw-green);
+}
+.nw-swatch[data-swatch='blue'] {
+  --swatch: var(--nw-blue);
+}
+.nw-swatch[data-swatch='purple'] {
+  --swatch: var(--nw-purple);
+}
+
+/* The description: a field along a bar, a button with the field in a menu down a side (Toolbar.tsx, DescribeField). */
+.nw-describe-along {
+  display: inline-flex;
+}
+.nw-describe-down {
+  display: none;
+}
+.nw-bar[data-dir='column'] .nw-describe-along {
+  display: none;
+}
+.nw-bar[data-dir='column'] .nw-describe-down {
+  display: inline-flex;
+}
+.nw-describe-along,
+.nw-describe {
+  min-width: 0;
+  max-width: 100%;
+}
+.nw-describe {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ui-text-2);
+  font-size: 13px;
+}
+.nw-describe input {
+  /* Narrower on a phone rather than running out of the bar. */
+  flex: 0 1 18em;
+  min-width: 0;
+  width: 18em;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+}
+
+/* ----- pop-overs: own colours, the paper, the font library, a table's size and delete menu ----- */
+
+.nw-popover-anchor,
+.nw-font-menu,
+.nw-table-picker,
+.nw-menu-anchor {
+  position: relative;
+  display: inline-flex;
+}
+.nw-popover,
+.nw-font-library,
+.nw-table-grid,
+.nw-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 30;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: var(--ui-shadow-3);
+  font: 13px/1.4 var(--ui-font);
+}
+
+.nw-colour-button {
+  gap: 2px;
+  padding: 0 6px;
+}
+.nw-colour-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 0.12),
+    0 0 0 1px var(--ui-border-strong);
+}
+/* The colour panel, laid out as Word's: ten 40 px columns. */
+.nw-colour-panel {
+  width: 422px;
+}
+.nw-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: -4px -4px 4px 2px;
+  color: var(--ui-text-2);
+  font-weight: 600;
+}
+.nw-panel-label {
+  margin: 10px 2px 4px;
+  color: var(--ui-text-3);
+  font-size: 12px;
+}
+.nw-colour-grid {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 40px));
+}
+/* The eight note colours over their shades, in wider columns across the same width. */
+.nw-note-colours {
+  grid-template-columns: repeat(8, minmax(0, 50px));
+}
+.nw-note-colours > :nth-child(-n + 8) {
+  margin-bottom: 6px;
+}
+.nw-colour-grid .nw-swatch {
+  width: auto;
+  min-width: 0;
+  height: 40px;
+}
+.nw-colour-grid .nw-swatch::before {
+  inset: 50% auto auto 50%;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  transform: translate(-50%, -50%);
+}
+.nw-wide-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 40px;
+  margin-top: 4px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ui-text);
+  font: inherit;
+  cursor: pointer;
+}
+.nw-wide-choice:hover {
+  background: var(--ui-hover);
+}
+.nw-wide-choice[aria-pressed='true'] {
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent-text);
+}
+
+/* More colours: the colour field, the hue slider, and boxes for red, green, blue and the code. */
+.nw-colour-field {
+  position: relative;
+  height: 180px;
+  border-radius: 10px;
+  background:
+    linear-gradient(to top, #000, transparent),
+    linear-gradient(to right, #fff, var(--hue));
+  touch-action: none;
+  cursor: crosshair;
+}
+.nw-colour-field:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+.nw-field-marker {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.5);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.nw-hue {
+  width: 100%;
+  height: 40px;
+  margin: 6px 0 2px;
+  background: transparent;
+  appearance: none;
+  cursor: pointer;
+}
+.nw-hue::-webkit-slider-runnable-track {
+  height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+.nw-hue::-moz-range-track {
+  height: 14px;
+  border-radius: 7px;
+  background: linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+.nw-hue::-webkit-slider-thumb {
+  width: 22px;
+  height: 22px;
+  margin-top: -4px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.5);
+  appearance: none;
+}
+.nw-hue::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.5);
+}
+.nw-colour-boxes,
+.nw-colour-hex {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+.nw-colour-boxes label,
+.nw-colour-hex label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  color: var(--ui-text-2);
+}
+.nw-colour-boxes input,
+.nw-colour-hex input {
+  width: 0;
+  flex: 1;
+  height: 40px;
+  padding: 0 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+}
+.nw-colour-hex input[aria-invalid='true'] {
+  border-color: var(--nw-red);
+}
+/* New and Current, side by side as one split box, each named under it. */
+.nw-colour-compare {
+  display: flex;
+  margin-top: 14px;
+}
+.nw-colour-compare > span {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--ui-text-3);
+  font-size: 11px;
+  line-height: 1;
+}
+.nw-colour-compare > span > span {
+  width: 52px;
+  height: 30px;
+  box-shadow: 0 0 0 1px var(--ui-border-strong);
+}
+.nw-colour-compare > span:first-child > span {
+  border-radius: 8px 0 0 8px;
+}
+.nw-colour-compare > span:last-child > span {
+  border-radius: 0 8px 8px 0;
+}
+.nw-dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+.nw-chip-primary {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent);
+  color: var(--ui-on-accent);
+}
+.nw-chip-primary:hover:not(:disabled) {
+  background: var(--ui-accent);
+  color: var(--ui-on-accent);
+  filter: brightness(1.08);
+}
+
+.nw-paper-menu {
+  width: 300px;
+}
+.nw-paper-choices {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.nw-paper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ui-text-2);
+  font: inherit;
+  cursor: pointer;
+}
+.nw-paper:hover {
+  background: var(--ui-hover);
+}
+.nw-paper[aria-pressed='true'] {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent-text);
+}
+.nw-paper-sample {
+  width: 46px;
+  height: 62px;
+  border-radius: 6px;
+  background-color: #fff;
+  box-shadow: var(--ui-shadow-1);
+}
+.nw-paper-sample[data-bg='ruled'] {
+  background-image: repeating-linear-gradient(to bottom, transparent 0 7px, var(--nw-rule) 7px 8px);
+}
+.nw-paper-sample[data-bg='grid'] {
+  background-image:
+    linear-gradient(var(--nw-rule) 1px, transparent 1px),
+    linear-gradient(90deg, var(--nw-rule) 1px, transparent 1px);
+  background-size: 6px 6px;
+}
+.nw-paper-sample[data-bg='dots'] {
+  background-image: radial-gradient(circle, #9fb4cf 1px, transparent 1.4px);
+  background-size: 6px 6px;
+}
+.nw-segmented {
+  display: flex;
+  padding: 3px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface-2);
+}
+.nw-segmented button {
+  flex: 1;
+  height: 36px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ui-text-2);
+  font: inherit;
+  cursor: pointer;
+}
+.nw-segmented button[aria-checked='true'] {
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: var(--ui-shadow-1);
+}
+
+/* ----- the font menu and library ----- */
+
+.nw-font-library {
+  width: 22em;
+  max-height: 60vh;
+  padding: 0;
+  overflow: auto;
+}
+.nw-font-library-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--ui-text-2);
+}
+.nw-font-library button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface-2);
+  color: var(--ui-text);
+  font: inherit;
+  cursor: pointer;
+}
+.nw-font-library button[aria-pressed='true'] {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent-text);
+}
+.nw-font-library ul {
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+}
+.nw-font-library li {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+}
+.nw-font-sample {
+  font-size: 16px;
+}
+.nw-font-like {
+  color: var(--ui-text-3);
+  font-size: 12px;
+}
+
+/* ----- tables, the Word way: a grid to pick the size, the table's tools, and its right-click menu ----- */
+
+.nw-table-size {
+  margin-bottom: 8px;
+  color: var(--ui-text-2);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.nw-pick-cells {
+  display: grid;
+  gap: 2px;
+}
+.nw-pick-cell {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 3px;
+  background: var(--ui-surface);
+  cursor: pointer;
+}
+.nw-pick-cell[data-on],
+.nw-pick-cell:hover {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+}
+.nw-dropdown {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 12em;
+  padding: 6px;
+}
+.nw-dropdown button,
+.nw-table-menu button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ui-text);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.nw-dropdown button:hover,
+.nw-table-menu button:hover {
+  background: var(--ui-hover);
+}
+.nw-table-menu {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-width: 12em;
+  padding: 6px;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: var(--ui-shadow-3);
+  font: 13px/1.4 var(--ui-font);
+}
+/* A line above the deletes, and above the header row. */
+.nw-table-menu button[data-action='deleteRow'] {
+  margin-top: 4px;
+  border-top: 1px solid var(--ui-border);
+  border-radius: 0 0 8px 8px;
+}
+.nw-table-menu button[data-action='header'] {
+  margin-top: 4px;
+  border-top: 1px solid var(--ui-border);
+}
+
+/* The table style menu: each look shown on a small table. */
+.nw-look-menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+}
+.nw-look-menu button[aria-checked='true'] {
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent-text);
+}
+.nw-look-sample {
+  display: inline-block;
+  width: 36px;
+  padding: 2px;
+  border-radius: 4px;
+  background: #fff;
+}
+.nw-look-sample table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.nw-look-sample td {
+  height: 6px;
+  padding: 0;
+  border: 1px solid #c9d0d9;
+}
+.nw-look-sample[data-look='lines'] td,
+.nw-look-sample[data-look='header'] td {
+  border-width: 0 0 1px;
+}
+
+/* ----- the AI: the ✨ button, the prompt box, the toast and the side panels ----- */
+
+.nw-ai-button {
+  position: fixed;
+  z-index: 40;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface);
+  color: var(--ui-accent-text);
+  box-shadow: var(--ui-shadow-2);
+  cursor: pointer;
+}
+.nw-ai-button:hover {
+  background: var(--ui-accent-soft);
+}
+.nw-ai-box {
+  position: fixed;
+  z-index: 41;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: var(--ui-shadow-3);
+  font: 13px/1.4 var(--ui-font);
+}
+.nw-ai-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.nw-ai-head .nw-segmented {
+  flex: none;
+  width: 150px;
+}
+.nw-ai-hint {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  padding-left: 6px;
+  color: var(--ui-text-3);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.nw-ai-ask {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+.nw-ai-ask textarea {
+  flex: 1;
+  box-sizing: border-box;
+  min-height: 44px;
+  max-height: 160px;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 10px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: 14px/1.4 var(--ui-font);
+  resize: vertical;
+}
+.nw-ai-ask textarea:focus {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: -1px;
+}
+.nw-ai-send {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--ui-accent);
+  color: var(--ui-on-accent);
+  cursor: pointer;
+}
+.nw-ai-send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.nw-ai-send[data-stop] {
+  background: var(--ui-text);
+  color: var(--ui-surface);
+}
+.nw-ai-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--ui-info-bg);
+  color: var(--ui-info-text);
+}
+/* An answer as it is written, in Ask: its last lines, the newest at the foot. */
+.nw-ai-partial {
+  display: flex;
+  flex-direction: column-reverse;
+  max-height: 7.5em;
+  margin: 0;
+  overflow: hidden;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font-size: 0.92em;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+.nw-ai-status[data-tone='error'] {
+  background: var(--ui-error-bg);
+  color: var(--ui-error-text);
+}
+/* The ⚡ line: what code will do with no model, said as the request is typed; a likely reading is a button to take it. */
+.nw-ai-instant {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 0;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 10px;
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent-text);
+  font: inherit;
+  font-size: 0.92em;
+  text-align: left;
+}
+.nw-ai-instant svg {
+  flex: none;
+}
+button.nw-ai-instant {
+  cursor: pointer;
+}
+button.nw-ai-instant:hover {
+  outline: 1px solid var(--ui-accent);
+}
+.nw-ai-instant kbd {
+  font: inherit;
+  font-weight: 600;
+}
+.nw-spin {
+  flex: none;
+  animation: nw-spin 0.9s linear infinite;
+}
+@keyframes nw-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.nw-ai-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(620px, calc(100% - 32px));
+  padding: 6px 6px 6px 8px;
+  border-radius: 14px;
+  background: var(--ui-toast);
+  color: var(--ui-toast-text);
+  box-shadow: var(--ui-shadow-3);
+  font: 13px/1.4 var(--ui-font);
+  transform: translateX(-50%);
+}
+.nw-ai-toast[data-tone='error'] {
+  padding-left: 16px;
+  background: var(--ui-danger);
+  color: #fff;
+}
+.nw-ai-toast .nw-ibtn {
+  min-width: 32px;
+  height: 32px;
+  color: inherit;
+}
+.nw-ai-toast-action {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ui-toast-action);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* The side panels, beside the desk: the answer to an Ask, and the AI log. The app places them. */
+.nw-side {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 10px;
+  width: 360px;
+  height: 100%;
+  overflow-y: auto;
+  padding: 12px 14px 20px;
+  border-left: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: 13px/1.45 var(--ui-font);
+}
+.nw-side-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.nw-side-head h2 {
+  margin: 0;
+  font-size: 15px;
+}
+.nw-side-question {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--ui-surface-2);
+  color: var(--ui-text-2);
+}
+.nw-side-meta {
+  margin: 0;
+  color: var(--ui-text-3);
+  font-size: 12px;
+}
+.nw-side-said {
+  margin: 0;
+  color: var(--ui-text-2);
+}
+.nw-side-said:empty {
+  display: none;
+}
+.nw-side-actions {
+  display: flex;
+  gap: 8px;
+}
+.nw-side-button {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 10px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+  font-weight: 550;
+  cursor: pointer;
+}
+.nw-side-button:hover:not(:disabled) {
+  background: var(--ui-hover);
+}
+.nw-side-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.nw-answer {
+  counter-reset: nw-answer;
+}
+.nw-answer p {
+  margin: 0 0 6px;
+}
+.nw-answer p[data-role='li']::before {
+  content: '• ';
+}
+.nw-answer p[data-role='oli'] {
+  counter-increment: nw-answer;
+}
+.nw-answer p[data-role='oli']::before {
+  content: counter(nw-answer) '. ';
+}
+.nw-answer table {
+  margin: 4px 0 8px;
+  border-collapse: collapse;
+}
+.nw-answer th,
+.nw-answer td {
+  padding: 3px 8px;
+  border: 1px solid var(--ui-border-strong);
+  text-align: left;
+}
+.nw-answer pre {
+  margin: 0 0 6px;
+  font: 12px/1.4 var(--nw-mono);
+  white-space: pre-wrap;
+}
+.nw-log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nw-log-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+}
+.nw-log-top,
+.nw-log-used {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  color: var(--ui-text-3);
+  font-size: 12px;
+}
+.nw-log-top span:last-child {
+  margin-left: auto;
+  color: var(--ui-text-2);
+}
+.nw-log-entry[data-result='failed'] .nw-log-top span:last-child {
+  color: var(--ui-danger);
+}
+.nw-log-request {
+  margin: 0;
+}
+.nw-log-error {
+  margin: 0;
+  color: var(--ui-error-text);
+  font-size: 12px;
+}
+.nw-log-entry .nw-side-button {
+  align-self: flex-start;
+  min-height: 32px;
+}
+
+/* The prompt box's own tools: speak the request, send a picture with it. */
+.nw-ai-tool {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ui-text-2);
+  cursor: pointer;
+}
+.nw-ai-tool:hover:not(:disabled) {
+  background: var(--ui-hover);
+  color: var(--ui-text);
+}
+.nw-ai-tool:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* Listening: red while the browser hears the request. */
+.nw-ai-tool[aria-pressed='true'] {
+  background: var(--ui-error-bg);
+  color: var(--ui-danger);
+}
+.nw-ai-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 6px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-surface-2);
+  font-size: 12.5px;
+}
+.nw-ai-chip img {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+.nw-ai-chip span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.nw-ai-chip .nw-ibtn {
+  min-width: 32px;
+  height: 32px;
+}
+
+/* ----- the pen ----- */
+
+/* The ink tools take every press on the pages: fingers scroll and zoom through them (ink/PenLayer.tsx). */
+.nw-desk[data-tool='pen'],
+.nw-desk[data-tool='highlighter'],
+.nw-desk[data-tool='eraser'] {
+  touch-action: none;
+}
+/* The pen's cursor is a dot as wide as it draws, in its colour; the eraser's, its ring (ink/PenLayer.tsx).
+   The desk too: while the pen is down its events go to the desk, which then gives the cursor. */
+.nw-desk[data-tool='pen'],
+.nw-desk[data-tool='highlighter'],
+.nw-desk[data-tool='eraser'],
+.nw-desk[data-tool='pen'] .nw-page,
+.nw-desk[data-tool='pen'] .nw-page *,
+.nw-desk[data-tool='highlighter'] .nw-page,
+.nw-desk[data-tool='highlighter'] .nw-page *,
+.nw-desk[data-tool='eraser'] .nw-page,
+.nw-desk[data-tool='eraser'] .nw-page * {
+  cursor: var(--nw-pen-cursor, crosshair) !important;
+  /* Safari reads only the prefixed one: without it a long press on an iPad selected icons all over the page. */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-user-drag: none;
+}
+/* The stroke being written, over the pages, until the page draws it. */
+.nw-live-ink {
+  position: fixed;
+  z-index: 5;
+  pointer-events: none;
+}
+.nw-width-dot,
+.nw-eraser-dot {
+  display: block;
+  border-radius: 50%;
+  background: currentColor;
+}
+.nw-eraser-dot {
+  background: transparent;
+  box-shadow: 0 0 0 1.5px currentColor;
+}
+.nw-penbar .nw-segmented button {
+  padding: 0 12px;
+  white-space: nowrap;
+}
+/* ----- the workspace: panels docked like Obsidian's ----- */
+
+/* Each panel drawn at the place its layout gives it (layout/tree.ts), in one flat list. No borders on the panels: the
+   edges between them draw the lines, so the notes start on a whole screen pixel (4-pixel steps) where the pen needs it. */
+.nw-dock {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.nw-dock-panel {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.nw-dock-panel > * {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+/* Floating: over the others, never under anything of ours (YouTube's terms). */
+.nw-dock-panel[data-floating] {
+  z-index: 40;
+  border-radius: 12px;
+  box-shadow: var(--ui-shadow-3);
+}
+/* Out of sight while another is in full view: kept, so a video is not made again. */
+.nw-dock-panel[data-hidden] {
+  visibility: hidden;
+  pointer-events: none;
+}
+/* The edge between two panels: a line, and 8 pixels to take hold of. */
+.nw-dock-splitter {
+  position: absolute;
+  z-index: 30;
+  touch-action: none;
+}
+.nw-dock-splitter[data-dir='row'] {
+  width: 8px !important;
+  margin-left: -4px;
+  cursor: ew-resize;
+}
+.nw-dock-splitter[data-dir='column'] {
+  height: 8px !important;
+  margin-top: -4px;
+  cursor: ns-resize;
+}
+.nw-dock-splitter::after {
+  position: absolute;
+  background: var(--ui-border);
+  content: '';
+}
+.nw-dock-splitter[data-dir='row']::after {
+  top: 0;
+  bottom: 0;
+  left: 4px;
+  width: 1px;
+}
+.nw-dock-splitter[data-dir='column']::after {
+  top: 4px;
+  right: 0;
+  left: 0;
+  height: 1px;
+}
+.nw-dock-splitter:hover::after,
+.nw-dock-splitter:active::after {
+  background: var(--ui-accent, #4f6bd8);
+}
+/* While dragging, the players let the pointer through. */
+.nw-dock[data-dragging] iframe,
+.nw-dock[data-dragging] video {
+  pointer-events: none;
+}
+/* A panel dragged: its outline under the pointer, and where it would go. */
+.nw-dock-ghost {
+  position: absolute;
+  z-index: 50;
+  border: 2px dashed var(--ui-accent, #4f6bd8);
+  border-radius: 10px;
+  pointer-events: none;
+}
+.nw-dock-drop {
+  position: absolute;
+  z-index: 49;
+  border: 2px solid var(--ui-accent, #4f6bd8);
+  border-radius: 8px;
+  background: rgb(79 107 216 / 18%);
+  pointer-events: none;
+}
+/* A panel's bar: dragged to move the panel; 32 pixels, a multiple of 4. */
+/* The bar is 32 pixels high: its buttons, at 40, were cut off at both edges. */
+.nw-dock-bar .nw-ibtn {
+  height: 28px;
+}
+.nw-dock-bar {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 6px 0 10px;
+  border-bottom: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  cursor: grab;
+  user-select: none;
+}
+.nw-dock-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ui-text-2);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* Full screen, at the notes' bottom right, clear of the scrollbar. */
+.nw-full-screen {
+  position: absolute;
+  right: 24px;
+  bottom: 20px;
+  z-index: 6;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface);
+  color: var(--ui-text-2);
+  box-shadow: var(--ui-shadow-2);
+  cursor: pointer;
+}
+.nw-full-screen:hover,
+.nw-full-screen:focus-visible {
+  color: var(--ui-text);
+}
+.nw-notes-panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.nw-notes-panel > .pages-area {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+/* The program panel (other programs inside ShellNote, stage 2): its bar, and the body the program's own window is
+   kept on, edge to edge; the border's colour is also the frame Windows draws round the program. */
+.nw-program {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+/* The mark that lines are keeping this program's place: always shown while they are. */
+.nw-program-keeping {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--ui-accent, #6d6df0);
+}
+.nw-program-name {
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--ui-text-2);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nw-program-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--ui-border-strong);
+  border-top: 0;
+}
+.nw-program-body[data-state='held'],
+.nw-program-body[data-state='covered'] {
+  overflow: hidden;
+  border: 0;
+}
+/* A program's live picture (stage 3): over the panel, its shape kept. Under the window itself while it is seen there,
+   shown while something of ShellNote covers it; none until its first frame, the program's title showing then. */
+.nw-program-picture {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: var(--ui-surface-2);
+}
+.nw-program-body[data-state='held'] .nw-program-picture,
+.nw-program-picture:not([data-drawn]) {
+  visibility: hidden;
+}
+.nw-program-standin {
+  display: grid;
+  height: 100%;
+  margin: 0;
+  padding: 16px;
+  place-items: center;
+  background: var(--ui-surface-2);
+  color: var(--ui-text-2);
+  font-size: 13px;
+}
+.nw-program-choose {
+  padding: 8px 12px;
+  font-size: 13px;
+}
+.nw-program-hint,
+.nw-program-note {
+  margin: 4px 0 8px;
+  color: var(--ui-text-2);
+}
+.nw-program-back {
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 6px;
+  padding: 2px 8px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+  cursor: pointer;
+}
+.nw-program-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* Each window: its program's icon, then its title over its program's file. */
+.nw-program-list li {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.nw-program-list button {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
+  width: 100%;
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: none;
+  color: var(--ui-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.nw-program-list li > button:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* Show its picture, at the row's end. */
+.nw-program-list .nw-program-see {
+  display: grid;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  place-items: center;
+  color: var(--ui-text-2);
+}
+.nw-program-list button:hover:not(:disabled) {
+  background: var(--ui-hover);
+}
+.nw-program-list button:disabled {
+  color: var(--ui-text-2);
+  cursor: default;
+  opacity: 0.6;
+}
+.nw-program-icon {
+  grid-row: 1 / span 2;
+  width: 20px;
+  height: 20px;
+  color: var(--ui-text-2);
+}
+.nw-program-title {
+  grid-column: 2;
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nw-program-file {
+  grid-column: 2;
+  color: var(--ui-text-2);
+  font-size: 12px;
+}
+/* The side panel: its bar, a row of tabs, and the tab open. */
+.nw-side-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+.nw-side-tabs {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--ui-border);
+}
+.nw-side-tab {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ui-text-2);
+  font: 13px var(--ui-font);
+  cursor: pointer;
+}
+.nw-side-tab:hover {
+  background: var(--ui-hover);
+}
+.nw-side-tab[aria-selected='true'],
+.nw-side-tab[aria-checked='true'] {
+  background: var(--ui-accent-soft, rgb(79 107 216 / 14%));
+  color: var(--ui-text);
+}
+.nw-side-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px;
+}
+
+/* The side panel's tabs: the timer, and a web page filling what is left of the panel. */
+.nw-timer {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+.nw-timer-modes,
+.nw-timer-presets,
+.nw-timer-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+.nw-timer-time {
+  font: 600 44px/1.1 var(--ui-font);
+  font-variant-numeric: tabular-nums;
+}
+.nw-timer-time[data-done] {
+  color: var(--ui-accent, #4f6bd8);
+  font-size: 28px;
+}
+.nw-timer-own input {
+  width: 64px;
+  height: 32px;
+  padding: 0 6px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+}
+.nw-timer-presets [aria-pressed='true'] {
+  border-color: var(--ui-accent, #4f6bd8);
+}
+/* The transcript: its lines, each a button playing from its time; the line playing marked. */
+.nw-transcript,
+.nw-transcript-paste {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+.nw-transcript-paste textarea,
+.nw-transcript-find {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: 13px/1.4 var(--ui-font);
+}
+.nw-transcript-paste textarea {
+  flex: 1 1 auto;
+  min-height: 120px;
+  resize: none;
+}
+.nw-transcript-lines {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  overflow: auto;
+  padding: 0;
+  list-style: none;
+}
+.nw-transcript-lines button {
+  display: block;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ui-text);
+  font: 13px/1.4 var(--ui-font);
+  text-align: left;
+  cursor: pointer;
+}
+.nw-transcript-lines button:hover {
+  background: var(--ui-hover);
+}
+.nw-transcript-lines button[aria-current='true'] {
+  background: var(--ui-accent-soft, rgb(79 107 216 / 14%));
+}
+.nw-transcript-time {
+  color: var(--ui-text-2);
+  font-variant-numeric: tabular-nums;
+}
+/* The Output: its two views, and the AI's answer and log as they were in their own panel, now inside it. */
+.nw-output {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.nw-output .nw-timer-modes {
+  justify-content: flex-start;
+}
+.nw-output-view .nw-side {
+  box-sizing: border-box;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  padding: 0 0 12px;
+  border: 0;
+  background: none;
+}
+
+/* The AI tab as a chat, after the person's notes RAG app: the conversation scrolls, the composer stays at the foot. */
+.nw-side-body:has(> .nw-chat) {
+  overflow: hidden;
+  padding: 0;
+}
+.nw-chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.nw-chat-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 14px 8px;
+}
+.nw-chat-hero {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 100%;
+  padding-bottom: 8px;
+  text-align: center;
+}
+.nw-chat-hero h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.nw-chat-hero p {
+  margin: 8px 0 0;
+  color: var(--ui-text-2);
+  font-size: 13px;
+}
+.nw-turn {
+  margin: 0 0 22px;
+  animation: nw-rise 0.3s ease;
+}
+.nw-turn-q {
+  margin: 0 0 10px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.nw-turn-pic {
+  max-width: 100%;
+  max-height: 140px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+}
+.nw-turn-a {
+  font-size: 14px;
+  line-height: 1.65;
+}
+.nw-turn-a p {
+  margin: 0 0 10px;
+  white-space: pre-wrap;
+}
+.nw-turn-a ul {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+.nw-turn-note {
+  margin: 8px 0 0;
+  color: var(--ui-text-2);
+  font-size: 13px;
+}
+.nw-turn-err {
+  color: var(--ui-danger, #d93025);
+}
+/* The dotted thinking orb (thinking-orbs, MIT), with what it waits for. */
+.nw-orb {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ui-text-2);
+  font-size: 13px;
+}
+.nw-orb canvas {
+  flex-shrink: 0;
+}
+.nw-chat-foot {
+  flex: none;
+  padding: 0 12px 12px;
+}
+.nw-chat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 4px 6px 4px 4px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-surface-2);
+  font-size: 12px;
+}
+.nw-chat-chip img {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+}
+.nw-chat-chip button {
+  display: grid;
+  padding: 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+.nw-chat-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 7px 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 16px;
+  background: var(--ui-surface-2);
+  transition: border-color 0.15s;
+}
+.nw-chat-composer:focus-within {
+  border-color: var(--ui-text-2);
+}
+.nw-chat-composer textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-height: 160px;
+  padding: 7px 2px;
+  border: 0;
+  background: none;
+  color: var(--ui-text);
+  font: 14px/1.5 var(--ui-font);
+  outline: none;
+  resize: none;
+}
+.nw-chat-composer textarea::placeholder {
+  color: var(--ui-text-2);
+}
+.nw-chat-icon,
+.nw-chat-send {
+  display: grid;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.nw-chat-icon {
+  background: none;
+  color: var(--ui-text-2);
+}
+.nw-chat-icon:hover {
+  background: var(--ui-hover);
+  color: var(--ui-text);
+}
+.nw-chat-send {
+  background: var(--ui-text);
+  color: var(--ui-surface);
+}
+.nw-chat-send:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.nw-chat-plus {
+  position: relative;
+}
+.nw-chat-menu {
+  top: auto;
+  bottom: calc(100% + 6px);
+  left: 0;
+  display: grid;
+  gap: 2px;
+  min-width: 200px;
+  padding: 6px;
+}
+.nw-chat-menu .nw-bar-place {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.nw-chat-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.nw-chat-pills button {
+  padding: 6px 14px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: 500 12.5px var(--ui-font);
+  cursor: pointer;
+}
+.nw-chat-pills button:hover {
+  background: var(--ui-hover);
+}
+.nw-chat-pills button[aria-checked='true'] {
+  border-color: var(--ui-text-2);
+  background: var(--ui-surface-2);
+}
+.nw-chat-pills-small {
+  margin-top: 6px;
+}
+.nw-chat-pills-small button {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.nw-chat-small {
+  margin-top: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: 12px var(--ui-font);
+  cursor: pointer;
+}
+.nw-chat-later {
+  margin: 8px 0 0;
+  color: var(--ui-text-2);
+  font-size: 11px;
+  text-align: center;
+}
+@keyframes nw-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nw-turn {
+    animation: none;
+  }
+}
+
+/* The scratch pad: what the AI made, each with its preview, put into the note or dragged onto a page. */
+.nw-made {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nw-made-item {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-surface);
+  cursor: grab;
+}
+.nw-made-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ui-text-2);
+  font-size: 12px;
+}
+.nw-made-about {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nw-made-table {
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.nw-made-table th,
+.nw-made-table td {
+  padding: 2px 6px;
+  border: 1px solid var(--ui-border);
+}
+.nw-made-text {
+  margin: 0;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+.nw-made-item .nw-diagram {
+  max-height: 240px;
+  margin: 0;
+  overflow: auto;
+}
+
+/* The description: the creator's words, a chapter's time a button. */
+.nw-description {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.nw-description-title {
+  margin: 0;
+  font-size: 15px;
+}
+.nw-description-text p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.nw-description-chapter {
+  display: block;
+  width: 100%;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ui-text);
+  font: 13px/1.45 var(--ui-font);
+  text-align: left;
+  cursor: pointer;
+}
+.nw-description-chapter:hover {
+  background: var(--ui-hover);
+}
+.nw-description-forget {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+.nw-web {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+}
+.nw-web-page {
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 200px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+/* ----- the video beside the note ----- */
+
+.nw-video {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--ui-border);
+  background: #000;
+}
+.nw-video[data-floating] {
+  border-radius: 12px;
+}
+.nw-video[data-floating] .nw-video-bar {
+  border-radius: 11px 11px 0 0;
+}
+.nw-video[data-floating] .nw-video-body {
+  border-radius: 0 0 11px 11px;
+}
+.nw-video-bar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  height: 36px;
+  padding: 0 6px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  user-select: none;
+}
+.nw-video-bar {
+  cursor: grab;
+}
+/* A narrow panel: the title gives way first, then the buttons narrow, and none runs out of the panel where it could not be pressed.
+   32 pixels high: the bar is 36, and 40 was cut off at both edges. */
+.nw-video-bar .nw-ibtn {
+  flex: 0 1 40px;
+  width: 40px;
+  min-width: 18px;
+  height: 32px;
+  padding: 0;
+}
+.nw-video-title {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nw-video-places {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: inline-flex;
+}
+/* A YouTube video on an iPad, waiting for the tap only its own button can take (VideoPanel.tsx): above the player, never on it. */
+.nw-video-tap {
+  flex: none;
+  margin: 0;
+  padding: 4px 10px;
+  background: var(--ui-accent-soft, rgb(79 107 216 / 14%));
+  color: var(--ui-text);
+  font: 12.5px/1.35 var(--ui-font);
+}
+.nw-video-body {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  /* The body clips, not the panel: the edge handles straddle the panel's border, half outside it. */
+  overflow: hidden;
+}
+.nw-video-player,
+.nw-video-player > *,
+.nw-video-player iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+/* Something of ours over YouTube's player: it steps aside, paused and hidden (stepAside.ts). */
+.nw-video-body[data-covered] .nw-video-player {
+  visibility: hidden;
+}
+.nw-video-aside {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  margin: 0;
+  padding: 16px;
+  place-items: center;
+  color: #ddd;
+  font-size: 13px;
+  text-align: center;
+}
+/* While an edge or the panel is dragged, the player lets the pointer through. */
+.nw-video[data-dragging] .nw-video-body {
+  pointer-events: none;
+}
+/* A video file of the person's own: the part shown, in its own shape, in the middle of the panel. */
+.nw-video-file {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.nw-video-frame {
+  position: relative;
+  flex: none;
+}
+.nw-video-frame video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+/* Cropped: the whole video made bigger and moved, so only the part kept shows. */
+.nw-video-file[data-cropped] .nw-video-frame {
+  overflow: hidden;
+}
+.nw-video-file[data-cropped] video {
+  position: absolute;
+  max-width: none;
+  object-fit: fill;
+}
+.nw-video-seek {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  color: #ddd;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.nw-video-seek input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+/* ⏱ beside a line written beside a video: faint until pointed at; a tap plays the video from there. */
+.nw-video-mark {
+  position: absolute;
+  z-index: 3;
+  padding: 1px 6px;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  background: var(--ui-surface);
+  color: var(--ui-text-2);
+  font: 11px/1.4 var(--ui-font);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  opacity: 0.6;
+  cursor: pointer;
+  transform: translate(calc(-100% - 2mm), -50%);
+}
+.nw-video-mark:hover,
+.nw-video-mark:focus-visible,
+.nw-video-mark:focus-within {
+  color: var(--ui-text);
+  opacity: 1;
+}
+/* A line's ⏱: a button for each time it was written, and × on hover to take the times off. */
+.nw-video-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  cursor: default;
+}
+.nw-video-time button {
+  padding: 1px 6px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.nw-video-time:hover .nw-video-clip-out,
+.nw-video-time:focus-within .nw-video-clip-out {
+  display: inline;
+}
+.nw-video-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+/* A line's ↩: the program's place when it was written, a tap going back there; under the ⏱ of a line written beside both. */
+.nw-program-mark[data-under] {
+  transform: translate(calc(-100% - 2mm), 60%);
+}
+.nw-program-mark button {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.nw-program-moment {
+  position: absolute;
+  z-index: 4;
+  top: 100%;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  max-width: 280px;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  white-space: normal;
+  cursor: default;
+}
+.nw-program-moment img {
+  display: block;
+  max-width: 100%;
+  margin: 4px 0;
+  border: 1px solid var(--ui-border);
+}
+.nw-program-moment .nw-video-clip-out {
+  display: inline;
+  align-self: flex-end;
+}
+/* The words kept of each place of a program, under the transcript. */
+.nw-program-words {
+  margin-top: 12px;
+  font-size: 13px;
+}
+.nw-program-words h3 {
+  margin: 8px 0 4px;
+  font-size: 13px;
+}
+.nw-program-words ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nw-program-words p {
+  margin: 4px 0 10px;
+  color: var(--ui-text-2);
+  white-space: pre-wrap;
+}
+/* ▶ a hard part marked, right of its line: a tap plays it, a drag moves it, × takes it out. */
+.nw-video-clip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  border-color: var(--ui-accent, #4f6bd8);
+  color: var(--ui-text);
+  opacity: 0.85;
+  transform: translate(0, -50%);
+  cursor: default;
+}
+.nw-video-clip button {
+  padding: 1px 6px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  touch-action: none;
+}
+.nw-video-clip-out {
+  display: none;
+  padding: 1px 5px 1px 2px;
+}
+.nw-video-clip:hover .nw-video-clip-out,
+.nw-video-clip:focus-within .nw-video-clip-out {
+  display: inline;
+}
+/* Cropping: the part kept is a box over the whole video, the rest dimmed; moved, or sized by its corners. */
+.nw-crop-box {
+  position: absolute;
+  outline: 2px solid #fff;
+  box-shadow: 0 0 0 9999px rgb(0 0 0 / 55%);
+  cursor: move;
+  touch-action: none;
+}
+.nw-crop-grip {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: #fff;
+  touch-action: none;
+}
+.nw-crop-grip[data-corner='nw'] {
+  top: -7px;
+  left: -7px;
+  cursor: nwse-resize;
+}
+.nw-crop-grip[data-corner='ne'] {
+  top: -7px;
+  right: -7px;
+  cursor: nesw-resize;
+}
+.nw-crop-grip[data-corner='sw'] {
+  bottom: -7px;
+  left: -7px;
+  cursor: nesw-resize;
+}
+.nw-crop-grip[data-corner='se'] {
+  right: -7px;
+  bottom: -7px;
+  cursor: nwse-resize;
+}
+.nw-crop-bar {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  display: flex;
+  gap: 6px;
+  transform: translateX(-50%);
+}
+.nw-video-problem {
+  margin: 0;
+  padding: 16px;
+  color: var(--ui-text-2);
+  font-size: 13px;
+}
+.nw-video-body .nw-video-problem {
+  color: #ddd;
+}
+/* Floating, the panel is sized from any edge or corner: thin grips along its edges, squares at its corners. */
+.nw-video-grip {
+  position: absolute;
+  z-index: 2;
+  touch-action: none;
+}
+.nw-video-grip[data-grip='n'],
+.nw-video-grip[data-grip='s'] {
+  right: 12px;
+  left: 12px;
+  height: 8px;
+  cursor: ns-resize;
+}
+.nw-video-grip[data-grip='e'],
+.nw-video-grip[data-grip='w'] {
+  top: 12px;
+  bottom: 12px;
+  width: 8px;
+  cursor: ew-resize;
+}
+.nw-video-grip[data-grip='n'] {
+  top: -4px;
+}
+.nw-video-grip[data-grip='s'] {
+  bottom: -4px;
+}
+.nw-video-grip[data-grip='e'] {
+  right: -4px;
+}
+.nw-video-grip[data-grip='w'] {
+  left: -4px;
+}
+.nw-video-grip[data-grip='ne'],
+.nw-video-grip[data-grip='nw'],
+.nw-video-grip[data-grip='se'],
+.nw-video-grip[data-grip='sw'] {
+  width: 16px;
+  height: 16px;
+}
+.nw-video-grip[data-grip='nw'] {
+  top: -4px;
+  left: -4px;
+  cursor: nwse-resize;
+}
+.nw-video-grip[data-grip='ne'] {
+  top: -4px;
+  right: -4px;
+  cursor: nesw-resize;
+}
+.nw-video-grip[data-grip='sw'] {
+  bottom: -4px;
+  left: -4px;
+  cursor: nesw-resize;
+}
+.nw-video-grip[data-grip='se'] {
+  right: -4px;
+  bottom: -4px;
+  cursor: nwse-resize;
+}
+.nw-video-menu {
+  right: 0;
+  left: auto;
+  display: grid;
+  gap: 8px;
+  width: 320px;
+}
+.nw-video-link {
+  display: flex;
+  gap: 6px;
+}
+.nw-video-link input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+}
+.nw-video-add,
+.nw-video-pick {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.nw-video-list {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.nw-video-list li {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.nw-video-pick {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nw-video-pick[aria-pressed='true'] {
+  border-color: var(--ui-accent, #4f6bd8);
+}
+/* Recording the note: the red stop chip beside the Video button, the time running. */
+.nw-recording {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  margin-right: 4px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 15px;
+  background: #d93025;
+  color: #fff;
+  font: 600 12px/1 var(--ui-font);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.nw-record-dot {
+  color: #d93025;
+  vertical-align: -1px;
+}
+.nw-video-note {
+  margin: 0;
+  color: var(--ui-text-2);
+  font-size: 12px;
+}
+/* Element Capture records only an element that is a stacking context of its own (record.ts). */
+.nw-desk[data-recording] {
+  isolation: isolate;
+}
+.nw-video-pick em {
+  color: var(--ui-text-2);
+  font-style: normal;
+}
+
+/* The wand up: what to do, and the whole note instead. */
+.nw-tidy-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px;
+  color: var(--ui-text-2);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.nw-tidy-whole {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+  cursor: pointer;
+}
+.nw-pen-panel {
+  right: 0;
+  left: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  width: 300px;
+  /* Never past the bottom of the screen: on a short one, the panel scrolls. */
+  max-height: calc(100vh - 150px);
+  max-height: calc(100dvh - 150px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Nothing in the panel may push it wider than itself: a long choice shrinks, its words cut short. */
+.nw-pen-panel > * {
+  min-width: 0;
+}
+.nw-pen-switch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.nw-pen-switch em {
+  color: var(--ui-text-2);
+  font-style: normal;
+}
+.nw-pen-switch > span {
+  flex: 0 1 auto;
+  white-space: nowrap;
+}
+.nw-pen-switch select {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 62%;
+  text-overflow: ellipsis;
+  height: 34px;
+  padding: 0 6px;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+}
+.nw-pen-reset {
+  height: 34px;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ui-text);
+  font: inherit;
+  cursor: pointer;
+}
+/* The highlighter's colour menu shows its note colours as it draws them. */
+[data-tones='highlighter'] .nw-swatch[data-swatch='ink'] {
+  --swatch: var(--nw-hl-ink);
+}
+[data-tones='highlighter'] .nw-swatch[data-swatch='gray'] {
+  --swatch: var(--nw-hl-gray);
+}
+[data-tones='highlighter'] .nw-swatch[data-swatch='red'] {
+  --swatch: var(--nw-hl-red);
+}
+[data-tones='highlighter'] .nw-swatch[data-swatch='orange'] {
+  --swatch: var(--nw-hl-orange);
+}
+[data-tones='highlighter'] .nw-swatch[data-swatch='yellow'] {
+  --swatch: var(--nw-hl-yellow);
+}
+[data-tones='highlighter'] .nw-swatch[data-swatch='green'] {
+  --swatch: var(--nw-hl-green);
+}
+[data-tones='highlighter'] .nw-swatch[data-swatch='blue'] {
+  --swatch: var(--nw-hl-blue);
+}
+[data-tones='highlighter'] .nw-swatch[data-swatch='purple'] {
+  --swatch: var(--nw-hl-purple);
+}
+.nw-pen-check {
+  margin: 0;
+  color: var(--ui-text-2);
+  font-size: 12px;
+}
+.nw-pen-hand {
+  display: grid;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--ui-border);
+  font-size: 12px;
+}
+.nw-pen-hand p {
+  margin: 0;
+  color: var(--ui-text-2);
+}
+.nw-pen-hand-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.nw-pen-hand-actions a {
+  color: var(--ui-accent-text);
+}
+.nw-pen-hand-actions button {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ui-text);
+  font: inherit;
+  cursor: pointer;
+}
+.nw-pen-symbols {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 8px 0 0;
+  border: 0;
+  border-top: 1px solid var(--ui-border);
+}
+/* Developer mode's rules: one to a line. */
+.nw-pen-rules {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+.nw-pen-rules em {
+  color: var(--ui-text-2);
+  font-size: 12px;
+}
+.nw-pen-symbols legend {
+  width: 100%;
+  padding: 0;
+  margin-bottom: 4px;
+}
+.nw-pen-symbols label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--ui-font);
+}
+
+/*
+ * ----- the terminal: Ctrl+Shift+P, on every screen -----
+ * Docked along the bottom of the window, the app above it made shorter (app.css, .app-area): never over the app,
+ * so the person and the agent see all of it, and a YouTube video, which must have nothing of ours over it, plays on.
+ */
+.nw-terminal {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: clamp(180px, 36vh, 420px);
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: 13px/1.45 var(--ui-font);
+}
+.nw-terminal-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 8px 8px 14px;
+  border-bottom: 1px solid var(--ui-border);
+}
+.nw-terminal-title {
+  font-weight: 600;
+}
+.nw-terminal-hint {
+  flex: 1;
+  color: var(--ui-text-2);
+  font-size: 12px;
+}
+.nw-terminal-close {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ui-text-2);
+  font-size: 18px;
+  cursor: pointer;
+}
+.nw-terminal-close:hover {
+  background: var(--ui-hover);
+}
+.nw-terminal-log {
+  flex: 1;
+  min-height: 120px;
+  overflow: auto;
+  padding: 10px 14px;
+}
+.nw-terminal-empty {
+  margin: 0;
+  color: var(--ui-text-2);
+}
+.nw-terminal-entry {
+  margin: 0 0 6px;
+  font: 12.5px/1.5 'JetBrains Mono', 'Cascadia Mono', Consolas, monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.nw-terminal-you {
+  font-weight: 600;
+}
+.nw-terminal-model {
+  padding: 6px 10px;
+  border-left: 3px solid var(--ui-accent);
+  background: var(--ui-surface-2);
+}
+.nw-terminal-out[data-ok='true'] {
+  color: #1d7a46;
+}
+.nw-terminal-out[data-ok='false'] {
+  color: #b3261e;
+}
+:root[data-theme='dark'] .nw-terminal-out[data-ok='true'] {
+  color: #6fcf97;
+}
+:root[data-theme='dark'] .nw-terminal-out[data-ok='false'] {
+  color: #ff8a80;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .nw-terminal-out[data-ok='true'] {
+    color: #6fcf97;
+  }
+  :root:not([data-theme='light']) .nw-terminal-out[data-ok='false'] {
+    color: #ff8a80;
+  }
+}
+.nw-terminal-note {
+  color: var(--ui-text-2);
+  font-style: italic;
+}
+.nw-terminal-ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-surface-2);
+}
+.nw-terminal-ask p {
+  flex-basis: 100%;
+  margin: 0 0 4px;
+}
+.nw-terminal-input {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 10px;
+  border-top: 1px solid var(--ui-border);
+}
+.nw-terminal-input textarea {
+  flex: 1;
+  min-height: 36px;
+  max-height: 160px;
+  padding: 8px 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 8px;
+  background: var(--ui-bg);
+  color: var(--ui-text);
+  font: 13px/1.4 'JetBrains Mono', 'Cascadia Mono', Consolas, monospace;
+  resize: vertical;
+}

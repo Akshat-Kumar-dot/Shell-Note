@@ -1,0 +1,52 @@
+{
+  "name": "@shellnote/editor",
+  "version": "0.0.0",
+  "private": true,
+  "description": "React components for ShellNote: the page view and its blocks. Core stays the source of truth.",
+  "license": "MIT OR Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./host": "./src/host.ts",
+    "./theme.css": "./src/theme.css",
+    "./fonts.css": "./src/fonts.css"
+  },
+  "dependencies": {
+    "@fontsource/atkinson-hyperlegible": "5.3.0",
+    "@fontsource/caveat": "5.3.0",
+    "@fontsource/eb-garamond": "5.3.0",
+    "@fontsource/fira-code": "5.3.0",
+    "@fontsource/inter": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@fontsource/lexend": "5.3.0",
+    "@fontsource/lora": "5.3.0",
+    "@fontsource/merriweather": "5.3.0",
+    "@fontsource/nunito": "5.3.0",
+    "@fontsource/open-sans": "5.3.0",
+    "@fontsource/opendyslexic": "5.3.0",
+    "@fontsource/patrick-hand": "5.3.0",
+    "@fontsource/playfair-display": "5.3.0",
+    "@fontsource/source-serif-4": "5.3.0",
+    "@tiptap/core": "3.31.3",
+    "@tiptap/extension-bold": "3.31.3",
+    "@tiptap/extension-code": "3.31.3",
+    "@tiptap/extension-highlight": "3.31.3",
+    "@tiptap/extension-italic": "3.31.3",
+    "@tiptap/extension-strike": "3.31.3",
+    "@tiptap/pm": "3.31.3",
+    "@shellnote/core": "workspace:*",
+    "lucide-react": "1.50.0",
+    "mermaid": "11.17.2",
+    "thinking-orbs": "0.3.2"
+  },
+  "peerDependencies": {
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  }
+}

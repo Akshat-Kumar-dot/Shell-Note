@@ -1,0 +1,106 @@
+/*
+ * The font library bundled with the app (core's fonts.ts): free fonts under the
+ * SIL Open Font License 1.1, allowed for font files. Latin letters, regular and
+ * bold, with italics where the font has them; other letters come from the
+ * computer's own fonts. The browser loads a font's files only when the page
+ * uses it, and each font falls back to the style it resembles. The licences are
+ * in apps/web/public/licences/fonts.txt.
+ */
+
+@import '@fontsource/inter/latin-400.css';
+@import '@fontsource/inter/latin-700.css';
+@import '@fontsource/inter/latin-400-italic.css';
+@import '@fontsource/inter/latin-700-italic.css';
+@import '@fontsource/open-sans/latin-400.css';
+@import '@fontsource/open-sans/latin-700.css';
+@import '@fontsource/open-sans/latin-400-italic.css';
+@import '@fontsource/open-sans/latin-700-italic.css';
+@import '@fontsource/nunito/latin-400.css';
+@import '@fontsource/nunito/latin-700.css';
+@import '@fontsource/nunito/latin-400-italic.css';
+@import '@fontsource/nunito/latin-700-italic.css';
+@import '@fontsource/atkinson-hyperlegible/latin-400.css';
+@import '@fontsource/atkinson-hyperlegible/latin-700.css';
+@import '@fontsource/atkinson-hyperlegible/latin-400-italic.css';
+@import '@fontsource/atkinson-hyperlegible/latin-700-italic.css';
+@import '@fontsource/lexend/latin-400.css';
+@import '@fontsource/lexend/latin-700.css';
+@import '@fontsource/lora/latin-400.css';
+@import '@fontsource/lora/latin-700.css';
+@import '@fontsource/lora/latin-400-italic.css';
+@import '@fontsource/lora/latin-700-italic.css';
+@import '@fontsource/merriweather/latin-400.css';
+@import '@fontsource/merriweather/latin-700.css';
+@import '@fontsource/merriweather/latin-400-italic.css';
+@import '@fontsource/merriweather/latin-700-italic.css';
+@import '@fontsource/source-serif-4/latin-400.css';
+@import '@fontsource/source-serif-4/latin-700.css';
+@import '@fontsource/source-serif-4/latin-400-italic.css';
+@import '@fontsource/source-serif-4/latin-700-italic.css';
+@import '@fontsource/eb-garamond/latin-400.css';
+@import '@fontsource/eb-garamond/latin-700.css';
+@import '@fontsource/eb-garamond/latin-400-italic.css';
+@import '@fontsource/eb-garamond/latin-700-italic.css';
+@import '@fontsource/playfair-display/latin-400.css';
+@import '@fontsource/playfair-display/latin-700.css';
+@import '@fontsource/playfair-display/latin-400-italic.css';
+@import '@fontsource/playfair-display/latin-700-italic.css';
+@import '@fontsource/jetbrains-mono/latin-400.css';
+@import '@fontsource/jetbrains-mono/latin-700.css';
+@import '@fontsource/jetbrains-mono/latin-400-italic.css';
+@import '@fontsource/jetbrains-mono/latin-700-italic.css';
+@import '@fontsource/fira-code/latin-400.css';
+@import '@fontsource/fira-code/latin-700.css';
+@import '@fontsource/caveat/latin-400.css';
+@import '@fontsource/caveat/latin-700.css';
+@import '@fontsource/patrick-hand/latin-400.css';
+@import '@fontsource/opendyslexic/latin-400.css';
+@import '@fontsource/opendyslexic/latin-700.css';
+@import '@fontsource/opendyslexic/latin-400-italic.css';
+@import '@fontsource/opendyslexic/latin-700-italic.css';
+
+.nw-page [data-font='inter'] {
+  font-family: 'Inter', var(--nw-sans);
+}
+.nw-page [data-font='open-sans'] {
+  font-family: 'Open Sans', var(--nw-sans);
+}
+.nw-page [data-font='nunito'] {
+  font-family: 'Nunito', var(--nw-sans);
+}
+.nw-page [data-font='atkinson-hyperlegible'] {
+  font-family: 'Atkinson Hyperlegible', var(--nw-sans);
+}
+.nw-page [data-font='lexend'] {
+  font-family: 'Lexend', var(--nw-sans);
+}
+.nw-page [data-font='lora'] {
+  font-family: 'Lora', var(--nw-serif);
+}
+.nw-page [data-font='merriweather'] {
+  font-family: 'Merriweather', var(--nw-serif);
+}
+.nw-page [data-font='source-serif-4'] {
+  font-family: 'Source Serif 4', var(--nw-serif);
+}
+.nw-page [data-font='eb-garamond'] {
+  font-family: 'EB Garamond', var(--nw-serif);
+}
+.nw-page [data-font='playfair-display'] {
+  font-family: 'Playfair Display', var(--nw-serif);
+}
+.nw-page [data-font='jetbrains-mono'] {
+  font-family: 'JetBrains Mono', var(--nw-mono);
+}
+.nw-page [data-font='fira-code'] {
+  font-family: 'Fira Code', var(--nw-mono);
+}
+.nw-page [data-font='caveat'] {
+  font-family: 'Caveat', var(--nw-hand);
+}
+.nw-page [data-font='patrick-hand'] {
+  font-family: 'Patrick Hand', var(--nw-hand);
+}
+.nw-page [data-font='opendyslexic'] {
+  font-family: 'OpenDyslexic', var(--nw-sans);
+}
