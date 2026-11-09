@@ -1,0 +1,29 @@
+Chapter 3: Waves
+page 1/3 w1
+fa frame continues in fc
+  h1 h1 Chapter 3: Waves
+  p1 p A wave carries energy, not matter. Its period $T$ and frequency $f$…
+  p2 p The lab kit costs $5, or $10 with the stand.
+  l1 li Transverse waves
+  l2 li+1 Light
+  l3 li Longitudinal waves
+  o1 oli Measure the period
+  o2 oli Compute the frequency
+  td todo [ ] Finish problem set 3
+  tk todo [x] Read chapter 2
+  qt quote Every wave is a pattern in motion.
+  mc math \sum_{x=1}^{10} x = 55
+  ic image Sine wave with the period marked
+  dc diagram graph LR A[Source] --> B[Medium] B --> C[Receiver]
+fb frame
+  b1 p Right column: summary
+  b2 li Wavelength λ
+mf math \int_0^1 x^2 \, dx = 1/3
+df diagram sequenceDiagram Student->>Teacher: Why do waves interfere?
+kk ink "wave = period × speed?"
+page 2/3 w2
+fc frame
+  c1 p Continued from the first page.
+gi image Ripple tank photo
+page 3/3 w3
+fe frame (empty)

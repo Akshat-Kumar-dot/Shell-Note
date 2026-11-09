@@ -1,0 +1,9 @@
+{
+  // Tests run in Node, so they may use Node types. The source is checked
+  // separately without them (../tsconfig.json).
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": [".", "../src"]
+}

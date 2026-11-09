@@ -1,0 +1,10 @@
+PAGE 1/1
+SELECTED
+a h2 Newton's laws
+b words "force" in: "An object at rest stays at rest unless a force acts on it."
+NEAR
+c after: math F = ma
+NOTEBOOK RULES
+- Headings are blue.
+ASK
+make the heading blue and bigger

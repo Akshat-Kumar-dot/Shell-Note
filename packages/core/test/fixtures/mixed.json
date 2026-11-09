@@ -1,0 +1,48 @@
+{
+  "v": 4,
+  "id": "w0",
+  "title": "Chapter 3: Waves",
+  "rev": 40,
+  "pages": ["w1", "w2", "w3"],
+  "page": {
+    "w1": { "id": "w1", "w": 21000, "h": 29700, "bg": "ruled", "free": ["fa", "fb", "mf", "df", "kk"] },
+    "w2": { "id": "w2", "w": 21000, "h": 29700, "bg": "blank", "free": ["fc", "gi"] },
+    "w3": { "id": "w3", "w": 21000, "h": 29700, "bg": "grid", "free": ["fe"] }
+  },
+  "block": {
+    "fa": { "id": "fa", "r": 31, "type": "frame", "page": "w1", "x": 2000, "y": 2000, "w": 8250, "h": 20000, "kids": ["h1", "p1", "p2", "l1", "l2", "l3", "o1", "o2", "td", "tk", "qt", "mc", "ic", "dc"], "next": "fc" },
+    "h1": { "id": "h1", "r": 3, "type": "text", "parent": "fa", "role": "h1", "indent": 0, "md": "Chapter 3: Waves", "style": { "color": "blue", "size": "xl" } },
+    "p1": { "id": "p1", "r": 12, "type": "text", "parent": "fa", "role": "p", "indent": 0, "md": "A **wave** carries *energy*, not matter. Its period $T$ and frequency $f$ satisfy $f = 1/T$. See [the notes](https://example.com/waves), ==remember== the [key idea]{color=red}, and use `v = f λ` with ~~speed~~ velocity." },
+    "p2": { "id": "p2", "r": 13, "type": "text", "parent": "fa", "role": "p", "indent": 0, "md": "The lab kit costs $5, or $10 with the stand." },
+    "l1": { "id": "l1", "r": 14, "type": "text", "parent": "fa", "role": "li", "indent": 0, "md": "Transverse waves" },
+    "l2": { "id": "l2", "r": 15, "type": "text", "parent": "fa", "role": "li", "indent": 1, "md": "Light" },
+    "l3": { "id": "l3", "r": 16, "type": "text", "parent": "fa", "role": "li", "indent": 0, "md": "Longitudinal waves" },
+    "o1": { "id": "o1", "r": 17, "type": "text", "parent": "fa", "role": "oli", "indent": 0, "md": "Measure the period" },
+    "o2": { "id": "o2", "r": 18, "type": "text", "parent": "fa", "role": "oli", "indent": 0, "md": "Compute the frequency" },
+    "td": { "id": "td", "r": 19, "type": "text", "parent": "fa", "role": "todo", "indent": 0, "md": "Finish problem set 3" },
+    "tk": { "id": "tk", "r": 34, "type": "text", "parent": "fa", "role": "todo", "indent": 0, "md": "Read chapter 2", "done": true },
+    "qt": { "id": "qt", "r": 20, "type": "text", "parent": "fa", "role": "quote", "indent": 0, "md": "Every wave is a pattern in motion.", "style": { "font": "serif" } },
+    "mc": { "id": "mc", "r": 21, "type": "math", "parent": "fa", "tex": "\\sum_{x=1}^{10} x", "value": "55" },
+    "ic": { "id": "ic", "r": 22, "type": "image", "parent": "fa", "asset": "a91f", "alt": "Sine wave with the period marked" },
+    "dc": { "id": "dc", "r": 23, "type": "diagram", "parent": "fa", "lang": "mermaid", "src": "graph LR\n  A[Source] --> B[Medium]\n  B --> C[Receiver]" },
+    "fb": { "id": "fb", "r": 25, "type": "frame", "page": "w1", "x": 10750, "y": 2000, "w": 8250, "h": 8000, "kids": ["b1", "b2"] },
+    "b1": { "id": "b1", "r": 24, "type": "text", "parent": "fb", "role": "p", "indent": 0, "md": "Right column: **summary**", "style": { "align": "center" } },
+    "b2": { "id": "b2", "r": 25, "type": "text", "parent": "fb", "role": "li", "indent": 0, "md": "Wavelength λ" },
+    "mf": { "id": "mf", "r": 26, "type": "math", "page": "w1", "x": 10750, "y": 11000, "w": 8250, "h": 1500, "tex": "\\int_0^1 x^2 \\, dx", "value": "1/3" },
+    "df": { "id": "df", "r": 27, "type": "diagram", "page": "w1", "x": 10750, "y": 13500, "w": 8250, "h": 6000, "lang": "mermaid", "src": "sequenceDiagram\n  Student->>Teacher: Why do waves interfere?" },
+    "kk": { "id": "kk", "r": 40, "type": "ink", "page": "w1", "x": 2000, "y": 23000, "w": 17000, "h": 4000, "text": "wave = period × speed?", "strokes": [
+      { "pts": [0, 2000, 120, 6000, 2000, 128], "color": "ink", "width": "m", "straight": true },
+      { "pts": [100, 100, 90, 400, 900, 140, 800, 300, 150], "color": "red", "width": "s" }
+    ] },
+    "fc": { "id": "fc", "r": 31, "type": "frame", "page": "w2", "x": 2000, "y": 2000, "w": 17000, "h": 3000, "kids": ["c1"] },
+    "c1": { "id": "c1", "r": 30, "type": "text", "parent": "fc", "role": "p", "indent": 0, "md": "Continued from the first page." },
+    "gi": { "id": "gi", "r": 32, "type": "image", "page": "w2", "x": 2000, "y": 6000, "w": 9000, "h": 6000, "asset": "b7c4", "alt": "Ripple tank photo" },
+    "fe": { "id": "fe", "r": 33, "type": "frame", "page": "w3", "x": 2000, "y": 2000, "w": 17000, "h": 0, "kids": [] }
+  },
+  "asset": {
+    "a91f": { "mime": "image/png", "w": 1600, "h": 1200, "bytes": 184322 },
+    "b7c4": { "mime": "image/jpeg", "w": 2400, "h": 1600, "bytes": 512000 },
+    "c0de": { "mime": "image/svg+xml", "bytes": 2048 }
+  },
+  "rules": ["Headings are blue.", "Keep answers short."]
+}

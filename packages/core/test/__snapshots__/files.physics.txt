@@ -1,0 +1,28 @@
+=== doc.json
+{
+  "v": 4,
+  "id": "d1",
+  "title": "Physics lecture 4",
+  "rev": 12,
+  "pages": ["p1"],
+  "page": {
+    "p1": {"id":"p1","w":21000,"h":29700,"bg":"ruled","free":["f1","g1","k1"]}
+  },
+  "asset": {
+    "a91f": {"mime":"image/png","w":1600,"h":1200,"bytes":184322}
+  },
+  "rules": [
+    "Headings are blue."
+  ]
+}
+=== pages/p1.json
+{
+  "block": {
+    "f1": {"id":"f1","r":4,"type":"frame","page":"p1","x":2000,"y":2000,"w":17000,"h":9000,"kids":["t1","t2","m1"]},
+    "t1": {"id":"t1","r":2,"type":"text","parent":"f1","role":"h2","indent":0,"md":"Newton's laws"},
+    "t2": {"id":"t2","r":3,"type":"text","parent":"f1","role":"p","indent":0,"md":"An object at rest stays at rest unless a **force** acts on it."},
+    "m1": {"id":"m1","r":4,"type":"math","parent":"f1","tex":"F = ma"},
+    "g1": {"id":"g1","r":9,"type":"image","page":"p1","x":11000,"y":12000,"w":8000,"h":6000,"asset":"a91f","alt":"Free-body diagram of a block on a slope"},
+    "k1": {"id":"k1","r":12,"type":"ink","page":"p1","x":2500,"y":19000,"w":6000,"h":1500,"strokes":[{"pts":[0,700,128,5800,700,128],"color":"red","width":"m","straight":true}]}
+  }
+}

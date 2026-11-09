@@ -1,0 +1,5 @@
+{
+  // Source only, with no DOM and no Node types: core must run everywhere.
+  "extends": "../../tsconfig.base.json",
+  "include": ["src"]
+}

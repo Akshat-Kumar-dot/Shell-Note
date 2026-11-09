@@ -1,0 +1,8 @@
+Physics lecture 4
+page 1/1 p1
+f1 frame
+  t1 h2 Newton's laws
+  t2 p An object at rest stays at rest unless a force acts on…
+  m1 math F = ma
+g1 image Free-body diagram of a block on a slope
+k1 ink (1 stroke)

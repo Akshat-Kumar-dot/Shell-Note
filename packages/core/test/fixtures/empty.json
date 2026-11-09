@@ -1,0 +1,15 @@
+{
+  "v": 4,
+  "id": "e1",
+  "title": "Untitled",
+  "rev": 0,
+  "pages": ["e2"],
+  "page": {
+    "e2": { "id": "e2", "w": 21000, "h": 29700, "bg": "blank", "free": ["e3"] }
+  },
+  "block": {
+    "e3": { "id": "e3", "r": 0, "type": "frame", "page": "e2", "x": 2000, "y": 2000, "w": 17000, "h": 0, "kids": [] }
+  },
+  "asset": {},
+  "rules": []
+}
