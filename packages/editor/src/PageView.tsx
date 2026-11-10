@@ -6,10 +6,12 @@
 // tool: on bare paper, Type puts the caret on the nearest line, as Word does,
 // and Free cursor puts a caret where it clicks, for a new frame; Select draws
 // a box that takes only what is inside it, or with a click chooses one block;
-// the ink tools draw and erase (ink/PenLayer.tsx).
+// the ink tools draw and erase (ink/PenLayer.tsx). Above each page, in the gap, a slim bar: the page's number, a round
+// + that puts a new page there, and the page's delete; under the last page, a round + adds one at the end.
 import { idTaken, newId, type Doc, type FreeBlock, type Here, type Id, type Selection } from '@shellnote/core'
-import { FilePlus2 } from 'lucide-react'
+import { Plus, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { createPortal } from 'react-dom'
 import { pictureFiles } from './assets.js'
 import { FreeView, PageBox, type AssetUrls, type FreeRenderer } from './blocks.js'
 import { MADE_TYPE, putMade, roomAt } from './layout/side/made.js'
@@ -52,6 +54,8 @@ const MARK_KEYS: Partial<Record<string, keyof WordMarks>> = { b: 'bold', i: 'ita
 const SHIFT_MARK_KEYS: Partial<Record<string, keyof WordMarks>> = { x: 'strike', h: 'highlight', '=': 'sup', '+': 'sup' }
 /** How far a pointer travels, in screen pixels, before a press becomes a Select box. */
 const SLOP = 3
+/** How long "Page N deleted" stays, with its Undo. */
+const TOAST_MS = 8000
 
 /** An area of a page in document units: a box being drawn, or a Select's box. */
 type Area = Extract<Here, { page: Id }>
@@ -73,15 +77,15 @@ function areaOf(doc: Doc, pageId: Id, sheet: Element, box: ScreenRect): Area {
 }
 
 /**
- * A new page after the last, like it (pages were only ever added by text running over), as one undo step; the
- * desk scrolls to it.
+ * A new page at `at` in the page list, like the page above it (above the first, like the first): its size and its
+ * paper. One undo step; the desk scrolls to it.
  */
-function addPage(store: EditorStore): void {
+function insertPage(store: EditorStore, at: number, desk: HTMLElement | null): void {
   const doc = store.doc
-  const last = doc.page[doc.pages.at(-1)!]!
+  const like = doc.page[doc.pages[Math.max(0, at - 1)]!]!
   const id = newId((candidate) => idTaken(store.doc, candidate))
-  store.apply([{ op: 'page', add: { id, w: last.w, h: last.h, bg: last.bg, free: [] }, at: doc.pages.length }], { origin: 'toolbar' })
-  requestAnimationFrame(() => document.querySelector(`.nw-page-slot[data-index="${doc.pages.length}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }))
+  store.apply([{ op: 'page', add: { id, w: like.w, h: like.h, bg: like.bg, free: [] }, at }], { origin: 'toolbar' })
+  requestAnimationFrame(() => desk?.querySelector(`.nw-page-slot[data-index="${at}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }))
 }
 
 /**
@@ -272,6 +276,43 @@ export function PageView({ doc: given, zoom, onZoom, assets = NO_ASSETS, store, 
   const [draft, setDraft] = useState<(DraftSpot & { key: number }) | null>(null)
   const drafts = useRef(0)
 
+  // A page deleted, with all on it, as one undo step: "Page N deleted" and its Undo stay a few seconds, and go as soon
+  // as the note changes again, so that Undo only ever takes back the delete. A note keeps one page at least.
+  const [gone, setGone] = useState<{ number: number; at: number; doc: Doc } | null>(null)
+  const deletePage = (id: Id): void => {
+    if (!store) return
+    const at = store.doc.pages.indexOf(id)
+    if (at < 0 || store.doc.pages.length < 2) return
+    try {
+      store.apply([{ op: 'page', remove: id }], { origin: 'toolbar' })
+    } catch (error) {
+      console.warn('shellnote: the page could not be deleted', error)
+      return
+    }
+    setGone({ number: at + 1, at, doc: store.doc })
+  }
+  useEffect(() => {
+    if (!store || !gone) return
+    if (store.doc !== gone.doc) {
+      setGone(null)
+      return
+    }
+    const timer = window.setTimeout(() => setGone(null), TOAST_MS)
+    const off = store.subscribe(() => {
+      if (store.doc !== gone.doc) setGone(null)
+    })
+    return () => {
+      window.clearTimeout(timer)
+      off()
+    }
+  }, [store, gone])
+  const undoDelete = (): void => {
+    if (!store || !gone) return
+    setGone(null)
+    if (store.doc !== gone.doc || !store.undo()) return
+    requestAnimationFrame(() => desk.current?.querySelector(`.nw-page-slot[data-index="${gone.at}"]`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
+  }
+
   // The Select tool: a box drawn anywhere on a page, even over text or a
   // picture, takes only what is inside it (region.ts). The press is caught on
   // its way down, before the text or the picture under it can take it; only
@@ -356,10 +397,13 @@ export function PageView({ doc: given, zoom, onZoom, assets = NO_ASSETS, store, 
 
   // The box of a Select, kept on the page until something else is selected.
   const region = store && store.selectionKind === 'objects' && selection.here && 'page' in selection.here ? selection.here : undefined
+  // Room above the first page's own bar: a bar floating over the desk, over two rows, reaches about a gap below
+  // `topSpace`, and would cover it. A page scrolled to stops as far down.
+  const lead = store && topSpace > 0 ? topSpace + PAGE_GAP : topSpace
 
   return (
     <div className="nw-desk" ref={desk} data-tool={store ? tool : undefined} onPointerDown={store ? onPaper : undefined}>
-      <div className="nw-pages" style={{ padding: PAGE_GAP, paddingTop: PAGE_GAP + topSpace, gap: PAGE_GAP }}>
+      <div className="nw-pages" style={{ padding: PAGE_GAP, paddingTop: PAGE_GAP + lead, gap: PAGE_GAP, '--nw-page-gap': `${PAGE_GAP}px`, '--nw-top-space': `${lead}px` } as CSSProperties}>
         {doc.pages.map((id, i) => {
           const page = doc.page[id]!
           const shown = i >= band.first && i <= band.last
@@ -383,16 +427,49 @@ export function PageView({ doc: given, zoom, onZoom, assets = NO_ASSETS, store, 
                   </PageBox>
                 </div>
               ) : null}
+              {store && shown ? (
+                <div className="nw-page-bar">
+                  <span className="nw-page-number">Page {i + 1}</span>
+                  <button
+                    type="button"
+                    className="nw-page-insert"
+                    aria-label={i === 0 ? 'Insert a page before page 1' : `Insert a page between pages ${i} and ${i + 1}`}
+                    title="Insert a page here"
+                    onClick={() => insertPage(store, i, desk.current)}
+                  >
+                    <Plus size={14} strokeWidth={2.5} aria-hidden />
+                  </button>
+                  {doc.pages.length > 1 ? (
+                    <button type="button" className="nw-page-delete" aria-label={`Delete page ${i + 1}`} title={`Delete page ${i + 1}`} onClick={() => deletePage(id)}>
+                      <Trash2 size={14} aria-hidden />
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           )
         })}
         {store ? (
-          <button type="button" className="nw-add-page" style={{ width: px(doc.page[doc.pages.at(-1)!]!.w, zoom) }} title="A new page after the last, like it: its size and its paper" onClick={() => addPage(store)}>
-            <FilePlus2 size={18} aria-hidden /> Add a page
+          <button type="button" className="nw-add-page" aria-label="Add a page" title="Add a page at the end, like the last one" onClick={() => insertPage(store, doc.pages.length, desk.current)}>
+            <Plus size={22} strokeWidth={2.5} aria-hidden />
           </button>
         ) : null}
       </div>
       {store ? <PenLayer store={store} desk={desk} zoom={zoom} onZoom={onZoom} /> : null}
+      {gone
+        ? createPortal(
+            <div className="nw-page-toast" role="status">
+              <span>Page {gone.number} deleted</span>
+              <button type="button" className="nw-page-toast-action" aria-label={`Undo deleting page ${gone.number}`} data-command="edit.undo" onClick={undoDelete}>
+                Undo
+              </button>
+              <button type="button" className="nw-ibtn" aria-label="Dismiss" onClick={() => setGone(null)}>
+                <X size={14} aria-hidden />
+              </button>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   )
 }

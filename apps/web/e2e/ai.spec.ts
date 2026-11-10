@@ -394,7 +394,8 @@ test('a table and a diagram asked for on empty paper land inside the box, the di
 
   kind = 'diagram'
   await page.keyboard.press('Escape')
-  // Below the table, on paper still empty.
+  // Below the table, on paper still empty: the foot of the page scrolled up into the window first.
+  await page.locator('.nw-desk').evaluate((desk) => desk.scrollBy(0, 200))
   box = await boxOnEmptyPaper(page, 258, 290)
   before = await note(page)
   await request(page, 'a flowchart: a push makes it move')

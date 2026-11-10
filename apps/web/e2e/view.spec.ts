@@ -47,7 +47,8 @@ test('draws only the pages near the screen', async ({ page }) => {
   await page.locator('.nw-desk').evaluate((el) => {
     el.scrollTop = el.scrollHeight
   })
-  await expect(page.getByText('Page 30')).toBeVisible()
+  // The words on the last page (the bar above it says "Page 30" too).
+  await expect(page.locator('.nw-page').getByText('Page 30')).toBeVisible()
   await expect(page.locator('.nw-page-slot[data-index="0"][data-shown]')).toHaveCount(0)
   expect(await page.locator('.nw-page-slot[data-shown]').count()).toBeLessThanOrEqual(3)
 })

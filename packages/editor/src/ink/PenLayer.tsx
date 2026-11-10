@@ -1148,6 +1148,8 @@ export function PenLayer({ store, desk, zoom, onZoom }: PenLayerProps) {
         event.stopPropagation()
         return
       }
+      // The pages' own buttons (the bar above each page, the + under the last) are pressed, by a finger too.
+      if (gesture === undefined && event.target instanceof Element && event.target.closest('.nw-page-bar, .nw-add-page')) return
       // A finger that does not draw, or a second finger: scrolling and zooming.
       if (touch && (gesture?.kind === 'fingers' || !palm.current.fingerDraws(contact(event)) || (gesture?.kind === 'draw' && gesture.pointerType === 'touch'))) {
         event.preventDefault()

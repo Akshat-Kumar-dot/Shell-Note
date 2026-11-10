@@ -85,3 +85,52 @@ test('“Add a page” under the last page adds one like it, its size and its pa
   await page.getByRole('button', { name: 'Undo', exact: true }).click()
   await expect.poll(() => pageCount(page)).toBe(1)
 })
+
+test('a page goes in between two pages or before the first, and a page is deleted with an Undo; each one undo step', async ({ page }) => {
+  const ids = (): Promise<string[]> => page.evaluate(() => window.__shellnote!.doc.pages)
+  await page.goto('/#/new')
+  await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
+  // The only page cannot be deleted.
+  await expect(page.locator('.nw-page-delete')).toHaveCount(0)
+  await page.getByRole('button', { name: 'Add a page' }).click()
+  await expect.poll(ids).toHaveLength(2)
+  const [first, second] = await ids()
+
+  await page.getByRole('button', { name: 'Insert a page between pages 1 and 2' }).click()
+  await expect.poll(ids).toHaveLength(3)
+  const three = await ids()
+  expect([three[0], three[2]]).toEqual([first, second])
+  // Like the page above it: its size and its paper, and nothing on it.
+  const [above, added] = await page.evaluate(() => {
+    const doc = window.__shellnote!.doc
+    return doc.pages.slice(0, 2).map((id) => ({ w: doc.page[id]!.w, h: doc.page[id]!.h, bg: doc.page[id]!.bg ?? null, free: doc.page[id]!.free.length }))
+  })
+  expect(added).toEqual({ ...above, free: 0 })
+
+  // The delete shows with the pointer over its page.
+  const remove = page.getByRole('button', { name: 'Delete page 2' })
+  await page.mouse.move(1, 1)
+  await expect(remove).toBeHidden()
+  await page.locator('.nw-page-slot').nth(1).hover()
+  await expect(remove).toBeVisible()
+  await remove.click()
+  await expect.poll(ids).toEqual([first, second])
+  const said = page.getByRole('status').filter({ hasText: 'Page 2 deleted' })
+  await expect(said).toBeVisible()
+  await said.getByRole('button', { name: 'Undo deleting page 2' }).click()
+  await expect.poll(ids).toEqual(three)
+  await expect(said).toHaveCount(0)
+
+  // Deleted again, then the note changes: the message goes, so its Undo can only ever take back the delete.
+  await page.locator('.nw-page-slot').nth(1).hover()
+  await remove.click()
+  await expect(said).toBeVisible()
+  await page.getByRole('button', { name: 'Add a page' }).click()
+  await expect(said).toHaveCount(0)
+  await expect.poll(ids).toHaveLength(3)
+
+  // Before the first page.
+  await page.locator('.nw-desk').evaluate((desk) => desk.scrollTo(0, 0))
+  await page.getByRole('button', { name: 'Insert a page before page 1' }).click()
+  await expect.poll(async () => (await ids()).slice(1, 3)).toEqual([first, second])
+})

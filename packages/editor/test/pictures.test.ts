@@ -2,7 +2,7 @@
 import { apply, createDoc, type Frame, type Op } from '@shellnote/core'
 import { describe, expect, it } from 'vitest'
 import { MIXED, PHYSICS } from '../../core/test/fixtures/index.js'
-import { moveBox, pageAt, pictureOps, pictureSize, resizeBox, type NewPicture } from '../src/index.js'
+import { moveBox, PAGE_GAP, pageAt, pictureOps, pictureSize, resizeBox, type NewPicture } from '../src/index.js'
 
 const png = (w: number, h: number, hash = 'ab12'): NewPicture => ({ hash, meta: { mime: 'image/png', w, h, bytes: 1000 } })
 const A4 = { w: 21000, h: 29700 }
@@ -106,10 +106,11 @@ describe('dragging a picture', () => {
 
 describe('the page in view', () => {
   it('is the page at the middle of the screen, or the nearer one in a gap', () => {
-    // Pages 100 px tall with 24 px gaps: page 0 is 24 to 124, page 1 is 148 to 248.
+    // Pages 100 px tall, a gap above each: page 0 ends at gap + 100, and the gap below it is split halfway.
+    const middle = PAGE_GAP + 100 + PAGE_GAP / 2
     expect(pageAt([100, 100, 100], 50)).toBe(0)
-    expect(pageAt([100, 100, 100], 130)).toBe(0)
-    expect(pageAt([100, 100, 100], 140)).toBe(1)
+    expect(pageAt([100, 100, 100], middle - 1)).toBe(0)
+    expect(pageAt([100, 100, 100], middle)).toBe(1)
     expect(pageAt([100, 100, 100], 9999)).toBe(2)
   })
 })

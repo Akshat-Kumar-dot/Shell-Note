@@ -12,8 +12,8 @@ export const PX_PER_MM = 96 / 25.4
 /** Document units to CSS pixels at a zoom. */
 export const px = (units: number, zoom = 1): number => (units / 100) * PX_PER_MM * zoom
 
-/** Space between pages, and around them, in screen pixels. */
-export const PAGE_GAP = 24
+/** Space between pages, and around them, in screen pixels: room for the bar above each page (PageView). */
+export const PAGE_GAP = 32
 
 export const MIN_ZOOM = 0.25
 export const MAX_ZOOM = 4
