@@ -73,6 +73,14 @@ export class Tabs {
     this.#post({ t: 'library', from: this.id })
   }
 
+  /**
+   * Tell this tab's own screens what a tab would: for a change that came from outside the app altogether, such as
+   * another device writing into the library's folder.
+   */
+  told(message: TabMessage): void {
+    for (const listener of [...this.#listeners]) listener(message)
+  }
+
   /** Listen to what the other tabs say. Returns the function that stops listening. */
   subscribe(listener: (message: TabMessage) => void): () => void {
     this.#listeners.add(listener)

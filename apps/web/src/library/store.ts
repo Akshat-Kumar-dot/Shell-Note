@@ -132,4 +132,6 @@ export interface LibraryStore {
   exchange?(note: ExchangedNote): Promise<Exchanged>
   /** Only there too: hear when the library changed from outside. Returns the function that stops listening. */
   watch?(listener: (change: OutsideChange) => void): () => void
+  /** The folder the library is kept in, as a person reads it, when it is kept in one: each note is then a file already. */
+  place?(): string | undefined
 }

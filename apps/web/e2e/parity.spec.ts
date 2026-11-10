@@ -175,6 +175,7 @@ const PERSON: { why: string; name?: RegExp; cls?: RegExp; within?: RegExp }[] = 
     ? [
         { why: "Other programs on a panel stay the person's: no command reaches them, for safety", name: /^Program panel$/u },
         { why: "The window's own minimise, maximise and close, as Windows' title bar's", name: /^(Minimise|Maximise|Restore|Close window)$/u },
+        { why: "Where the notes are kept is the person's alone to choose, in the system's own dialog: no command moves the library", name: /^(Keep them in a folder…|Keep them in the app instead)$/u },
       ]
     : []),
 ]

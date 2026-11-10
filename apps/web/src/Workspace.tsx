@@ -161,6 +161,9 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
   const drawNow = useRef<() => Promise<void>>(async () => {})
   /** Set when this tab steps back because another tab saved the same note: then it must not save its own copy over that one. */
   const steppingBack = useRef(false)
+  /** Each open note as this screen and the library last agreed on it: what a change from another device is merged over. */
+  const agreed = useRef(new WeakMap<EditorStore, Doc>())
+  if (!agreed.current.has(store)) agreed.current.set(store, store.doc)
   useEffect(() => {
     if (note === undefined || !editing) return
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -173,7 +176,31 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
       const file = fileRef.current
       // One write at a time, in order, and a failed one, told here, does not stop the next.
       queue = queue
-        .then(() => library.save({ doc: now, blob: (hash) => store.assets.blob(hash), file }))
+        .then(async () => {
+          const blob = (hash: string): Blob | undefined => store.assets.blob(hash)
+          if (!library.exchange) {
+            await library.save({ doc: now, blob, file })
+            return
+          }
+          // Where other devices write too, keeping hands back what arrived from them: it joins what is on screen,
+          // the caret and the undo steps as they are (the editor's store, absorb).
+          const kept = await library.exchange({ doc: now, since: agreed.current.get(store) ?? now, blob, file })
+          if (kept.merged) {
+            for (const [hash, bytes] of kept.merged.assets) {
+              const asset = kept.merged.doc.asset[hash]
+              if (asset && !store.assets.blob(hash)) await store.assets.put(hash, bytes, asset.mime)
+            }
+            store.absorb(now, kept.merged.doc)
+            agreed.current.set(store, kept.merged.doc)
+          } else agreed.current.set(store, now)
+          // Kept in a folder, the note is a file already: the status line says so.
+          if (library.place?.() !== undefined && kept.entry.file) {
+            const next: FileState = { name: kept.entry.file.name, rev: now.rev, savedAt: Date.now() }
+            fileRef.current = next
+            setFile(next)
+            setNow(Date.now())
+          }
+        })
         .then(
           () => {
             kept.current = now.rev
@@ -252,6 +279,17 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
       setProblem(`The note could not be read again: ${hintOf(error)}`)
     }
   }, [library, note])
+
+  // A change to this note from another device, arriving in the library's folder: taken in at once while it is edited
+  // here (keeping the note hands it back), or shown as it now is while it is read-only.
+  useEffect(() => {
+    if (note === undefined || !library.watch) return
+    return library.watch((change) => {
+      if (!change.notes.has(note)) return
+      if (modeRef.current === 'edit') void keepNow.current()
+      else if (modeRef.current === 'view') void reload()
+    })
+  }, [library, note, reload])
 
   // Two tabs on one note: the second shows it read-only; "Edit here" asks the first to save and step back.
   const taking = useRef(false)
@@ -580,6 +618,8 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
     if (editing && title !== store.doc.title) store.apply([{ op: 'update', id: store.doc.id, set: { title } }], { key: `title:${store.doc.id}` })
   }
   const status = statusOf(doc, file, note === undefined, now, openedAt)
+  // Kept in a folder, the note is a file as it stands; Save then puts a copy elsewhere.
+  const keptWords = note !== undefined && library.place?.() !== undefined ? IN_FOLDER : status.kept
   const librarySide = <LibrarySide store={library} tabs={tabs} note={note} folder={folder} title={doc.title} at={sideAt} onMove={moveSide} />
 
   return (
@@ -649,7 +689,7 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
               type="button"
               className="button primary save"
               aria-label="Save"
-              title={`${status.text}. Save the note to a .shellnote file, the copy that lasts (Ctrl+S; Ctrl+Shift+S for a new file). ${status.kept}`}
+              title={`${status.text}. Save the note to a .shellnote file, the copy that lasts (Ctrl+S; Ctrl+Shift+S for a new file). ${keptWords}`}
               data-unsaved={status.changed ? '' : undefined}
               data-late={status.late ? '' : undefined}
               data-command="file.save"
@@ -697,7 +737,7 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
         {sideAt === 'right' ? librarySide : null}
       </main>
       {editing ? <AiLayer key={session.key} store={store} host={host} enabled={editing} /> : null}
-      {settings ? <Settings onClose={() => setSettings(false)} /> : null}
+      {settings ? <Settings onClose={() => setSettings(false)} beforeChange={flush} /> : null}
     </div>
   )
 }
@@ -708,6 +748,8 @@ const KEPT = inDesktopApp()
   ? 'The app keeps the note in your library on this computer as you work. The file you save is the copy that lasts.'
   : 'This browser keeps the note in your library as you work, but a browser can clear what it keeps. The file you save is the copy that lasts.'
 const NOT_KEPT = 'A sample note is not kept. Save it to a file to keep it.'
+const IN_FOLDER = "The app keeps the note as a file in your library's folder as you work. Save puts a copy of it wherever you choose."
+
 
 /** The tightest step of the app bar in one row (app.css, data-tight), and the one used over two rows, for a finger on a phone. */
 const TIGHTEST = 4

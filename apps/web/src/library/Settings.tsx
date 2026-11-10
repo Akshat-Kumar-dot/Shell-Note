@@ -2,14 +2,17 @@
 // (the paper always stays white), the AI (ai/AiSettings.tsx), how much this
 // browser's storage the library uses, whether the browser has agreed not to
 // clear it, and the plain truth that a saved .shellnote file is the copy
-// that lasts.
-import { commands, inDesktopApp } from '@shellnote/editor'
+// that lasts. In the app on Windows, also where the notes are kept: in the
+// app, or in a folder the person chooses (LibraryPlace.tsx).
+import { commands, inDesktopApp, inWindowsApp } from '@shellnote/editor'
 import { HardDrive, Monitor, Moon, ShieldCheck, Sun, TriangleAlert } from 'lucide-react'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { AiSettingsPart } from '../ai/AiSettings.js'
 import { lastKeepAnswer } from '../commands.js'
 import { appearanceNow, onAppearance, type Appearance } from '../theme.js'
+import { library } from './chosen.js'
 import { Dialog } from './Dialog.js'
+import { LibraryPlace } from './LibraryPlace.js'
 
 const LOOKS: [Appearance, string, typeof Sun][] = [
   ['system', 'System', Monitor],
@@ -32,7 +35,8 @@ function size(bytes: number): string {
  */
 type Asking = 'not asked' | 'asking' | 'refused'
 
-export function Settings({ onClose }: { onClose: () => void }) {
+/** `beforeChange`: what must be kept before the library moves elsewhere, such as the note that is open. */
+export function Settings({ onClose, beforeChange }: { onClose: () => void; beforeChange?: () => Promise<void> }) {
   const look = useSyncExternalStore(onAppearance, appearanceNow)
   const [usage, setUsage] = useState<{ used: number; quota: number }>()
   const [safe, setSafe] = useState<boolean>()
@@ -81,6 +85,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
         <p className="settings-hint">The paper always stays white, as it prints.</p>
       </section>
       <AiSettingsPart />
+      {inWindowsApp() ? <LibraryPlace beforeChange={beforeChange} /> : null}
       <section className="settings-part">
         <h3>{app ? 'Storage in the app' : 'Storage in this browser'}</h3>
         <p className="settings-line">
@@ -103,7 +108,11 @@ export function Settings({ onClose }: { onClose: () => void }) {
               : 'The browser said no, for now. Edge and Chrome never ask you: they decide by themselves, and say yes to a site they count as important, such as one you have bookmarked, installed as an app or use often. You can ask again later.'
             : ''}
         </p>
-        <p className="settings-hint">{app ? 'What the app keeps is on this computer only, in its own folder.' : 'A browser can still clear what it keeps, for example when you clear its history.'} The copy that lasts is a .shellnote file: open a note and choose Save.</p>
+        <p className="settings-hint">
+          {library.place() !== undefined
+            ? 'Your notes are files in the folder above; this is the copy of each the app keeps on this computer beside them.'
+            : `${app ? 'What the app keeps is on this computer only, in its own folder.' : 'A browser can still clear what it keeps, for example when you clear its history.'} The copy that lasts is a .shellnote file: open a note and choose Save.`}
+        </p>
       </section>
     </Dialog>
   )

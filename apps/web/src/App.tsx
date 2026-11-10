@@ -5,11 +5,13 @@
 // kept; ?record=strokes the stroke recorder (record/Recorder.tsx). On start,
 // the note storage version 1 kept moves into the library once, safely, items
 // past their 30 days in Recently deleted go, and the pen profile is read
-// (library/penProfile.ts).
+// (library/penProfile.ts). In the desktop app the library may be a folder the
+// person chose (library/chosen.ts): then what another device writes into it
+// shows on the screens as it arrives.
 import { commands } from '@shellnote/editor'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Home } from './library/Home.js'
-import { BrowserLibrary } from './library/indexeddb.js'
+import { library } from './library/chosen.js'
 import { loadPenProfile } from './library/penProfile.js'
 import { Tabs } from './library/tabs.js'
 import { Recorder } from './record/Recorder.js'
@@ -17,8 +19,7 @@ import { sampleDoc } from './samples.js'
 import { askToKeep } from './storage/cache.js'
 import { sessionFor, Workspace, type Session } from './Workspace.js'
 
-/** The library, for the screens and the app's commands alike. */
-export const library = new BrowserLibrary()
+export { library }
 const tabs = new Tabs()
 
 type Route = { to: 'home'; folder: string | null } | { to: 'bin' } | { to: 'note'; id: string } | { to: 'new'; folder: string | null }
@@ -55,8 +56,14 @@ let starting: Promise<string | undefined> | undefined
 function startOnce(): Promise<string | undefined> {
   starting ??= (async () => {
     let problem: string | undefined
+    // Where the library is kept, before anything is read from it.
+    await library.start()
+    // What changes in the library's folder from outside the app reaches the screens as another tab's changes do.
+    library.watch((change) => {
+      if (change.library) tabs.told({ t: 'library', from: 'folder' })
+    })
     try {
-      await library.migrate(Date.now())
+      await library.app.migrate(Date.now())
     } catch (error) {
       problem = (error as Error).message
     }
@@ -67,7 +74,7 @@ function startOnce(): Promise<string | undefined> {
     }
     await loadPenProfile(library)
     void askToKeep()
-    return problem
+    return problem ?? library.problem()
   })()
   return starting
 }
