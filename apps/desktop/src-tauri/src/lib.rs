@@ -16,6 +16,8 @@ use std::time::Duration;
 use tauri::webview::{NewWindowResponse, PageLoadEvent, ScrollBarStyle};
 use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Window, WindowEvent};
 
+/// The library kept in a folder the person chooses: its files, and the choice.
+mod library;
 #[cfg(windows)]
 mod speech;
 /// Elsewhere the web view's own speech recognition is used: the page asks for Windows' only on Windows (desktop.ts).
@@ -477,7 +479,17 @@ pub fn run() {
             place::apps_words_of,
             place::apps_read_picture,
             place::apps_may_keep_picture,
-            titlebar::titlebar_snap
+            titlebar::titlebar_snap,
+            library::library_folder,
+            library::library_choose,
+            library::library_forget,
+            library::library_list,
+            library::library_info,
+            library::library_read,
+            library::library_write,
+            library::library_move,
+            library::library_remove,
+            library::library_make_folder
         ])
         .setup(|app| {
             // Programs a ShellNote that ended without letting them go left held (a crash, End task): given back.

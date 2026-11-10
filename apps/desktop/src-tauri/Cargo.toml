@@ -24,7 +24,8 @@ serde_json = "=1.0.154"
 [target.'cfg(windows)'.dependencies]
 # Windows' own speech recognizer, for the AI box's microphone (src/speech.rs), and other programs' windows kept on a
 # panel (src/apps.rs) with their live picture (src/picture.rs), and the snap window of the app's own title bar
-# (src/titlebar.rs): the version Tauri already uses, with the parts of it these need (no new crate).
+# (src/titlebar.rs), and the system's dialog for choosing the library's folder (src/library.rs): the version Tauri
+# already uses, with the parts of it these need (no new crate).
 windows = { version = "=0.62.2", features = [
   "Foundation",
   "Globalization",
@@ -56,6 +57,8 @@ windows = { version = "=0.62.2", features = [
   "Win32_UI_Accessibility",
   "Win32_UI_HiDpi",
   "Win32_UI_Input_KeyboardAndMouse",
+  "Win32_UI_Shell",
+  "Win32_UI_Shell_Common",
   "Win32_UI_WindowsAndMessaging",
 ] }
 # WebView2's shared buffers, a program's live picture given to the page with no copy (src/picture.rs): the crate

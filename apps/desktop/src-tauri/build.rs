@@ -22,6 +22,16 @@ fn main() {
         "apps_read_picture",
         "apps_may_keep_picture",
         "titlebar_snap",
+        "library_folder",
+        "library_choose",
+        "library_forget",
+        "library_list",
+        "library_info",
+        "library_read",
+        "library_write",
+        "library_move",
+        "library_remove",
+        "library_make_folder",
     ]);
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(commands)).expect("the app's build failed");
 }
