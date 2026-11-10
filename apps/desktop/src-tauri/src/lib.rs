@@ -326,7 +326,7 @@ fn show(window: &WebviewWindow) {
 /// A window of the app on one of its pages, made here rather than in tauri.conf.json, for what only code can set.
 fn app_window(app: &AppHandle, label: &str, page: WebviewUrl) -> tauri::Result<WebviewWindow> {
     let builder = WebviewWindowBuilder::new(app, label, page)
-        .title("shellnote")
+        .title("ShellNote")
         // Shown once its page has loaded, drawn, not as a blank white window first (SHOW_WAIT at most).
         .visible(false)
         .on_page_load(|window, payload| {
@@ -347,7 +347,7 @@ fn app_window(app: &AppHandle, label: &str, page: WebviewUrl) -> tauri::Result<W
         .disable_drag_drop_handler()
         // The window's title is the page's: the note's name, as the browser's tab shows it.
         .on_document_title_changed(|window, title| {
-            let _ = window.set_title(if title.trim().is_empty() { "shellnote" } else { &title });
+            let _ = window.set_title(if title.trim().is_empty() { "ShellNote" } else { &title });
         })
         // Scroll bars as Edge's, over the page: WebView2's own take 15 points from it, so the page sat 7.6 points
         // left of where Edge puts it, and jumped sideways when a note grew long enough to scroll (18 October 2026).
@@ -386,6 +386,8 @@ fn app_window(app: &AppHandle, label: &str, page: WebviewUrl) -> tauri::Result<W
         })
     };
     let window = builder.build()?;
+    #[cfg(windows)]
+    whole_screen_when_full(&window);
     #[cfg(desktop)]
     if label == MAIN {
         restore_place(&window);
@@ -396,6 +398,53 @@ fn app_window(app: &AppHandle, label: &str, page: WebviewUrl) -> tauri::Result<W
         show(&late);
     });
     Ok(window)
+}
+
+/// Full screen from a maximised window. When the page asks for full screen (the app's own button, F11, a video's own),
+/// Tauri makes the window full screen; but a window without Windows' frame that is maximised keeps its page within the
+/// screen less the taskbar, so the page stopped short and left a black band at the bottom. So a maximised window is
+/// restored first, at once, before Tauri's full screen comes in, and maximised again once full screen is left.
+#[cfg(windows)]
+fn whole_screen_when_full(window: &WebviewWindow) {
+    use std::sync::atomic::AtomicBool;
+    use std::sync::Arc;
+    use webview2_com::ContainsFullScreenElementChangedEventHandler;
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{IsZoomed, ShowWindow, SW_RESTORE};
+
+    let was_maximised = Arc::new(AtomicBool::new(false));
+    let target = window.clone();
+    let _ = window.with_webview(move |webview| unsafe {
+        let Ok(core) = webview.controller().CoreWebView2() else { return };
+        let handler = ContainsFullScreenElementChangedEventHandler::create(Box::new(move |sender, _| {
+            let mut full = windows::core::BOOL::default();
+            sender.ok_or_else(windows::core::Error::empty)?.ContainsFullScreenElement(&mut full)?;
+            let Ok(raw) = target.hwnd() else { return Ok(()) };
+            let hwnd = HWND(raw.0 as *mut std::ffi::c_void);
+            if full.as_bool() {
+                // Restored now, on this thread, before Tauri's own full screen (sent to the event loop) is carried out.
+                if IsZoomed(hwnd).as_bool() {
+                    was_maximised.store(true, Ordering::SeqCst);
+                    let _ = ShowWindow(hwnd, SW_RESTORE);
+                }
+            } else if was_maximised.swap(false, Ordering::SeqCst) {
+                // Maximised again once the window has left full screen, which Tauri does after this returns.
+                let window = target.clone();
+                std::thread::spawn(move || {
+                    for _ in 0..40 {
+                        if !window.is_fullscreen().unwrap_or(true) {
+                            let _ = window.maximize();
+                            break;
+                        }
+                        std::thread::sleep(Duration::from_millis(50));
+                    }
+                });
+            }
+            Ok(())
+        }));
+        let mut token = Default::default();
+        let _ = core.add_ContainsFullScreenElementChanged(&handler, &mut token);
+    });
 }
 
 /// Whether this program was started as the watcher of a ShellNote holding other programs (apps.rs): its work is

@@ -1159,9 +1159,6 @@ a {
   background: #c42b1c;
   color: #fff;
 }
-html:fullscreen .window-controls {
-  display: none;
-}
 html[data-own-titlebar] .appbar {
   padding-right: 148px;
 }

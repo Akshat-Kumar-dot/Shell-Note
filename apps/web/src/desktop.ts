@@ -159,9 +159,15 @@ if (inDesktopApp()) {
       invoke('ready_to_close').catch(() => undefined)
     })
   })
-  // F11, as in a browser: full screen, and back. The page's own full screen, as its button asks, which the window follows.
+  // F11, as in a browser: full screen, and back; and Esc leaves it, as a browser's does (the button's tooltip says so).
+  // The page's own full screen, as its button asks, which the window follows.
   window.addEventListener('keydown', (event) => {
-    if (event.key !== 'F11' || event.defaultPrevented || event.repeat) return
+    if (event.repeat) return
+    if (event.key === 'Escape' && document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => undefined)
+      return
+    }
+    if (event.key !== 'F11' || event.defaultPrevented) return
     event.preventDefault()
     if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined)
     else void document.documentElement.requestFullscreen().catch(() => undefined)

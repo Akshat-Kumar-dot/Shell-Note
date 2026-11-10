@@ -1,7 +1,8 @@
 // ShellNote's own minimise, maximise and close, in the desktop app on Windows, which has no Windows title bar. At the window's top right on
 // every screen; each top bar keeps room for them (app.css, html[data-own-titlebar], set in main.tsx before anything is drawn) and drags the
 // window by its empty parts (data-tauri-drag-region). Windows' snap layouts come from a window of the app's own over the maximise button
-// (src-tauri/src/titlebar.rs), which tells this one when the pointer is over it.
+// (src-tauri/src/titlebar.rs), which tells this one when the pointer is over it. In full screen the buttons stay, and
+// the middle one leaves full screen.
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { getCurrentWindow } from '@tauri-apps/api/window'
@@ -12,6 +13,7 @@ const MINIMISE = ''
 const MAXIMISE = ''
 const RESTORE = ''
 const CLOSE = ''
+const EXIT_FULL_SCREEN = ''
 
 /** The maximise button's box in the screen's pixels from the page's top left; none in full screen or when not drawn. */
 function snapArea(button: HTMLElement | null): { x: number; y: number; width: number; height: number } | null {
@@ -22,6 +24,7 @@ function snapArea(button: HTMLElement | null): { x: number; y: number; width: nu
 export function WindowControls() {
   const [maximised, setMaximised] = useState(false)
   const [snap, setSnap] = useState<'hover' | 'press' | 'leave'>('leave')
+  const [full, setFull] = useState(() => document.fullscreenElement !== null)
   const maximise = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
@@ -43,14 +46,18 @@ export function WindowControls() {
     }).catch(() => undefined)
     const told = listen<'hover' | 'leave' | 'press'>('titlebar', (event) => setSnap(event.payload)).catch(() => undefined)
     const scale = matchMedia(`(resolution: ${devicePixelRatio}dppx)`)
+    const fullChanged = (): void => {
+      setFull(document.fullscreenElement !== null)
+      place()
+    }
     scale.addEventListener('change', place)
-    document.addEventListener('fullscreenchange', place)
+    document.addEventListener('fullscreenchange', fullChanged)
     return () => {
       live = false
       void resized.then((stop) => stop?.())
       void told.then((stop) => stop?.())
       scale.removeEventListener('change', place)
-      document.removeEventListener('fullscreenchange', place)
+      document.removeEventListener('fullscreenchange', fullChanged)
     }
   }, [])
 
@@ -59,9 +66,15 @@ export function WindowControls() {
       <button type="button" aria-label="Minimise" title="Minimise" onClick={() => void getCurrentWindow().minimize().catch(() => undefined)}>
         {MINIMISE}
       </button>
-      <button ref={maximise} type="button" aria-label={maximised ? 'Restore' : 'Maximise'} title={maximised ? 'Restore down' : 'Maximise'} data-snap={snap} onClick={() => void getCurrentWindow().toggleMaximize().catch(() => undefined)}>
-        {maximised ? RESTORE : MAXIMISE}
-      </button>
+      {full ? (
+        <button type="button" aria-label="Exit full screen" title="Exit full screen" onClick={() => void document.exitFullscreen().catch(() => undefined)}>
+          {EXIT_FULL_SCREEN}
+        </button>
+      ) : (
+        <button ref={maximise} type="button" aria-label={maximised ? 'Restore' : 'Maximise'} title={maximised ? 'Restore down' : 'Maximise'} data-snap={snap} onClick={() => void getCurrentWindow().toggleMaximize().catch(() => undefined)}>
+          {maximised ? RESTORE : MAXIMISE}
+        </button>
+      )}
       <button type="button" className="window-close" aria-label="Close window" title="Close" onClick={() => void getCurrentWindow().close().catch(() => undefined)}>
         {CLOSE}
       </button>
