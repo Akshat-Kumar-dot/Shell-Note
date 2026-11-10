@@ -149,7 +149,7 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
   useEffect(() => {
     document.title = `${doc.title} – ShellNote`
     return () => {
-      document.title = 'shellnote'
+      document.title = 'ShellNote'
     }
   }, [doc.title])
 
