@@ -59,6 +59,27 @@ export interface SavingNote {
   file?: FileState | undefined
 }
 
+/** A note being kept by the screen it is open on, which may hold changes from elsewhere it has not seen. */
+export interface ExchangedNote extends SavingNote {
+  /** The note as this screen and the library last agreed on it: as opened, or as last kept or handed back. */
+  since: Doc
+}
+
+/** What keeping an open note gives back. */
+export interface Exchanged {
+  entry: NoteEntry
+  /** The note with changes from elsewhere merged in, when there are any the screen has not seen: it shows this, and counts from it. */
+  merged?: { doc: Doc; assets: Map<string, Blob> }
+}
+
+/** What changed in the library from outside the app: on another device, or in the folder itself. */
+export interface OutsideChange {
+  /** Notes whose content changed. */
+  notes: ReadonlySet<string>
+  /** True when notes or folders came, went, moved or were renamed. */
+  library: boolean
+}
+
 /** How long a deleted item stays in Recently deleted. */
 export const KEPT_DAYS = 30
 
@@ -103,4 +124,12 @@ export interface LibraryStore {
   penProfile(): Promise<PenProfile | undefined>
   /** Keep the pen profile, or forget it (undefined). */
   setPenProfile(profile: PenProfile | undefined): Promise<void>
+  /**
+   * Only where other devices change the library too (a synced folder): keep
+   * an open note as `save` does, merged with what arrived for it from
+   * elsewhere, and hand that back for the screen to show.
+   */
+  exchange?(note: ExchangedNote): Promise<Exchanged>
+  /** Only there too: hear when the library changed from outside. Returns the function that stops listening. */
+  watch?(listener: (change: OutsideChange) => void): () => void
 }

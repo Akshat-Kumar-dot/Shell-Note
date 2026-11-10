@@ -55,8 +55,8 @@ const SKIPPED = new Set(['id', 'r', 'type', 'kids', 'strokes', ...PLACE, ...SIZE
 
 const ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 
-/** An id made from a text, the same on every device: for the copy of a block kept twice. */
-function idFrom(text: string): Id {
+/** An id made from a text, the same on every device: for the copy of a block kept twice, or of a note. */
+export function idFrom(text: string): Id {
   let a = 0x811c9dc5
   let b = 0x01000193
   for (let i = 0; i < text.length; i++) {

@@ -28,6 +28,8 @@ export const Lineage = z.strictObject({
    * the note just after. Blocks whose `r` is above it are this device's own changes since.
    */
   base: z.strictObject({ seen: Seen, rev: z.int().nonnegative() }).optional(),
+  /** When the note was last put where it is: moved, deleted or brought back. Of two files of one note, the one put later says where it belongs. */
+  put: z.int().nonnegative().optional(),
 })
 export type Lineage = z.infer<typeof Lineage>
 
@@ -45,8 +47,8 @@ export function readLineage(text: string | undefined): Lineage | undefined {
 /** sync.json's text, the same for the same lineage. */
 export function lineageText(lineage: Lineage): string {
   const sorted = (map: Seen): Seen => Object.fromEntries(Object.entries(map).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)))
-  const { v, by, at, id, base } = lineage
-  return `${JSON.stringify({ v, by, at, id, seen: sorted(lineage.seen), ...(base ? { base: { seen: sorted(base.seen), rev: base.rev } } : {}) })}\n`
+  const { v, by, at, id, base, put } = lineage
+  return `${JSON.stringify({ v, by, at, id, seen: sorted(lineage.seen), ...(base ? { base: { seen: sorted(base.seen), rev: base.rev } } : {}), ...(put !== undefined ? { put } : {}) })}\n`
 }
 
 /** True when `a` includes everything `b` does. */

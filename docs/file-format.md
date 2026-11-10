@@ -191,6 +191,7 @@ A library kept in a folder that a cloud service copies between devices adds one 
 | `id` | A fingerprint of the note's content, without `rev` and each block's `r`: two versions that hold the same have the same one. |
 | `seen` | The latest change of each device this version includes: the device's own `rev` of the note when it wrote that change. |
 | `base` | The last version this device took from another device or merged: what that one had seen, and this device's `rev` just after. Blocks whose `r` is above it are this device's own changes since. |
+| `put` | When the note was last put where it is: moved, deleted or brought back. Of two files of one note in two places, the one put later says where the note belongs. |
 
 Given two versions: when one has seen everything the other has, it is the newer and is taken as it is. When each has changes the other has not seen, they are merged block by block (`merge` in [packages/core/src/sync/merge.ts](../packages/core/src/sync/merge.ts)): a block changed on one device is taken from it, an edit stands against a removal, text changed in different words is merged, and a paragraph whose same words both changed is kept twice, one after the other. A file saved with Save, to share or keep, has no `sync.json`.
 
