@@ -22,6 +22,13 @@ All notable changes to ShellNote are listed here. The format follows
 - Pages added between two pages, before the first or at the end, and deleted, each one step to undo.
 - The library beside a note: folders and notes, a search by name, a new note or folder, on the left or the right, hidden
   or shown with its arrow.
+- In the Windows app, the library in a folder you choose (Settings): each note one `.shellnote` file, folders as real
+  folders, Recently deleted a folder of its own. A cloud service that copies the folder keeps the notes the same on
+  every device. A note changed on two devices is merged block by block, and a paragraph whose same words both changed
+  is kept twice; a service's "conflicted copy" is merged in and moved to Recently deleted; a half-copied file never
+  replaces a note. Notes already in the app are copied into the folder, and nothing is removed from the app.
+- A change from another device goes into the open note beside what is being typed; Undo still takes back only what
+  you did.
 
 ### Changed
 

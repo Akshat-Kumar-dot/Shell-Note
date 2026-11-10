@@ -50,8 +50,11 @@ describe('one device after another', () => {
     expect(phone.heard.some((change) => change.notes.has(id))).toBe(false)
     // Nothing is written again once both agree.
     const before = (await laptop.folder.info('Trip.shellnote'))!.modified
+    const own = JSON.stringify(await laptop.own.list())
     await cloud.settle(laptop, phone)
     expect((await laptop.folder.info('Trip.shellnote'))!.modified).toBe(before)
+    // Nor is anything this device keeps for itself: a look at a library that has not changed costs a listing.
+    expect(JSON.stringify(await laptop.own.list())).toBe(own)
   })
 
   it('renames, moves and deletes alike on both', async () => {

@@ -87,7 +87,16 @@ async function close(child: ChildProcess, data: string): Promise<void> {
  * embedding model, and an AI test its chat model. A test that wants a model routes a stand-in of its own, which comes
  * after this one and so wins.
  */
-const apart = base.extend<{ refused: string[] }>({
+const apart = base.extend<{ refused: string[]; libraryInFolder: boolean; folder: string | undefined }>({
+  // With `test.use({ libraryInFolder: true })`, inside the app: the library is kept in a folder made for the test,
+  // which `folder` names (the app is told it as it starts, so no dialog is asked).
+  libraryInFolder: [false, { option: true }],
+  folder: async ({ libraryInFolder }, use) => {
+    if (!libraryInFolder || !app) return use(undefined)
+    const made = mkdtempSync(join(tmpdir(), 'shellnote-library-'))
+    await use(made)
+    rmSync(made, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
+  },
   // What the content security policy refused during the test (underPolicy only).
   // eslint-disable-next-line no-empty-pattern -- Playwright reads what a fixture needs from this pattern: nothing here.
   refused: async ({}, use) => use([]),
@@ -102,7 +111,7 @@ const apart = base.extend<{ refused: string[] }>({
 export const test = !app
   ? apart
   : apart.extend({
-      context: async ({ viewport, baseURL }, use, testInfo) => {
+      context: async ({ viewport, baseURL, folder }, use, testInfo) => {
         const port = portOf(testInfo.workerIndex)
         const data = mkdtempSync(join(tmpdir(), 'shellnote-e2e-'))
         const child = spawn(app, [], {
@@ -116,6 +125,7 @@ export const test = !app
             SHELLNOTE_WINDOW_SIZE: `${viewport?.width ?? 1280}x${viewport?.height ?? 720}`,
             // A link that would open the person's browser is written down instead.
             SHELLNOTE_OPENED_LOG: join(data, 'opened.txt'),
+            ...(folder === undefined ? {} : { SHELLNOTE_LIBRARY_FOLDER: folder }),
           },
           stdio: 'ignore',
         })

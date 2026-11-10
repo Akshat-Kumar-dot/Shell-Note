@@ -93,6 +93,8 @@ const decoder = new TextDecoder()
 /** A file that has gone is taken as deleted only after it has been gone this long: a cloud service may replace a file by removing it first. */
 const GONE_AFTER = 4000
 const DAY = 24 * 60 * 60 * 1000
+/** How many bytes of pictures are remembered between writes: 128 MiB. */
+const PICTURES_HELD = 128 * 2 ** 20
 
 const listing = (doc: Doc): Pick<NoteState, 'title' | 'pages' | 'assets' | 'rev'> => ({ title: doc.title, pages: doc.pages.length, assets: Object.keys(doc.asset).sort(), rev: doc.rev })
 
@@ -109,7 +111,11 @@ export class FolderLibrary implements LibraryStore {
   readonly #files = new Map<string, FileSeen>()
   #folders: FileInfo[] = []
   readonly #records = new Map<string, DeletedRecord>()
+  #recordFiles = new Map<string, { sig: string; record: DeletedRecord }>()
   readonly #gone = new Map<string, number>()
+  /** Pictures' bytes read of late, by what they hold, and how many bytes that is. */
+  readonly #pictures = new Map<string, Uint8Array>()
+  #pictureBytes = 0
   readonly #listeners = new Set<(change: OutsideChange) => void>()
   #changed = new Set<string>()
   #problem: string | undefined
@@ -246,14 +252,27 @@ export class FolderLibrary implements LibraryStore {
   }
 
   async #keepAssets(assets: Iterable<[string, Uint8Array]>): Promise<void> {
-    for (const [hash, bytes] of assets) if (!(await this.#local.info(`assets/${hash}`))) await this.#local.write(`assets/${hash}`, bytes)
+    for (const [hash, bytes] of assets) if (!this.#pictures.has(hash) && !(await this.#local.info(`assets/${hash}`))) await this.#local.write(`assets/${hash}`, bytes)
   }
 
+  /** The bytes of a note's pictures. Those just read are remembered: a note is written again with each pause in typing. */
   async #assetBytes(doc: Doc): Promise<Record<string, Uint8Array>> {
     const bytes: Record<string, Uint8Array> = {}
     for (const hash of Object.keys(doc.asset)) {
+      const held = this.#pictures.get(hash)
+      if (held) {
+        bytes[hash] = held
+        continue
+      }
       try {
-        bytes[hash] = await this.#local.read(`assets/${hash}`)
+        const read = await this.#local.read(`assets/${hash}`)
+        bytes[hash] = read
+        if (this.#pictureBytes + read.length > PICTURES_HELD) {
+          this.#pictures.clear()
+          this.#pictureBytes = 0
+        }
+        this.#pictures.set(hash, read)
+        this.#pictureBytes += read.length
       } catch {
         // Not kept: a picture nothing shows any more may have no bytes.
       }
@@ -270,7 +289,12 @@ export class FolderLibrary implements LibraryStore {
     await this.#local.remove(`notes/${id}.doc.json`)
     await this.#local.remove(`notes/${id}.base.json`)
     // Pictures no other note uses go too.
-    if (state) for (const hash of onlyUsedBy({ notes: [...this.#notes.values()].map((n) => this.#entry(n)), folders: [] }, new Set([id]), state.assets)) await this.#local.remove(`assets/${hash}`)
+    if (state) {
+      for (const hash of onlyUsedBy({ notes: [...this.#notes.values()].map((n) => this.#entry(n)), folders: [] }, new Set([id]), state.assets)) {
+        await this.#local.remove(`assets/${hash}`)
+        this.#pictures.delete(hash)
+      }
+    }
   }
 
   #lineage(state: NoteState): Lineage {
@@ -460,6 +484,12 @@ export class FolderLibrary implements LibraryStore {
   /** Bring one note and every file that holds it together: its content, and where it belongs. */
   async #settle(id: string, paths: string[]): Promise<void> {
     const before = this.#notes.get(id)
+    // Nothing new: the one file is where it was and as it was last read or written, and the copy holds no more.
+    if (before && !before.dirty && paths.length === 1 && paths[0] === before.path && this.#files.get(before.path)?.sig === before.file?.sig) {
+      this.#gone.delete(id)
+      return
+    }
+    const was = before ? JSON.stringify(before) : ''
     const files = paths.map((path) => ({ path, seen: this.#files.get(path)! })).filter((file) => !file.seen.problem)
     if (files.length === 0) {
       // Files that do not read yet are waited for; none at all, and the note is written again, or is gone.
@@ -535,7 +565,7 @@ export class FolderLibrary implements LibraryStore {
     }
     if (beside.includes(main)) await this.#keepBeside(state, main.path, main.seen)
     if (state.dirty) await this.#write(state)
-    else await this.#keep(state, await this.#doc(id))
+    else if (JSON.stringify(state) !== was) await this.#writeJson(this.#local, `notes/${id}.state.json`, state)
   }
 
   /** Look at the folder, and bring every note together with what is there now. */
@@ -558,12 +588,26 @@ export class FolderLibrary implements LibraryStore {
     this.#problem = undefined
     const was = this.#shape()
 
+    // When each deleted item went, and from where: read again only when its small file changed.
+    const told = new Map<string, { sig: string; record: DeletedRecord }>()
     this.#records.clear()
     for (const info of infos) {
       if (info.folder || !info.path.startsWith(`${HIDDEN}/deleted/`) || !info.path.endsWith('.json')) continue
+      const name = nameOf(info.path).slice(0, -'.json'.length)
+      const held = this.#recordFiles.get(name)
+      if (held?.sig === sigOf(info)) {
+        told.set(name, held)
+        this.#records.set(name, held.record)
+        continue
+      }
       const record = (await this.#readJson(this.#shared, info.path)) as Partial<DeletedRecord> | undefined
-      if (record && typeof record.at === 'number' && typeof record.from === 'string') this.#records.set(nameOf(info.path).slice(0, -'.json'.length), { at: record.at, from: record.from })
+      if (record && typeof record.at === 'number' && typeof record.from === 'string') {
+        const read = { at: record.at, from: record.from }
+        told.set(name, { sig: sigOf(info), record: read })
+        this.#records.set(name, read)
+      }
     }
+    this.#recordFiles = told
     this.#folders = infos.filter((info) => info.folder && !isHidden(info.path) && info.path !== BIN)
     const noteFiles = infos.filter((info) => !info.folder && isNote(info.path))
     const there = new Set(noteFiles.map((info) => info.path))

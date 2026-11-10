@@ -45,6 +45,10 @@ just that part change. It runs in the browser and as a Windows desktop app, and 
 - A library of notes and folders, kept on your device, and beside the note you are writing in: open another note in
   one click. It sits on the left or the right, and hides with its arrow.
 - Save and open notes as single `.shellnote` files.
+- In the Windows app, keep the library in a folder of your choice, where each note is a `.shellnote` file and folders
+  are folders. Choose a folder inside OneDrive, Dropbox, Google Drive or iCloud Drive, and the same folder on your
+  other computers, and your notes are the same on all of them: what two of them wrote apart is merged, and nothing is
+  lost. A change from another computer goes into the note you have open as you type.
 - Nothing is sent anywhere unless you choose a hosted AI model.
 
 ## Getting started
