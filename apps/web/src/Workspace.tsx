@@ -17,6 +17,7 @@ import { loadLog, saveLog } from './ai/log.js'
 import { loadSettings, missing, modelFrom, savedKey } from './ai/settings.js'
 import { keepWhenClosing } from './desktop.js'
 import { importNote } from './library/importing.js'
+import { LibrarySide, useLibrarySideAt } from './library/LibrarySide.js'
 import { libraryPictures } from './library/pictures.js'
 import { Settings } from './library/Settings.js'
 import type { LibraryStore } from './library/store.js'
@@ -144,6 +145,8 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
   const logRef = useRef(log)
   logRef.current = log
   const [settings, setSettings] = useState(false)
+  // The library beside the note, on the side the person keeps it.
+  const [sideAt, moveSide] = useLibrarySideAt()
 
 
   useEffect(() => {
@@ -577,6 +580,7 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
     if (editing && title !== store.doc.title) store.apply([{ op: 'update', id: store.doc.id, set: { title } }], { key: `title:${store.doc.id}` })
   }
   const status = statusOf(doc, file, note === undefined, now, openedAt)
+  const librarySide = <LibrarySide store={library} tabs={tabs} note={note} folder={folder} title={doc.title} at={sideAt} onMove={moveSide} />
 
   return (
     <div className="app">
@@ -670,6 +674,7 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
         </div>
       ) : null}
       <main className="main">
+        {sideAt === 'left' ? librarySide : null}
         {editing && hasBars('left') ? <BarStrip side="left">{barsAt('left')}</BarStrip> : null}
         {editing ? (
           <div className="main-middle">
@@ -689,6 +694,7 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
         )}
         {editing && hasBars('right') ? <BarStrip side="right">{barsAt('right')}</BarStrip> : null}
         {editing ? barsAt('float') : null}
+        {sideAt === 'right' ? librarySide : null}
       </main>
       {editing ? <AiLayer key={session.key} store={store} host={host} enabled={editing} /> : null}
       {settings ? <Settings onClose={() => setSettings(false)} /> : null}

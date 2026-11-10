@@ -158,6 +158,7 @@ async function walk(page: Page): Promise<void> {
 const PERSON: { why: string; name?: RegExp; cls?: RegExp; within?: RegExp }[] = [
   { why: "Note control: what is inside the note, the format bar's and the page's own", name: /^(Bold|Italic|Underline|Strikethrough|Code|Highlight|Subscript|Superscript|Link|Small|Normal size|Large|Extra large|Align left|Centre|Align right|Indent less|Indent more|Ticked|Block type|Font|Picture|Table|Paper)$/u },
   { why: 'Note control: adding and deleting pages is what is inside the note', cls: /nw-add-page|nw-page-insert|nw-page-delete/u },
+  { why: 'Where the person looks: the library beside the note shown or hidden, on either side, its folders opened, its search; its notes open with note.open', cls: /side-library-(toggle|move|folder|search|clear)/u },
   { why: "Opens a menu, a field or a dialog, whose own controls carry the commands (the pen's colours, a bar's places, a card's actions, the name typed, the folder chosen)", name: /^(Actions for .*|Pen settings|Video|Move the (tools|format) bar|Colour|Move to…|Rename|Paste again)$/u },
   { why: "In Recently deleted a card's click opens its menu, whose Restore and Delete for good carry the commands", name: /^(Folder|Note): .*Deleted /u },
   { why: 'Help: what the stroke recorder is, shown and put away', name: /^What is the stroke recorder\?$/u },

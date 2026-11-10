@@ -970,6 +970,316 @@ a {
   height: 100%;
 }
 
+/*
+ * The library beside a note, on the left or the right; hidden, a slim strip with its arrow. Its widths, border and
+ * all, are whole multiples of 4 pixels, so the pages beside it stay on whole screen pixels at 125, 150 and 175 %: a
+ * page a fraction of a pixel off draws its kept ink a little apart from the live line the pen drew.
+ */
+.side-library {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 272px;
+  min-height: 0;
+  border-left: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: 13px/1.3 var(--ui-font);
+}
+.side-library[data-at='left'] {
+  border-right: 1px solid var(--ui-border);
+  border-left: 0;
+}
+.side-library[data-shown='false'] {
+  align-items: center;
+  width: 44px;
+  padding-top: 8px;
+}
+.side-library-toggle {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+.side-library-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px 6px 14px;
+  color: var(--ui-text-2);
+}
+.side-library-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.side-library-find {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  margin: 4px 10px 8px;
+  padding: 0 4px 0 10px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-surface-2);
+  color: var(--ui-text-3);
+}
+.side-library-find:focus-within {
+  border-color: var(--ui-accent);
+  background: var(--ui-surface);
+}
+.side-library-search {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ui-text);
+  font: inherit;
+}
+.side-library-search::-webkit-search-cancel-button {
+  display: none;
+}
+.side-library-clear {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ui-text-2);
+  cursor: pointer;
+}
+.side-library-clear:hover {
+  background: var(--ui-hover);
+}
+.side-library-list {
+  flex: 1;
+  min-height: 0;
+  padding: 2px 6px 8px;
+  overflow: auto;
+}
+.side-tree,
+.side-tree ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.side-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.side-item {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px 0 calc(8px + var(--depth, 0) * 16px);
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ui-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.side-item:hover {
+  background: var(--ui-hover);
+}
+.side-item:focus-visible,
+.side-add:focus-visible,
+.side-library-action:focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: -2px;
+}
+.side-item svg {
+  flex: none;
+  color: var(--ui-text-3);
+}
+/* The note open now. */
+.side-item[aria-current='page'] {
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent-text);
+  font-weight: 600;
+}
+.side-item[aria-current='page'] svg {
+  color: currentColor;
+}
+.side-chevron {
+  transition: transform 0.12s;
+}
+.side-item[aria-expanded='true'] .side-chevron {
+  transform: rotate(90deg);
+}
+.side-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.side-where {
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  color: var(--ui-text-3);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.side-count {
+  flex: none;
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--ui-surface-2);
+  color: var(--ui-text-2);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+/* A new note in this folder: in place of the count while the pointer is on the line. */
+.side-add {
+  position: absolute;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: var(--ui-surface);
+  color: var(--ui-text-2);
+  cursor: pointer;
+  opacity: 0;
+}
+.side-row:hover .side-add,
+.side-add:focus-visible {
+  opacity: 1;
+}
+.side-row:hover .side-count {
+  visibility: hidden;
+}
+.side-add:hover {
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent-text);
+}
+.side-library-naming {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  margin-left: calc(4px + var(--depth, 0) * 16px);
+  padding: 0 8px;
+  border: 1px solid var(--ui-accent);
+  border-radius: 8px;
+  outline: 0;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: inherit;
+}
+.side-library-quiet {
+  margin: 12px 10px;
+  color: var(--ui-text-3);
+}
+.side-library-problem {
+  margin: 0 10px 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--ui-error-bg);
+  color: var(--ui-error-text);
+}
+.side-library-foot {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--ui-border);
+}
+.side-library-action {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font: 600 12px var(--ui-font);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.side-library-action:hover {
+  border-color: var(--ui-accent);
+  background: var(--ui-accent-soft);
+  color: var(--ui-accent-text);
+}
+/* Where nothing can hover (a finger), the + always shows, after the count. */
+@media (hover: none) {
+  .side-add {
+    opacity: 1;
+  }
+  .side-library-folder {
+    padding-right: 36px;
+  }
+  .side-row:hover .side-count {
+    visibility: visible;
+  }
+}
+/*
+ * A phone's width: the library comes over the pages instead of beside them, and hidden it takes no room at all, its
+ * arrow a small tab at the edge of the screen, low down.
+ */
+@media (max-width: 760px) {
+  .side-library[data-shown='false'] {
+    position: absolute;
+    bottom: 76px;
+    left: 0;
+    z-index: 30;
+    width: auto;
+    padding: 4px;
+    border: 1px solid var(--ui-border);
+    border-left: 0;
+    border-radius: 0 12px 12px 0;
+    box-shadow: var(--ui-shadow-2);
+  }
+  .side-library[data-shown='false'][data-at='right'] {
+    right: 0;
+    left: auto;
+    border-right: 0;
+    border-left: 1px solid var(--ui-border);
+    border-radius: 12px 0 0 12px;
+  }
+  .side-library[data-shown='true'] {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    width: min(300px, 86vw);
+    box-shadow: var(--ui-shadow-3);
+  }
+  .side-library[data-shown='true'][data-at='left'] {
+    right: auto;
+    left: 0;
+  }
+}
+
 .opening {
   display: grid;
   height: 100%;
