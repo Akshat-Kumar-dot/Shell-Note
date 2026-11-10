@@ -24,6 +24,13 @@ export function same(a: unknown, b: unknown): boolean {
   return true
 }
 
+/** JSON with the keys in order, so the same data always reads the same. */
+export function stable(value: unknown): string {
+  return JSON.stringify(value, (_key, inner: unknown) =>
+    inner && typeof inner === 'object' && !Array.isArray(inner) ? Object.fromEntries(Object.entries(inner).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : inner,
+  )
+}
+
 /** True when two blocks are the same but for `r`, the count of when each was last changed. */
 export function sameBlock(a: Block | undefined, b: Block | undefined): boolean {
   if (a === b) return true

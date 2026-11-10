@@ -64,6 +64,7 @@ export { hashBytes } from './io/hash.js'
 export { become, difference, same, sameBlock, sameContent } from './sync/diff.js'
 export { merge, type Merged, type MergeOptions } from './sync/merge.js'
 export { mergeList, mergeText } from './sync/text.js'
+export { compare, contentId, includes, Lineage, lineageText, mergeOptions, readLineage, Seen, seenByBoth } from './sync/lineage.js'
 export {
   emptyHistory,
   HISTORY_LIMIT,

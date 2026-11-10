@@ -10,6 +10,7 @@ One document is one zip file, with the extension `.shellnote`.
 doc.json              the document, without its blocks
 pages/<pageId>.json   the blocks on one page
 assets/<hash>         image bytes
+sync.json             only in a library kept in a synced folder (see Sync)
 ```
 
 The same layout unzipped is a folder, the **folder form**. The desktop app and the MCP server can use it directly.
@@ -174,6 +175,24 @@ The pen switches (`pen` on the document, from version 3) are `penOnly` (`auto`, 
 - `vt` on a stroke: `{ "m": "<media id>", "t": <tenths of a second>, "e"?: <tenths of a second> }`, which video the stroke was written beside, where it was as the pen went down, and, when later, where it was as the pen lifted (`e`, added the same day).
 
 Their ids are new to the document, like a block's. A file video's asset must be in the note; a clip's video and page must be too.
+
+## Sync
+
+A library kept in a folder that a cloud service copies between devices adds one small file to each note, `sync.json`. It lets a device tell "the other device saw all I wrote, and wrote more" from "we both wrote apart", with no server. A file without it opens as any note does, and a reader that does not know it skips it.
+
+```json
+{"v":1,"by":"k3J9x2Qa","at":1794300000000,"id":"5f2c9a0e41b7d3886a10c2e4f7b95d03","seen":{"Zp01mN7c":8,"k3J9x2Qa":12},"base":{"seen":{"Zp01mN7c":8},"rev":9}}
+```
+
+| Field | Meaning |
+|---|---|
+| `by` | The device that wrote this version: a random id it made for this library. It names nothing else. |
+| `at` | When that device last changed the note, in milliseconds since 1970. |
+| `id` | A fingerprint of the note's content, without `rev` and each block's `r`: two versions that hold the same have the same one. |
+| `seen` | The latest change of each device this version includes: the device's own `rev` of the note when it wrote that change. |
+| `base` | The last version this device took from another device or merged: what that one had seen, and this device's `rev` just after. Blocks whose `r` is above it are this device's own changes since. |
+
+Given two versions: when one has seen everything the other has, it is the newer and is taken as it is. When each has changes the other has not seen, they are merged block by block (`merge` in [packages/core/src/sync/merge.ts](../packages/core/src/sync/merge.ts)): a block changed on one device is taken from it, an edit stands against a removal, text changed in different words is merged, and a paragraph whose same words both changed is kept twice, one after the other. A file saved with Save, to share or keep, has no `sync.json`.
 
 ## Not stored in the file
 

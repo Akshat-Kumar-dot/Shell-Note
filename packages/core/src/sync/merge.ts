@@ -17,7 +17,7 @@
 // versions merge into the same note wherever it is done.
 import type { Block, Doc, Frame, Id, Page } from '../schema/doc.js'
 import { has } from '../util.js'
-import { same, sameBlock } from './diff.js'
+import { same, sameBlock, stable } from './diff.js'
 import { mergeList, mergeText } from './text.js'
 
 export interface MergeOptions {
@@ -52,13 +52,6 @@ const CONTENT = new Set(['md', 'caption', 'text', 'tex', 'src', 'asset', 'alt', 
 const PLACE = ['page', 'x', 'y', 'parent'] as const
 const SIZE = ['w', 'h'] as const
 const SKIPPED = new Set(['id', 'r', 'type', 'kids', 'strokes', ...PLACE, ...SIZE])
-
-/** JSON with the keys in order, so the same data always reads the same. */
-function stable(value: unknown): string {
-  return JSON.stringify(value, (_key, inner: unknown) =>
-    inner && typeof inner === 'object' && !Array.isArray(inner) ? Object.fromEntries(Object.entries(inner).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : inner,
-  )
-}
 
 const ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 

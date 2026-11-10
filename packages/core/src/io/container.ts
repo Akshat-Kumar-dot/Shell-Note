@@ -3,6 +3,7 @@
 //   doc.json              everything except the blocks
 //   pages/<pageId>.json   the blocks on one page
 //   assets/<hash>         image bytes
+//   sync.json             only in a library kept in a synced folder: what this version has seen (sync/lineage.ts)
 //
 // Unzipped, the same layout is a folder, which the desktop app and the MCP
 // server can use directly. Splitting blocks by page means a folder save only
@@ -12,6 +13,7 @@ import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from 'fflate'
 import { Asset, Id, Page, PenOverrides, type Block, type Doc } from '../schema/doc.js'
 import { has, isRecord } from '../util.js'
 import { parseDoc } from '../validate/doc.js'
+import { lineageText, readLineage, type Lineage } from '../sync/lineage.js'
 import { ValidationError } from '../validate/errors.js'
 import { canonicalBlock, parseWith } from '../validate/shape.js'
 
@@ -75,12 +77,15 @@ export interface Opened {
   doc: Doc
   /** Image bytes by hash, for the assets the document lists. */
   assets: Record<string, Uint8Array>
+  /** What the file says of its past, when it comes from a library kept in a synced folder. */
+  lineage?: Lineage
 }
 
-/** The document as one zip file. Images an image block uses must have their bytes in `assets`. */
-export function pack(doc: Doc, assets: Readonly<Record<string, Uint8Array>> = {}): Uint8Array {
+/** The document as one zip file. Images an image block uses must have their bytes in `assets`. `lineage` goes in as sync.json. */
+export function pack(doc: Doc, assets: Readonly<Record<string, Uint8Array>> = {}, lineage?: Lineage): Uint8Array {
   const zip: Zippable = {}
   for (const [path, text] of Object.entries(toFiles(doc))) zip[path] = strToU8(text)
+  if (lineage) zip[SYNC_PATH] = strToU8(lineageText(lineage))
   for (const hash of Object.keys(doc.asset).sort()) {
     const bytes = has(assets, hash) ? assets[hash] : undefined
     // Images and videos are compressed already, so they are stored as they are.
@@ -92,15 +97,18 @@ export function pack(doc: Doc, assets: Readonly<Record<string, Uint8Array>> = {}
   return zipSync(zip, { level: 6, mtime: FIXED_TIME })
 }
 
-/** Open a zip file written by pack(). Files that are not part of the format are ignored. */
-export function unpack(bytes: Uint8Array): Opened {
+/**
+ * Open a zip file written by pack(). Files that are not part of the format are ignored. With `assets: false` the
+ * images' bytes are not read: enough to list a note, or to see whether it changed.
+ */
+export function unpack(bytes: Uint8Array, options: { assets?: boolean } = {}): Opened {
   let entries: Record<string, Uint8Array>
   let count = 0
   let total = 0
   try {
     entries = unzipSync(bytes, {
       filter: (file) => {
-        if (!KNOWN_PATH.test(file.name)) return false
+        if (!KNOWN_PATH.test(file.name) || (options.assets === false && file.name.startsWith('assets/'))) return false
         total += file.originalSize
         if (++count > LIMITS.files || total > LIMITS.total || (file.name.endsWith('.json') && file.originalSize > LIMITS.json)) {
           throw new ValidationError('bad_doc', 'This file is too large to open safely.')
@@ -118,16 +126,18 @@ export function unpack(bytes: Uint8Array): Opened {
     if (path.startsWith('assets/')) found[path.slice('assets/'.length)] = data
     else files[path] = strFromU8(data)
   }
+  const lineage = readLineage(has(files, SYNC_PATH) ? files[SYNC_PATH] : undefined)
   const doc = fromFiles(files)
   const assets: Record<string, Uint8Array> = {}
   for (const hash of Object.keys(doc.asset)) if (has(found, hash)) assets[hash] = found[hash]!
-  return { doc, assets }
+  return { doc, assets, ...(lineage ? { lineage } : {}) }
 }
 
 // ----- details ----------------------------------------------------------------
 
 /** Every entry the format uses. Anything else in a zip is skipped, never read. */
-const KNOWN_PATH = /^(doc\.json|pages\/[A-Za-z0-9][A-Za-z0-9_-]{0,31}\.json|assets\/[0-9a-f]{4,64})$/
+const SYNC_PATH = 'sync.json'
+const KNOWN_PATH = /^(doc\.json|sync\.json|pages\/[A-Za-z0-9][A-Za-z0-9_-]{0,31}\.json|assets\/[0-9a-f]{4,64})$/
 const LIMITS = { files: 100_000, json: 64 * 2 ** 20, total: 2 ** 30 }
 /** A fixed timestamp, so the same document always packs to the same bytes. */
 const FIXED_TIME = new Date(2000, 0, 1)
