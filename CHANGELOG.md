@@ -19,3 +19,13 @@ All notable changes to ShellNote are listed here. The format follows
 - A library of notes and folders kept on the device, and notes saved as single `.shellnote` files.
 - A Windows desktop app, with other programs (a browser, a PDF reader, PowerPoint, VS Code) on a panel beside the
   note, and a VS Code companion extension.
+- Pages added between two pages, before the first or at the end, and deleted, each one step to undo.
+- The library beside a note: folders and notes, a search by name, a new note or folder, on the left or the right, hidden
+  or shown with its arrow.
+
+### Fixed
+
+- Full screen in the desktop app fills the whole screen from a maximised window, keeps the window buttons, and Esc
+  leaves it.
+- Deleting a page also removes the video marks placed on it, so the note still opens.
+- The window is titled ShellNote again after a note is closed.

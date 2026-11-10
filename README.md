@@ -14,6 +14,7 @@ just that part change. It runs in the browser and as a Windows desktop app, and 
 - Text, headings, lists, to-dos, tables, equations (LaTeX), pictures and Mermaid diagrams on real pages.
 - Editing that feels like a word processor: fonts, colours, sizes, a table grid, and a Select box you drag over any
   part of a page, like a snipping tool.
+- Add a page anywhere, between two pages or at the end, and delete one, with Undo.
 
 **A pen that keeps up**
 - Smooth ink with pressure, drawn as fast as the pen moves.
@@ -41,7 +42,9 @@ just that part change. It runs in the browser and as a Windows desktop app, and 
 - Private browser windows are never listed, shown or pictured, and no command or agent can control these programs.
 
 **Yours**
-- A library of notes and folders, kept on your device. Save and open notes as single `.shellnote` files.
+- A library of notes and folders, kept on your device, and beside the note you are writing in: open another note in
+  one click. It sits on the left or the right, and hides with its arrow.
+- Save and open notes as single `.shellnote` files.
 - Nothing is sent anywhere unless you choose a hosted AI model.
 
 ## Getting started
