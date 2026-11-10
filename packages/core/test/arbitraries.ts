@@ -43,16 +43,19 @@ function pick<T>(list: readonly T[], n: number): T | undefined {
 export class Namer {
   private count = 0
 
+  /** `prefix`: the first letter of its ids, so two namers stand for two devices, whose ids never meet. */
+  constructor(private readonly prefix = 'z') {}
+
   id(doc: Doc): string {
     for (;;) {
-      const id = `z${this.count++}`
+      const id = `${this.prefix}${this.count++}`
       if (!idTaken(doc, id)) return id
     }
   }
 
   hash(doc: Doc): string {
     for (;;) {
-      const hash = (0xab000 + this.count++).toString(16)
+      const hash = ((this.prefix === 'z' ? 0xab000 : 0xcd000) + this.count++).toString(16)
       if (!has(doc.asset, hash)) return hash
     }
   }
