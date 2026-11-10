@@ -20,7 +20,7 @@
 //
 // The merging knows nothing of files, and the files nothing of notes
 // (files.ts), so a drive reached another way can use both as they are.
-import { apply, become, compare, contentId, createDoc, idFrom, includes, merge, mergeOptions, newId, pack, parseDoc, PenProfile, sameContent, seenByBoth, unpack, validateDoc, ValidationError, type Doc, type Lineage, type Opened, type Seen } from '@shellnote/core'
+import { apply, become, compare, contentId, createDoc, idFrom, includes, lineageText, merge, mergeOptions, newId, pack, parseDoc, PenProfile, sameContent, seenByBoth, unpack, validateDoc, ValidationError, type Doc, type Lineage, type Opened, type Seen } from '@shellnote/core'
 import type { FileState } from '../../storage/cache.js'
 import { EXTENSION } from '../../storage/files.js'
 import { KEPT_DAYS, type Exchanged, type ExchangedNote, type FolderEntry, type ItemRef, type Library, type LibraryStore, type NoteEntry, type OpenedNote, type OutsideChange, type SavingNote } from '../store.js'
@@ -59,6 +59,7 @@ interface FileSeen {
   /** The note it holds, and the fingerprint of its content. */
   note?: string
   cid?: string
+  title?: string
   lineage?: Lineage
   modified: number
   /** It does not read (half copied or damaged), or was made by a newer ShellNote. */
@@ -88,7 +89,7 @@ const decoder = new TextDecoder()
 const GONE_AFTER = 4000
 const DAY = 24 * 60 * 60 * 1000
 
-const listing = (doc: Doc): Pick<NoteState, 'title' | 'pages' | 'assets' | 'rev'> => ({ title: doc.title, pages: doc.pages.length, assets: Object.keys(doc.asset), rev: doc.rev })
+const listing = (doc: Doc): Pick<NoteState, 'title' | 'pages' | 'assets' | 'rev'> => ({ title: doc.title, pages: doc.pages.length, assets: Object.keys(doc.asset).sort(), rev: doc.rev })
 
 export class FolderLibrary implements LibraryStore {
   readonly #shared: Files
@@ -243,7 +244,7 @@ export class FolderLibrary implements LibraryStore {
     const before = this.#files.get(info.path)
     if (before?.sig === sig) return before
     const opened = await this.#open(info.path, false)
-    const seen: FileSeen = typeof opened === 'string' ? { sig, modified: info.modified, problem: opened } : { sig, modified: info.modified, note: opened.doc.id, cid: opened.lineage?.id ?? (await contentId(opened.doc)), ...(opened.lineage ? { lineage: opened.lineage } : {}) }
+    const seen: FileSeen = typeof opened === 'string' ? { sig, modified: info.modified, problem: opened } : { sig, modified: info.modified, note: opened.doc.id, title: opened.doc.title, cid: opened.lineage?.id ?? (await contentId(opened.doc)), ...(opened.lineage ? { lineage: opened.lineage } : {}) }
     this.#files.set(info.path, seen)
     return seen
   }
@@ -262,7 +263,7 @@ export class FolderLibrary implements LibraryStore {
         return
       }
       // Another note took this name meanwhile: this one goes beside it.
-      if (!seen.problem && seen.note !== state.id) state.path = this.#freePath(folderOf(state.path), state.title)
+      if (!seen.problem && seen.note !== state.id) state.path = await this.#freePath(folderOf(state.path), state.title)
     }
     const doc = await this.#doc(state.id)
     await this.#shared.write(state.path, pack(doc, await this.#assetBytes(doc), this.#lineage(state)))
@@ -274,15 +275,23 @@ export class FolderLibrary implements LibraryStore {
     await this.#keep(state, doc)
   }
 
-  /** A path not taken in a folder for a note of this title. */
-  #freePath(folder: string, title: string, but?: string): string {
+  /** A name not taken in a folder: by what was listed last, then by the folder itself, where a file may have arrived since. */
+  async #free(folder: string, wanted: string, extension: string, but?: string): Promise<string> {
     const taken = [...this.#files.keys(), ...this.#folders.map((f) => f.path)].filter((path) => folderOf(path) === folder && path !== but).map(nameOf)
-    return join(folder, freeName(titleStem(title), EXTENSION, taken))
+    for (;;) {
+      const path = join(folder, freeName(wanted, extension, taken))
+      if (!(await this.#shared.info(path))) return path
+      taken.push(nameOf(path))
+    }
   }
 
-  #freeFolder(folder: string, name: string): string {
-    const taken = [...this.#files.keys(), ...this.#folders.map((f) => f.path)].filter((path) => folderOf(path) === folder).map(nameOf)
-    return join(folder, freeName(name, '', taken))
+  /** A path not taken in a folder for a note of this title. */
+  #freePath(folder: string, title: string, but?: string): Promise<string> {
+    return this.#free(folder, titleStem(title), EXTENSION, but)
+  }
+
+  #freeFolder(folder: string, name: string): Promise<string> {
+    return this.#free(folder, name, '')
   }
 
   // ----- taking in what arrived -----------------------------------------------------
@@ -352,7 +361,7 @@ export class FolderLibrary implements LibraryStore {
     await this.#keepAssets(Object.entries(opened.assets))
     const day = new Date(this.#now()).toISOString().slice(0, 10)
     const doc = validateDoc({ ...opened.doc, id, title: `${opened.doc.title} (conflicted copy ${day})` })
-    const fresh: NoteState = { id, path: this.#freePath(folderOf(state.path), doc.title), ...listing(doc), created: this.#now(), edited: this.#now(), cid: await contentId(doc), at: this.#now(), seen: { [this.#device]: doc.rev }, dirty: true }
+    const fresh: NoteState = { id, path: await this.#freePath(folderOf(state.path), doc.title), ...listing(doc), created: this.#now(), edited: this.#now(), cid: await contentId(doc), at: this.#now(), seen: { [this.#device]: doc.rev }, dirty: true }
     await this.#keep(fresh, doc)
     await this.#write(fresh)
     this.#changed.add(id)
@@ -420,7 +429,10 @@ export class FolderLibrary implements LibraryStore {
     this.#gone.delete(id)
 
     // Where the note belongs: the file put there last says. A deleted one does not stand over a note changed since.
-    const order = [...files].sort((a, b) => (b.seen.lineage?.put ?? 0) - (a.seen.lineage?.put ?? 0) || (a.path === before?.path ? -1 : b.path === before?.path ? 1 : a.path < b.path ? -1 : 1))
+    // Of two put there at once, or never moved: the one named as its title asks, as a service's conflicted copy never is.
+    // Nothing here depends on the device, so every device chooses the same file.
+    const fits = (file: (typeof files)[number]): number => (file.seen.title === undefined ? 2 : titleStem(file.seen.title).toLocaleLowerCase() === stem(nameOf(file.path)).toLocaleLowerCase() ? 0 : namedFor(nameOf(file.path), file.seen.title) ? 1 : 2)
+    const order = [...files].sort((a, b) => (b.seen.lineage?.put ?? 0) - (a.seen.lineage?.put ?? 0) || fits(a) - fits(b) || a.path.length - b.path.length || (a.path < b.path ? -1 : 1))
     let main = order[0]!
     if (inBin(main.path)) {
       const alive = order.find((file) => !inBin(file.path) && !includes(main.seen.lineage?.seen ?? {}, file.seen.lineage?.seen ?? {}))
@@ -428,6 +440,9 @@ export class FolderLibrary implements LibraryStore {
     }
     const edited = before !== undefined && !inBin(before.path) && !includes(main.seen.lineage?.seen ?? {}, before.seen)
     const mainCid = main.seen.cid
+    // The very same version in a second file was copied there by hand; two devices never write the same version twice.
+    const mainLineage = main.seen.lineage
+    const copied = (seen: FileSeen): boolean => seen.cid === mainCid && (seen.lineage && mainLineage ? lineageText(seen.lineage) === lineageText(mainLineage) : !seen.lineage && !mainLineage)
 
     const beside: typeof files = []
     for (const file of [main, ...files.filter((other) => other !== main)]) {
@@ -445,7 +460,7 @@ export class FolderLibrary implements LibraryStore {
     if (state.path !== main.path) {
       if (edited && inBin(main.path)) {
         // Deleted on another device, and changed here since: the change brings it back to where it was.
-        const back = this.#freePath(this.#folders.some((f) => f.path === folderOf(state.path)) ? folderOf(state.path) : '', state.title)
+        const back = await this.#freePath(this.#folders.some((f) => f.path === folderOf(state.path)) ? folderOf(state.path) : '', state.title)
         await this.#shared.move(main.path, back)
         await this.#record(nameOf(main.path), undefined)
         this.#files.delete(main.path)
@@ -465,7 +480,7 @@ export class FolderLibrary implements LibraryStore {
         await this.#keepBeside(state, file.path, file.seen)
         await this.#shared.remove(file.path)
         this.#files.delete(file.path)
-      } else await this.#retire(state, file.path, file.seen, file.seen.cid === mainCid && !file.seen.lineage?.put)
+      } else await this.#retire(state, file.path, file.seen, copied(file.seen))
       this.#changed.add('')
     }
     if (beside.includes(main)) await this.#keepBeside(state, main.path, main.seen)
@@ -645,7 +660,7 @@ export class FolderLibrary implements LibraryStore {
     state.dirty = true
     await this.#keep(state, doc)
     if (!namedFor(nameOf(state.path), doc.title) && !inBin(state.path)) {
-      const target = this.#freePath(folderOf(state.path), doc.title, state.path)
+      const target = await this.#freePath(folderOf(state.path), doc.title, state.path)
       if (await this.#shared.info(state.path)) {
         await this.#shared.move(state.path, target)
         const seen = this.#files.get(state.path)
@@ -653,6 +668,8 @@ export class FolderLibrary implements LibraryStore {
         if (seen) this.#files.set(target, seen)
       }
       state.path = target
+      // Of two devices that named it at once, the later name stands.
+      state.put = this.#now()
       this.#changed.add('')
     }
     await this.#write(state)
@@ -660,7 +677,7 @@ export class FolderLibrary implements LibraryStore {
 
   async #newState(doc: Doc, folder: string): Promise<NoteState> {
     const now = this.#now()
-    return { id: doc.id, path: this.#freePath(folder, doc.title), ...listing(doc), created: now, edited: now, cid: await contentId(doc), at: now, seen: { [this.#device]: doc.rev }, dirty: true }
+    return { id: doc.id, path: await this.#freePath(folder, doc.title), ...listing(doc), created: now, edited: now, cid: await contentId(doc), at: now, seen: { [this.#device]: doc.rev }, dirty: true }
   }
 
   save(note: SavingNote): Promise<NoteEntry> {
@@ -717,7 +734,7 @@ export class FolderLibrary implements LibraryStore {
     return this.#act(async () => {
       const library = this.#library()
       const home = parent !== null && library.folders.some((f) => f.id === parent) && !inBin(this.#folderPath(parent)) ? this.#folderPath(parent) : ''
-      const path = this.#freeFolder(home, 'Untitled folder')
+      const path = await this.#freeFolder(home, 'Untitled folder')
       await this.#shared.makeFolder(path)
       const info = (await this.#shared.info(path)) ?? { path, folder: true, size: 0, modified: this.#now() }
       this.#folders.push(info)
@@ -768,10 +785,10 @@ export class FolderLibrary implements LibraryStore {
       const home = this.#folderPath(to)
       if (item.kind === 'note') {
         const state = this.#state(item.id)
-        if (folderOf(state.path) !== home) await this.#put(state, this.#freePath(home, stem(nameOf(state.path))))
+        if (folderOf(state.path) !== home) await this.#put(state, await this.#freePath(home, stem(nameOf(state.path))))
       } else {
         const path = this.#folderPath(item.id)
-        if (folderOf(path) !== home) await this.#shared.move(path, this.#freeFolder(home, nameOf(path)))
+        if (folderOf(path) !== home) await this.#shared.move(path, await this.#freeFolder(home, nameOf(path)))
       }
     })
   }
@@ -781,7 +798,7 @@ export class FolderLibrary implements LibraryStore {
       const path = item.kind === 'note' ? this.#state(item.id).path : this.#folderPath(item.id)
       if (binned(path)) return
       // Out of a deleted folder too: it then waits in Recently deleted by itself.
-      const target = item.kind === 'note' ? this.#freePath(BIN, stem(nameOf(path))) : this.#freeFolder(BIN, nameOf(path))
+      const target = item.kind === 'note' ? await this.#freePath(BIN, stem(nameOf(path))) : await this.#freeFolder(BIN, nameOf(path))
       await this.#record(nameOf(target), { at: this.#now(), from: inBin(path) ? '' : folderOf(path) })
       if (item.kind === 'note') await this.#put(this.#state(item.id), target)
       else await this.#shared.move(path, target)
@@ -795,8 +812,8 @@ export class FolderLibrary implements LibraryStore {
       // Back to its folder, or to the top level when that folder is gone or deleted itself.
       const from = this.#records.get(nameOf(path))?.from ?? ''
       const home = from !== '' && this.#folders.some((f) => f.path === from) && !inBin(from) ? from : ''
-      if (item.kind === 'note') await this.#put(this.#state(item.id), this.#freePath(home, stem(nameOf(path))))
-      else await this.#shared.move(path, this.#freeFolder(home, nameOf(path)))
+      if (item.kind === 'note') await this.#put(this.#state(item.id), await this.#freePath(home, stem(nameOf(path))))
+      else await this.#shared.move(path, await this.#freeFolder(home, nameOf(path)))
       await this.#record(nameOf(path), undefined)
     })
   }
