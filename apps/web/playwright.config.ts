@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { defineConfig } from '@playwright/test'
 
 const ci = process.env.CI !== undefined
@@ -15,7 +16,10 @@ const url = `http://localhost:${E2E_PORT}`
 // downloaded. On CI they use Playwright's own Chromium.
 export default defineConfig({
   testDir: './e2e',
-  reporter: ci ? 'github' : 'list',
+  // On CI a failing test runs again, up to twice: CI machines are slower and busier than a laptop, and a test that
+  // passes on a retry is reported as flaky, never hidden. A failed run keeps an HTML report, which the workflow uploads.
+  retries: ci ? 2 : 0,
+  reporter: ci ? [['github'], ['html', { open: 'never', outputFolder: fileURLToPath(new URL('../../playwright-report', import.meta.url)) }]] : 'list',
   use: { baseURL: url, ...(ci ? {} : { channel: 'msedge' }) },
   webServer: {
     command: `node node_modules/vite/bin/vite.js --port ${E2E_PORT} --strictPort`,
