@@ -9,14 +9,15 @@
 // dependencies. A build script's or a macro's own dependencies run only while
 // building, on the developer's machine.
 //
-// It writes apps/desktop/licences/third-party-rust.txt: the licence texts of
-// the excepted packages, which the desktop build copies into the app.
+// It writes apps/desktop/licences/third-party-rust.txt: the licence notice of
+// every package the app ships, which the desktop build copies into the app.
 //
 // Run: corepack pnpm licences:rust (the desktop build runs it first).
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { chosenFiles, entry, mitText, offersMit, readTexts, webAddress } from './notices.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const manifest = join(root, 'apps/desktop/src-tauri/Cargo.toml')
@@ -76,7 +77,15 @@ export function shipped() {
     }
     for (const id of seen) {
       const p = packages.get(id)
-      found.set(`${p.name}@${p.version}`, { name: p.name, version: p.version, licence: p.license ?? undefined, dir: dirname(p.manifest_path), licenceFile: p.license_file ?? undefined })
+      found.set(`${p.name}@${p.version}`, {
+        name: p.name,
+        version: p.version,
+        licence: p.license ?? undefined,
+        dir: dirname(p.manifest_path),
+        licenceFile: p.license_file ?? undefined,
+        authors: (p.authors ?? []).map((author) => author.replace(/\s*[<(].*$/u, '').trim()).filter(Boolean),
+        repository: webAddress(p.repository ?? undefined),
+      })
     }
   }
   return [...found.values()].sort((a, b) => a.name.localeCompare(b.name) || a.version.localeCompare(b.version, 'en', { numeric: true }))
@@ -99,35 +108,38 @@ export function problems(packages = shipped()) {
 
 /**
  * Notices kept here for packages published without their licence file, taken
- * from their own repository: alloc-stdlib 0.3 names BSD-3-Clause but ships no
+ * from their own projects: alloc-stdlib 0.3 names BSD-3-Clause but ships no
  * text; its repository's LICENSE (dropbox/rust-alloc-no-stdlib) is the one
- * alloc-no-stdlib ships, word for word (checked 18 October 2026).
+ * alloc-no-stdlib ships, word for word (checked 18 October 2026). selectors
+ * 0.38 names MPL-2.0 but ships no text; the Mozilla Public License 2.0, as
+ * cssparser, of the same Servo project, ships it (10 November 2026).
  */
 const notices = join(root, 'apps/desktop/licences/notices')
 
-/** The licence files in a package's folder: LICENSE, LICENSE-MIT, COPYING and the like, or the one its manifest names. */
+/**
+ * The licence notices of one package: the file its manifest names; or its licence files (where its licence is a
+ * choice, the MIT one); or one kept in `notices`; or, for one published without and under MIT, MIT's standard text
+ * with the authors it names.
+ */
 function licenceTexts(pkg) {
-  if (pkg.licenceFile) return [readFileSync(join(pkg.dir, pkg.licenceFile), 'utf8')]
+  if (pkg.licenceFile) return readTexts(pkg.dir, [pkg.licenceFile])
   const files = readdirSync(pkg.dir).filter((name) => /^(?:licen[cs]e|copying|unicode)(?:[-_.][\w.-]*)?$/iu.test(name)).sort()
-  if (files.length > 0) return files.map((file) => readFileSync(join(pkg.dir, file), 'utf8'))
+  if (files.length > 0) return readTexts(pkg.dir, chosenFiles(files, pkg.licence))
   const kept = join(notices, `${pkg.name}.txt`)
-  if (existsSync(kept)) return [readFileSync(kept, 'utf8')]
+  if (existsSync(kept)) return [readFileSync(kept, 'utf8').replace(/\r\n/gu, '\n').trim()]
+  if (offersMit(pkg.licence)) return [mitText(pkg.authors.length > 0 ? pkg.authors.join(', ') : `the ${pkg.name} authors`)]
   throw new Error(`No licence file in ${pkg.dir}, and none kept in ${notices}`)
 }
 
-/** apps/desktop/licences/third-party-rust.txt: the licence texts of the excepted packages the app ships. */
+/** apps/desktop/licences/third-party-rust.txt: the licence notice of every package the app ships. */
 export function thirdParty(packages = shipped()) {
-  const rule = '='.repeat(78)
   const parts = [
-    'Rust code built into the ShellNote app under licences other than MIT, Apache-2.0, MPL-2.0 and ISC',
+    'Rust packages built into the ShellNote desktop app',
     '',
-    "These packages come with Tauri; their licences are allowed by the project's licence policy. Each package's licence text follows its name.",
+    'ShellNote is open source under the Apache License 2.0. Its desktop app is built with the Rust packages below, each under its own licence, whose notice follows its name. Where a package offers a choice of licences, ShellNote takes it under MIT.',
     '',
   ]
-  for (const pkg of packages.filter(excepted)) {
-    parts.push(rule, `${pkg.name} ${pkg.version} (${pkg.licence})`, rule, '')
-    for (const text of licenceTexts(pkg)) parts.push(text.replace(/\r\n/gu, '\n').trim(), '')
-  }
+  for (const pkg of packages) parts.push(...entry(`${pkg.name} ${pkg.version} (${pkg.licence})`, pkg.repository, licenceTexts(pkg)))
   return parts.join('\n')
 }
 

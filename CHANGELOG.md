@@ -33,3 +33,4 @@ All notable changes to ShellNote are listed here. The format follows
   leaves it.
 - Deleting a page also removes the video marks placed on it, so the note still opens.
 - The window is titled ShellNote again after a note is closed.
+- Every open-source package the app is built on now has its licence notice shipped with the app, not only a few.

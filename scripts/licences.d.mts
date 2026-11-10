@@ -6,12 +6,13 @@ export interface Shipped {
   dir: string
   /** The package that brought it in, or "the workspace". */
   via: string
+  /** One of ShellNote's own packages, under the project's own licence. */
+  own?: boolean
 }
 export interface Exception {
   name: string
   version: string
   licence: string
-  ship?: boolean
   file?: boolean
   why: string
 }
