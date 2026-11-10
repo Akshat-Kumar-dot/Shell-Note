@@ -3,7 +3,7 @@
 // it comes from typing, the toolbar, undo, or later an AI edit, and each
 // listener hears which blocks changed and who made the change, so the frame
 // being typed in does not redraw what it already shows.
-import { apply, emptyHistory, record, redo, undo, type Applied, type Doc, type History, type Id, type Op, type Selection } from '@shellnote/core'
+import { apply, become, emptyHistory, merge, rebase, record, redo, undo, type Applied, type Doc, type History, type Id, type Op, type Selection } from '@shellnote/core'
 import { AssetStore } from './assets.js'
 
 export interface Change {
@@ -178,6 +178,35 @@ export class EditorStore {
     this.#doc = moved.doc
     this.#history = moved.history
     this.#emit(moved.changed, undefined, false)
+    return true
+  }
+
+  /**
+   * Take in a version of the note that came from elsewhere, such as another
+   * device: `since` is the note as this store and the library last agreed on
+   * it, `theirs` the note the library holds now. What was typed here since
+   * stays, merged with what came in (core's merge). It goes in through apply,
+   * as one change that is no undo step; the steps there are fitted to the
+   * note as it now is, so Undo still takes back what the person did and
+   * leaves what came in. Returns whether the note changed. Throws, changing
+   * nothing, when the two cannot be brought together.
+   */
+  absorb(since: Doc, theirs: Doc): boolean {
+    const before = this.#doc
+    // What the person just did here stands over the same small thing changed elsewhere.
+    const result = become(before, merge(before, theirs, { base: since, first: 'mine' }).doc)
+    if (result.changed.length === 0) return false
+    this.#doc = result.doc
+    this.#history = rebase(this.#history, before, result.doc)
+    // What is selected may be gone now.
+    const there = (id: Id): boolean => Object.hasOwn(result.doc.block, id)
+    const { blocks, range, words, here } = this.#selection
+    const hereStays = here === undefined || ('parent' in here ? there(here.parent) : Object.hasOwn(result.doc.page, here.page))
+    if (blocks.some((id) => !there(id)) || (range && !there(range.block)) || words?.some((word) => !there(word.block)) || !hereStays) {
+      const kept = words?.filter((word) => there(word.block))
+      this.select({ blocks: blocks.filter(there), ...(range && there(range.block) ? { range } : {}), ...(kept && kept.length > 0 ? { words: kept } : {}), ...(here && hereStays ? { here } : {}) }, this.#kind)
+    }
+    this.#emit(result.changed, undefined, false)
     return true
   }
 

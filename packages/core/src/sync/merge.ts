@@ -87,6 +87,7 @@ function three<T>(first: T, second: T, base: T | undefined, known: boolean): { v
  * put after what comes before it there. Only `members` are kept.
  */
 function orderOf(first: readonly Id[], second: readonly Id[], base: readonly Id[] | undefined, members: ReadonlySet<Id>): Id[] {
+  if (first === second || same(first, second)) return first.filter((id) => members.has(id))
   let lead = first
   let rest = second
   if (base) {
