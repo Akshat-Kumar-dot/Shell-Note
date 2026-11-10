@@ -223,6 +223,19 @@ describe('page', () => {
     expect(doc.block.f1).not.toHaveProperty('next')
   })
 
+  it("takes a video's marks on a removed page with it, and undo puts them back", () => {
+    const lecture = { id: 'vid00001', kind: 'youtube' as const, video: 'dQw4w9WgXcQ', title: 'A lecture' }
+    const mark = (id: string, page: string) => ({ id, media: 'vid00001', from: 7500, to: 7900, page, x: 2000, y: 3000 })
+    const marked = (clips: ReturnType<typeof mark>[]): Doc =>
+      apply(base, [
+        { op: 'page', add: blankPage('p2') },
+        { op: 'update', id: base.id, set: { media: [lecture], clips } },
+      ]).doc
+    expect(step(marked([mark('clp00001', 'p1'), mark('clp00002', 'p2')]), [{ op: 'page', remove: 'p2' }]).doc.clips).toEqual([mark('clp00001', 'p1')])
+    // The only mark gone, the note has none.
+    expect(step(marked([mark('clp00002', 'p2')]), [{ op: 'page', remove: 'p2' }]).doc).not.toHaveProperty('clips')
+  })
+
   it('keeps at least one page, and pages are added empty', () => {
     expectError(() => apply(base, [{ op: 'page', remove: 'p1' }]), 'last_page')
     expectError(() => apply(base, [{ op: 'page', add: { ...blankPage('p2'), free: ['g1'] } }]), 'not_empty')

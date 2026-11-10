@@ -436,10 +436,16 @@ function page(draft: Draft, op: OpOf<'page'>): Op[] {
       readd.unshift(back.readd)
       relink.push(...back.relink)
     }
+    // A video's marks placed on this page go with it: a mark on a page the note lacks would make the note unreadable.
+    const clips = draft.doc.clips ?? []
+    const kept = clips.filter((clip) => clip.page !== gone.id)
+    const marks: Op[] = kept.length < clips.length ? [{ op: 'update', id: draft.doc.id, set: { clips } }] : []
+    if (marks.length > 0) draft.setDocFields({ clips: kept })
     draft.dropPage(gone.id)
     draft.setPages(removed(pages, at))
-    // The page first, as its blocks need it; links last, as they point at frames that must be back by then.
-    return [{ op: 'page', add: { ...gone, free: [] }, at }, ...readd.flat(), ...relink]
+    // The page first, as its blocks and marks need it; then its blocks, the links (they point at frames that must be
+    // back by then), and the marks.
+    return [{ op: 'page', add: { ...gone, free: [] }, at }, ...readd.flat(), ...relink, ...marks]
   }
 
   const id = op.move!
