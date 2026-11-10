@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Headless document model and operations for AI-editable notes. No DOM, no framework.",
-  "license": "MIT OR Apache-2.0",
+  "license": "Apache-2.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

@@ -127,6 +127,8 @@ Please report vulnerabilities privately, as described in [SECURITY.md](SECURITY.
 
 ## License
 
-ShellNote is dual-licensed under the [MIT License](LICENSE-MIT) and the [Apache License 2.0](LICENSE-APACHE); you
-may use it under either. The licences of the packages it uses are listed in
-[`apps/web/public/licences`](apps/web/public/licences).
+ShellNote is licensed under the [Apache License 2.0](LICENSE). Copyright 2026 Akshat Kumar; see [NOTICE](NOTICE).
+
+ShellNote is built on open-source packages, each under its own licence. Their notices ship with every copy of the app
+and are listed in [`apps/web/public/licences`](apps/web/public/licences) and
+[`apps/desktop/licences`](apps/desktop/licences).

@@ -71,5 +71,5 @@ Common prefixes: `core:`, `editor:`, `web:`, `desktop:`, `providers:`, `docs:`, 
 
 ## License
 
-By contributing, you agree that your contributions are licensed under the project's dual licence,
-[MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE), at the user's option.
+By contributing, you agree that your contributions are licensed under the project's licence, the
+[Apache License 2.0](LICENSE), as its section 5 describes.

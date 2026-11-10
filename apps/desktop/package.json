@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "ShellNote as an installed app (Tauri 2): the web app in the system's own web view, with Rust for what a browser cannot do. Windows first.",
-  "license": "MIT OR Apache-2.0",
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "node run.mjs dev",

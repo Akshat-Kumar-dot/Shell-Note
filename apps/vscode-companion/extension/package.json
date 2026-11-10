@@ -4,7 +4,7 @@
   "description": "Tells ShellNote the file and line this window is at, so a line of notes written beside it can go back there. Stays on this computer: no network, no port.",
   "version": "0.1.0",
   "publisher": "shellnote",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "engines": {
     "vscode": "^1.60.0"
   },

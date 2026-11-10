@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "The ShellNote web app (Vite and React). Installable as a PWA later.",
-  "license": "MIT OR Apache-2.0",
+  "license": "Apache-2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

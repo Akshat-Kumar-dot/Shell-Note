@@ -23,6 +23,10 @@ All notable changes to ShellNote are listed here. The format follows
 - The library beside a note: folders and notes, a search by name, a new note or folder, on the left or the right, hidden
   or shown with its arrow.
 
+### Changed
+
+- ShellNote is now licensed under the Apache License 2.0 alone, in place of a choice of MIT or Apache-2.0.
+
 ### Fixed
 
 - Full screen in the desktop app fills the whole screen from a maximised window, keeps the window buttons, and Esc
