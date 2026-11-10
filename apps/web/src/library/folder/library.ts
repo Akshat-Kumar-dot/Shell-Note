@@ -80,6 +80,11 @@ export interface FolderLibraryOptions {
   now?: () => number
   /** Runs one piece of work at a time across every window of the app; in one window, one after another is enough. */
   lock?: <T>(work: () => Promise<T>) => Promise<T>
+  /**
+   * A word every window of the app can read and set, such as one kept by the browser: a window that changed this
+   * device's copies sets a new one, so the others know to read them again before they go on.
+   */
+  mark?: { read(): string | null; write(value: string): void }
 }
 
 const sigOf = (info: FileInfo): string => `${info.size}:${info.modified}`
@@ -109,21 +114,51 @@ export class FolderLibrary implements LibraryStore {
   #changed = new Set<string>()
   #problem: string | undefined
   #timer: ReturnType<typeof setInterval> | undefined
+  readonly #mark: FolderLibraryOptions['mark']
+  /** The word this window last read or set, and whether it has changed this device's copies since. */
+  #word: string | null = null
+  #wrote = false
 
   constructor(options: FolderLibraryOptions) {
     this.#shared = options.shared
-    this.#local = options.local
+    const local = options.local
+    const noting = <A extends unknown[]>(change: (...args: A) => Promise<void>) => (...args: A): Promise<void> => {
+      this.#wrote = true
+      return change(...args)
+    }
+    this.#local = { list: () => local.list(), info: (path) => local.info(path), read: (path) => local.read(path), write: noting((path, bytes) => local.write(path, bytes)), move: noting((from, to) => local.move(from, to)), remove: noting((path) => local.remove(path)), makeFolder: noting((path) => local.makeFolder(path)) }
     this.#now = options.now ?? Date.now
     this.#lock = options.lock ?? ((work) => work())
+    this.#mark = options.mark
   }
 
   // ----- one thing at a time ---------------------------------------------------
 
   #run<T>(work: () => Promise<T>): Promise<T> {
-    const next = this.#queue.then(() => this.#lock(async () => {
-      await (this.#loaded ??= this.#load())
-      return work()
-    }))
+    const next = this.#queue.then(() =>
+      this.#lock(async () => {
+        if (this.#loaded) {
+          // Another window changed this device's copies: what this one remembers of them is read again.
+          const word = this.#mark?.read() ?? null
+          if (word !== this.#word) {
+            this.#word = word
+            await this.#remember()
+          }
+        } else {
+          this.#word = this.#mark?.read() ?? null
+          await (this.#loaded = this.#load())
+        }
+        try {
+          return await work()
+        } finally {
+          if (this.#wrote && this.#mark) {
+            this.#word = newId()
+            this.#mark.write(this.#word)
+          }
+          this.#wrote = false
+        }
+      }),
+    )
     this.#queue = next.catch(() => undefined)
     return next
   }
@@ -158,30 +193,44 @@ export class FolderLibrary implements LibraryStore {
       this.#device = newId()
       await this.#writeJson(this.#local, 'device.json', { id: this.#device })
     }
-    // Each note's copy says what is known of it; nothing else is kept between starts.
-    for (const info of await this.#local.list()) {
-      if (info.folder || !/^notes\/[A-Za-z0-9_-]+\.json$/u.test(info.path) || info.path.endsWith('.base.json')) continue
-      const kept = (await this.#readJson(this.#local, info.path)) as { state?: NoteState } | undefined
-      if (kept?.state && typeof kept.state.id === 'string' && typeof kept.state.path === 'string') this.#notes.set(kept.state.id, kept.state)
-    }
+    await this.#remember()
     await this.#look()
+  }
+
+  /** What this device knows of each note, read from its own place: nothing else is kept between starts. */
+  async #remember(): Promise<void> {
+    this.#notes.clear()
+    this.#docs.clear()
+    for (const info of await this.#local.list()) {
+      if (info.folder || !/^notes\/[A-Za-z0-9_-]+\.state\.json$/u.test(info.path)) continue
+      const state = (await this.#readJson(this.#local, info.path)) as NoteState | undefined
+      if (state && typeof state.id === 'string' && typeof state.path === 'string' && typeof state.cid === 'string') this.#notes.set(state.id, state)
+    }
   }
 
   /** This device's copy of a note. */
   async #doc(id: string): Promise<Doc> {
     const cached = this.#docs.get(id)
     if (cached) return cached
-    const kept = (await this.#readJson(this.#local, `notes/${id}.json`)) as { doc?: unknown } | undefined
-    if (!kept?.doc) throw new Error('This note is not in the library any more.')
-    const doc = parseDoc(kept.doc)
+    const kept = await this.#readJson(this.#local, `notes/${id}.doc.json`)
+    if (kept === undefined) throw new Error('This note is not in the library any more.')
+    const doc = parseDoc(kept)
     this.#docs.set(id, doc)
+    // The copy was written and the app ended before what is known of it was: it counts as a change made here.
+    const state = this.#notes.get(id)
+    if (state && state.rev !== doc.rev) {
+      Object.assign(state, listing(doc), { cid: await contentId(doc), seen: { ...state.seen, [this.#device]: Math.max(doc.rev, state.seen[this.#device] ?? 0) }, dirty: true })
+      await this.#writeJson(this.#local, `notes/${id}.state.json`, state)
+    }
     return doc
   }
 
   /** Keep this device's copy of a note, and what it knows of it. */
   async #keep(state: NoteState, doc: Doc): Promise<void> {
     Object.assign(state, listing(doc))
-    await this.#writeJson(this.#local, `notes/${state.id}.json`, { state, doc })
+    // The note first, then what is known of it: read in that order too, a half-done keep is seen and put right.
+    if (this.#docs.get(state.id) !== doc) await this.#writeJson(this.#local, `notes/${state.id}.doc.json`, doc)
+    await this.#writeJson(this.#local, `notes/${state.id}.state.json`, state)
     this.#notes.set(state.id, state)
     this.#docs.set(state.id, doc)
   }
@@ -217,7 +266,8 @@ export class FolderLibrary implements LibraryStore {
     this.#notes.delete(id)
     this.#docs.delete(id)
     this.#gone.delete(id)
-    await this.#local.remove(`notes/${id}.json`)
+    await this.#local.remove(`notes/${id}.state.json`)
+    await this.#local.remove(`notes/${id}.doc.json`)
     await this.#local.remove(`notes/${id}.base.json`)
     // Pictures no other note uses go too.
     if (state) for (const hash of onlyUsedBy({ notes: [...this.#notes.values()].map((n) => this.#entry(n)), folders: [] }, new Set([id]), state.assets)) await this.#local.remove(`assets/${hash}`)
@@ -692,6 +742,8 @@ export class FolderLibrary implements LibraryStore {
       }
       let state = this.#notes.get(doc.id)
       if (!state) {
+        // Open on a screen, with nothing new in it, and gone from the library: removed for good elsewhere, and not brought back.
+        if (since !== doc && sameContent(since, doc)) throw new Error('This note is not in the library any more: it was removed for good, here or on another device.')
         // A note the library does not have: kept as a new one, at the top level.
         state = await this.#newState(doc, '')
         await this.#keep(state, doc)

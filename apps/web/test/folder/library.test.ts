@@ -1,10 +1,12 @@
 // The library in a folder: every action of the storage interface, on real
 // files (kept in memory here): folders as folders, each note one .shellnote
 // file, Recently deleted a folder of its own.
-import { createDoc, pack, unpack, type TextBlock } from '@shellnote/core'
+import { apply, createDoc, pack, unpack, type TextBlock } from '@shellnote/core'
 import { describe, expect, it } from 'vitest'
 import { MIXED, PHYSICS } from '../../../../packages/core/test/fixtures/index.js'
+import { MemoryFiles } from '../../src/library/folder/files.js'
 import { BIN } from '../../src/library/folder/layout.js'
+import { FolderLibrary } from '../../src/library/folder/library.js'
 import { KEPT_DAYS, type Library } from '../../src/library/store.js'
 import { Clock, device, edit, restarted, type Device } from './devices.js'
 
@@ -269,5 +271,58 @@ describe('the folder itself', () => {
     expect(new Set(library.notes.map((n) => n.id)).size).toBe(2)
     expect(library.notes.some((n) => n.id === note.id)).toBe(true)
     expect(library.notes.every((n) => n.deleted === undefined)).toBe(true)
+  })
+})
+
+describe('two windows of the app on one library', () => {
+  it('each sees what the other kept, and neither writes over the other', async () => {
+    const clock = new Clock()
+    const shared = new MemoryFiles(clock.now)
+    const local = new MemoryFiles(clock.now)
+    // What the windows share: a word each can read and set, and one piece of work at a time.
+    let word: string | null = null
+    const mark = { read: () => word, write: (value: string) => void (word = value) }
+    let turn: Promise<unknown> = Promise.resolve()
+    const lock = <T>(work: () => Promise<T>): Promise<T> => {
+      const next = turn.then(work)
+      turn = next.catch(() => undefined)
+      return next
+    }
+    const one = new FolderLibrary({ shared, local, now: clock.now, mark, lock })
+    const two = new FolderLibrary({ shared, local, now: clock.now, mark, lock })
+    const note = await one.newNote(null)
+    expect((await two.list()).notes.map((n) => n.id)).toEqual([note.id])
+    const frame = Object.keys((await two.open(note.id)).doc.block)[0]!
+    const add = async (library: FolderLibrary, id: string, md: string): Promise<void> => {
+      const opened = await library.open(note.id)
+      const doc = apply(opened.doc, [{ op: 'add', block: { id, r: 0, type: 'text', parent: frame, role: 'p', indent: 0, md } }]).doc
+      await library.exchange({ doc, since: opened.doc, blob: () => undefined })
+    }
+    await add(two, 'a', 'From the second window.')
+    await add(one, 'b', 'From the first window.')
+    await two.rename({ kind: 'note', id: note.id }, 'Both')
+    for (const library of [one, two]) {
+      const doc = (await library.open(note.id)).doc
+      expect(doc.title).toBe('Both')
+      expect(Object.keys(doc.block)).toEqual(expect.arrayContaining(['a', 'b']))
+    }
+    expect(Object.keys(unpack(shared.peek('Both.shellnote')!).doc.block)).toEqual(expect.arrayContaining(['a', 'b']))
+    expect((await one.list()).notes).toHaveLength(1)
+  })
+})
+
+describe('a note removed for good while it is open', () => {
+  it('is not brought back by a screen with nothing new to keep, and is kept when the screen holds new words', async () => {
+    const { on } = await started()
+    const note = await on.library.newNote(null)
+    const opened = await on.library.open(note.id)
+    await on.library.deleteForever({ kind: 'note', id: note.id })
+    const same = apply(opened.doc, [{ op: 'update', id: note.id, set: { title: 'x' } }]).doc
+    const back = apply(same, [{ op: 'update', id: note.id, set: { title: opened.doc.title } }]).doc
+    await expect(on.library.exchange({ doc: back, since: opened.doc, blob: () => undefined })).rejects.toThrow(/removed for good/u)
+    expect((await on.library.list()).notes).toEqual([])
+    const typed = apply(opened.doc, [{ op: 'update', id: note.id, set: { title: 'Typed since' } }]).doc
+    await on.library.exchange({ doc: typed, since: opened.doc, blob: () => undefined })
+    expect((await on.library.list()).notes.map((n) => n.title)).toEqual(['Typed since'])
   })
 })
