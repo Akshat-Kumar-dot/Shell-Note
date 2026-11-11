@@ -43,8 +43,10 @@ export function safeName(name: string): string {
     .replace(/\s+/gu, ' ')
     .trim()
     .replace(/^\.+/u, '')
-    .replace(/[. ]+$/u, '')
     .slice(0, 100)
+    // After the cut, which may end on a space or a dot: Windows drops those from the end of a name, so the folder
+    // made would not be the one named.
+    .replace(/[. ]+$/u, '')
   const named = safe === '' ? 'Untitled folder' : safe
   return DEVICE.test(named) ? `Folder ${named}` : named
 }
