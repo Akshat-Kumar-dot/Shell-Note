@@ -67,11 +67,19 @@ pub async fn apps_place_of(id: i64) -> Result<Option<Place>, String> {
     tauri::async_runtime::spawn_blocking(read).await.map_err(|error| error.to_string())
 }
 
-/// An address a note may send a browser to: a web page, or a file on this computer. Never a switch of the browser's, nor
-/// any other scheme.
+/// An address a note may send a browser to: a web page, or a file on a drive of this computer ("file:///C:/…"). Never
+/// a switch of the browser's, nor any other scheme, nor a file on another computer: "file://///server/share/x" would
+/// make Windows sign in to that server, handing it the person's name and a hash of their password.
 fn may_open(address: &str) -> bool {
     let lower = address.to_ascii_lowercase();
-    lower.starts_with("https://") || lower.starts_with("http://") || lower.starts_with("file:///")
+    if lower.starts_with("https://") || lower.starts_with("http://") {
+        return true;
+    }
+    let Some(path) = lower.strip_prefix("file:///") else { return false };
+    let bytes = path.as_bytes();
+    // A drive's letter, then the path; and no second way of writing a server's name inside it.
+    let on_a_drive = bytes.len() > 2 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && bytes[2] == b'/';
+    on_a_drive && !path.contains("//") && !path.contains('\\') && !path.contains("%5c") && !path.contains("%2f")
 }
 
 /// A file a note may send VS Code to: a whole path, to a file that is there.
@@ -197,6 +205,11 @@ fn now_ms() -> u64 {
 /// A record older than this is ignored, in milliseconds: one left by a VS Code that ended without saying (a day).
 const RECORD_LASTS: u64 = 24 * 60 * 60 * 1000;
 
+/// The most of the companion's folder that is read: a record is a few hundred bytes, one a window. Any program of the
+/// person's can write there, so a file too large to be a record is passed over, and the count has an end.
+const RECORD_BYTES: u64 = 64 * 1024;
+const RECORDS: usize = 200;
+
 /// What the companion keeps on this computer, read as a line is written beside VS Code.
 fn companion_records() -> Vec<CompanionRecord> {
     let Some(base) = std::env::var_os("LOCALAPPDATA") else { return Vec::new() };
@@ -204,6 +217,8 @@ fn companion_records() -> Vec<CompanionRecord> {
     files
         .flatten()
         .filter(|file| file.path().extension().is_some_and(|extension| extension == "json"))
+        .filter(|file| file.metadata().is_ok_and(|meta| meta.is_file() && meta.len() <= RECORD_BYTES))
+        .take(RECORDS)
         .filter_map(|file| serde_json::from_str(&std::fs::read_to_string(file.path()).ok()?).ok())
         .collect()
 }
@@ -457,12 +472,24 @@ pub async fn apps_read_picture(request: tauri::ipc::Request<'_>) -> Result<Optio
     let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else { return Err("no picture".into()) };
     let size = |name: &str| request.headers().get(name).and_then(|value| value.to_str().ok()).and_then(|value| value.parse::<u32>().ok()).unwrap_or(0);
     let (width, height) = (size("x-width"), size("x-height"));
-    if width == 0 || height == 0 || bytes.len() != width as usize * height as usize * 4 {
+    if !whole_picture(width, height, bytes.len()) {
         return Err("not a whole picture".into());
     }
     let bytes = bytes.clone();
     let read = move || picture_words(bytes, width, height).ok().map(|words| words.trim().to_string()).filter(|words| !words.is_empty());
     tauri::async_runtime::spawn_blocking(read).await.map_err(|error| error.to_string())
+}
+
+/// The largest side of a picture Windows' text reading takes (its `OcrEngine.MaxImageDimension`).
+const MOST_SIDE: u32 = 10_000;
+
+/// Whether `bytes` is a picture of `width` by `height`, four bytes a pixel, of a size Windows reads. The sizes come
+/// from the page, so they are multiplied with care: two large ones would wrap round to a small number.
+fn whole_picture(width: u32, height: u32, bytes: usize) -> bool {
+    if width == 0 || height == 0 || width > MOST_SIDE || height > MOST_SIDE {
+        return false;
+    }
+    (width as usize).checked_mul(height as usize).and_then(|pixels| pixels.checked_mul(4)) == Some(bytes)
 }
 
 fn picture_words(mut pixels: Vec<u8>, width: u32, height: u32) -> windows::core::Result<String> {
@@ -675,6 +702,31 @@ mod tests {
         for refused in ["--gpu-launcher=calc.exe", "--load-extension=C:/x", "javascript:alert(1)", "chrome://settings", "ms-settings:", "file://server/x", "C:/a.pdf", ""] {
             assert!(!may_open(refused), "{refused}");
         }
+        // A file on another computer, however its server is written: Windows would sign in to it.
+        for refused in [
+            "file://///server/share/a.pdf",
+            "file:////server/share/a.pdf",
+            "file:///\\\\server\\share\\a.pdf",
+            "file:///%5C%5Cserver/share/a.pdf",
+            "file:///C://server/share",
+            "file:///C:/a%2F%2Fserver",
+            "file:///server/share/a.pdf",
+            "FILE://///SERVER/x",
+        ] {
+            assert!(!may_open(refused), "{refused}");
+        }
+        assert!(may_open("file:///D:/My%20Notes/big.pdf#page=20"));
+    }
+
+    #[test]
+    fn a_picture_to_read_is_whole_and_of_a_size_windows_reads() {
+        assert!(whole_picture(2, 3, 24));
+        assert!(!whole_picture(2, 3, 23));
+        assert!(!whole_picture(0, 3, 0));
+        // Two sizes whose product wraps round to nothing: no bytes at all would have passed for the whole picture.
+        assert!(!whole_picture(1 << 31, 1 << 31, 0));
+        assert!(!whole_picture(u32::MAX, u32::MAX, 4));
+        assert!(!whole_picture(MOST_SIDE + 1, 1, (MOST_SIDE as usize + 1) * 4));
     }
 
     #[test]

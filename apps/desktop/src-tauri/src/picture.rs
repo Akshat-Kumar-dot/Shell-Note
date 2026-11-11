@@ -40,6 +40,10 @@ use windows::Win32::UI::WindowsAndMessaging::IsWindow;
 /// panel, so a last picture is there should something of ShellNote cover it.
 const SEEN_EVERY: u32 = 33;
 const KEPT_EVERY: u32 = 500;
+/// The largest side of a picture, in pixels (an 8K screen's width), and the most pictures at once: a panel shows one
+/// program, and a line's mark another for a moment.
+const MOST_SIDE: u32 = 8192;
+const MOST_LIVE: usize = 8;
 
 /// One window pictured for one ShellNote window.
 struct Live {
@@ -89,12 +93,18 @@ pub fn apps_picture(window: WebviewWindow, id: i64, width: u32, height: u32, see
     let target = crate::apps::may_picture(id)?.0 as isize;
     let every = if seen { SEEN_EVERY } else { KEPT_EVERY };
     let label = window.label().to_string();
+    // The sizes come from the page: kept to what a panel can be, so no buffer is ever asked for that memory cannot give.
+    let (width, height) = (width.clamp(1, MOST_SIDE), height.clamp(1, MOST_SIDE));
     {
         let live = LIVE.lock().map_err(|_| "busy")?;
         if let Some(one) = live.iter().find(|one| one.id == id && one.label == label) {
             one.size.store(packed(width, height), Ordering::SeqCst);
             one.every.store(every, Ordering::SeqCst);
             return Ok(());
+        }
+        // Each picture holds two buffers as large as the screen: a page asking for one of every window is refused.
+        if live.len() >= MOST_LIVE {
+            return Err("Too many programs are pictured at once.".into());
         }
     }
     let stop = Arc::new(AtomicBool::new(false));
@@ -104,7 +114,7 @@ pub fn apps_picture(window: WebviewWindow, id: i64, width: u32, height: u32, see
     // Listed at once, before its buffers exist: a second call for this window finds it and only changes its numbers.
     LIVE.lock().map_err(|_| "busy")?.push(Live { serial, id, label: label.clone(), stop: stop.clone(), size: size.clone(), every: rate.clone() });
     // The largest frame: the screen ShellNote is on, so the buffers are made once, whatever the panel's size later.
-    let capacity = screen_of(&window).max(packed_bytes(width, height));
+    let capacity = screen_of(&window).max(packed_bytes(width, height)).min(packed_bytes(MOST_SIDE, MOST_SIDE));
     let app = window.app_handle().clone();
     // WebView2's buffers are made on ShellNote's own thread; the capture then runs on a thread of its own.
     window
@@ -321,7 +331,16 @@ fn fit(width: u32, height: u32, box_width: u32, box_height: u32, capacity: usize
     if w * h * scale * scale > room {
         scale = (room / (w * h)).sqrt();
     }
-    (((w * scale).floor() as u32).max(1), ((h * scale).floor() as u32).max(1))
+    let (mut out_width, mut out_height) = (((w * scale).floor() as u32).max(1), ((h * scale).floor() as u32).max(1));
+    // A side brought up to one pixel may have passed the room: the other gives way, so the bytes written always fit.
+    while out_width as usize * out_height as usize > capacity / 4 && (out_width > 1 || out_height > 1) {
+        if out_width >= out_height {
+            out_width = (out_width / 2).max(1);
+        } else {
+            out_height = (out_height / 2).max(1);
+        }
+    }
+    (out_width, out_height)
 }
 
 /// Scaled down by averaging each area of Windows' blue, green, red and alpha into one pixel of red, green, blue and
@@ -366,6 +385,11 @@ mod tests {
         // Never more bytes than a buffer holds.
         let (w, h) = fit(1000, 1000, 1000, 1000, 100 * 100 * 4);
         assert!(w as usize * h as usize * 4 <= 100 * 100 * 4);
+        // A window one pixel wide and very tall, a box of nothing, a buffer of a few pixels: still never past it.
+        for (width, height, box_width, box_height, capacity) in [(1, 60_000, 1, 60_000, 64), (60_000, 1, 60_000, 1, 64), (3, 3, 0, 0, 4), (16_384, 16_384, u32::MAX, u32::MAX, 4 * 7)] {
+            let (w, h) = fit(width, height, box_width, box_height, capacity);
+            assert!(w >= 1 && h >= 1 && w as usize * h as usize * 4 <= capacity, "{width} by {height} into {capacity} bytes gave {w} by {h}");
+        }
     }
 
     #[test]
