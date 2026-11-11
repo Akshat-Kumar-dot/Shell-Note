@@ -307,7 +307,8 @@ async function sendBar(page: Page, bar: string, place: string): Promise<void> {
   await page.getByRole('menuitemradio', { name, exact: true }).evaluate((element: HTMLElement) => element.click())
   if (place !== 'corner') return
   const at = (await grip.boundingBox())!
-  const size = page.viewportSize()!
+  // Inside the desktop app the window is the app's own, and Playwright keeps no size for it: the page says.
+  const size = page.viewportSize() ?? (await page.evaluate(() => ({ width: innerWidth, height: innerHeight })))
   await page.mouse.move(at.x + 10, at.y + 10)
   await page.mouse.down()
   await page.mouse.move(size.width - 140, size.height - 110, { steps: 4 })
