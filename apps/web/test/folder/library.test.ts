@@ -326,3 +326,40 @@ describe('a note removed for good while it is open', () => {
     expect((await on.library.list()).notes.map((n) => n.title)).toEqual(['Typed since'])
   })
 })
+
+describe('names and files the library must be careful with', () => {
+  it('gives a note a file name the library can see and Windows can keep, whatever its title', async () => {
+    const { on } = await started()
+    const hidden = await on.library.newNote(null)
+    const device = await on.library.newNote(null)
+    await on.library.rename({ kind: 'note', id: hidden.id }, '.plans')
+    await on.library.rename({ kind: 'note', id: device.id }, 'CON')
+    expect(await paths(on)).toEqual(['Note CON.shellnote', 'plans.shellnote'])
+    // Looked at again, both are still there under their titles.
+    await on.library.sync()
+    expect((await on.library.list()).notes.map((note) => note.title).sort()).toEqual(['.plans', 'CON'])
+    const folder = await on.library.newFolder(null)
+    await on.library.rename({ kind: 'folder', id: folder.id }, 'nul')
+    expect(await paths(on)).toContain('Folder nul')
+  })
+
+  it('never removes a file that is not a note, even with the folder it is in', async () => {
+    const { on } = await started()
+    const folder = await on.library.newFolder(null)
+    const note = await on.library.newNote(folder.id)
+    on.folder.put('Untitled folder/taxes.pdf', new Uint8Array([1, 2, 3]))
+    on.folder.put('Untitled folder/desktop.ini', new Uint8Array([4]))
+    await on.library.delete({ kind: 'folder', id: folder.id })
+    const binned = (await on.library.list()).folders[0]!
+    expect(binned.deleted).toBeGreaterThan(0)
+    await expect(on.library.deleteForever({ kind: 'folder', id: binned.id })).rejects.toThrow(/never removes/u)
+    // Its notes are gone; the folder is back, with the file that was no note.
+    expect(await paths(on)).toEqual([BIN, 'Untitled folder', 'Untitled folder/taxes.pdf'])
+    expect((await on.library.list()).notes.find((n) => n.id === note.id)).toBeUndefined()
+    expect((await on.library.list()).folders.map((f) => [f.name, f.deleted])).toEqual([['Untitled folder', undefined]])
+    // Emptying Recently deleted leaves such a file too.
+    await on.library.delete({ kind: 'folder', id: (await on.library.list()).folders[0]!.id })
+    await on.library.emptyBin()
+    expect(await paths(on)).toEqual([BIN, 'Untitled folder', 'Untitled folder/taxes.pdf'])
+  })
+})

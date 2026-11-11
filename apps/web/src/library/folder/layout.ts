@@ -29,6 +29,12 @@ export const isNote = (path: string): boolean => path.toLocaleLowerCase().endsWi
 /** A folder's id: made from its place, so every device gives the same folder the same id. The top level has none. */
 export const folderId = (path: string): string | null => (path === '' ? null : idFrom(`folder:${path}`))
 
+/** Names Windows keeps for its devices, whatever comes after a dot: a file cannot be called one. */
+const DEVICE = /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)/iu
+
+/** Other programs' own small files, which may lie in any folder and are no one's work. */
+export const isClutter = (name: string): boolean => /^(desktop\.ini|thumbs\.db|\.ds_store)$/iu.test(name) || /^\..*\.tmp-\d+-\d+$/u.test(name)
+
 /** A name a folder can have on any system: characters none allows become dashes. */
 export function safeName(name: string): string {
   const visible = Array.from(name, (ch) => (ch < ' ' ? ' ' : ch)).join('')
@@ -39,7 +45,8 @@ export function safeName(name: string): string {
     .replace(/^\.+/u, '')
     .replace(/[. ]+$/u, '')
     .slice(0, 100)
-  return safe === '' ? 'Untitled folder' : safe
+  const named = safe === '' ? 'Untitled folder' : safe
+  return DEVICE.test(named) ? `Folder ${named}` : named
 }
 
 /** A note's file name without the extension. */
@@ -57,8 +64,15 @@ export function freeName(wanted: string, extension: string, taken: Iterable<stri
   }
 }
 
-/** The file name a note's title asks for, without the extension. */
-export const titleStem = (title: string): string => stem(fileName(title))
+/**
+ * The file name a note's title asks for, without the extension. Never one the library would not see as a note (a
+ * leading dot hides a file, and "~$" marks another program's lock), and never a device's name.
+ */
+export function titleStem(title: string): string {
+  const plain = stem(fileName(title)).replace(/^[.~$\s]+/u, '')
+  const named = plain === '' ? 'Untitled' : plain
+  return DEVICE.test(named) ? `Note ${named}` : named
+}
 
 /** True when a file's name is the one its title asks for, or that with a number after it. */
 export function namedFor(name: string, title: string): boolean {

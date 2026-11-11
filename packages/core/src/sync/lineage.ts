@@ -11,7 +11,7 @@ import { stable } from './diff.js'
 import type { MergeOptions } from './merge.js'
 
 /** The latest change of each device a version includes: the device's own `rev` of the note when it wrote that change. */
-export const Seen = z.record(Id, z.int().nonnegative())
+export const Seen = z.record(Id, z.int().nonnegative().max(2 ** 40)).refine((seen) => Object.keys(seen).length <= 256, { error: 'A note is not kept on more than 256 devices.' })
 export type Seen = z.infer<typeof Seen>
 
 export const Lineage = z.strictObject({
@@ -27,7 +27,7 @@ export const Lineage = z.strictObject({
    * The last version this device took from another or merged: what that one had seen, and this device's `rev` of
    * the note just after. Blocks whose `r` is above it are this device's own changes since.
    */
-  base: z.strictObject({ seen: Seen, rev: z.int().nonnegative() }).optional(),
+  base: z.strictObject({ seen: Seen, rev: z.int().nonnegative().max(2 ** 40) }).optional(),
   /** When the note was last put where it is: moved, deleted or brought back. Of two files of one note, the one put later says where it belongs. */
   put: z.int().nonnegative().optional(),
 })

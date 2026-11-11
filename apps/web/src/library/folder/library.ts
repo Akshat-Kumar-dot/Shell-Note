@@ -26,7 +26,7 @@ import { EXTENSION } from '../../storage/files.js'
 import { KEPT_DAYS, type Exchanged, type ExchangedNote, type FolderEntry, type ItemRef, type Library, type LibraryStore, type NoteEntry, type OpenedNote, type OutsideChange, type SavingNote } from '../store.js'
 import { canMove, contents, onlyUsedBy, uniqueName } from '../tree.js'
 import type { FileInfo, Files } from './files.js'
-import { BIN, binned, folderId, folderOf, freeName, HIDDEN, inBin, isHidden, isNote, join, MARK, namedFor, nameOf, PEN_PROFILE, previewPath, recordPath, safeName, stem, titleStem } from './layout.js'
+import { BIN, binned, folderId, folderOf, freeName, HIDDEN, inBin, isClutter, isHidden, isNote, join, MARK, namedFor, nameOf, PEN_PROFILE, previewPath, recordPath, safeName, stem, titleStem } from './layout.js'
 
 /** What this device knows of one note: where its file is, what its own copy holds, and what that copy has seen. */
 interface NoteState {
@@ -922,17 +922,35 @@ export class FolderLibrary implements LibraryStore {
     })
   }
 
-  /** Remove an item for good, with what a folder holds. */
-  async #removeForGood(path: string, folder: boolean): Promise<void> {
+  /**
+   * Remove an item for good, with the notes a folder holds. Only notes are ever removed: a folder that holds other
+   * files too (the person may have chosen a folder with more in it than notes) loses its notes and is put back in
+   * the library with the rest. Returns whether the item is gone.
+   */
+  async #removeForGood(path: string, folder: boolean): Promise<boolean> {
     const inside = (other: string): boolean => other === path || (folder && other.startsWith(`${path}/`))
     for (const state of [...this.#notes.values()]) {
       if (!inside(state.path)) continue
       await this.#shared.remove(previewPath(state.id))
       await this.#forget(state.id)
     }
-    await this.#shared.remove(path)
     for (const key of [...this.#files.keys()]) if (inside(key)) this.#files.delete(key)
+    let others = false
+    if (folder) {
+      // Each note's file by itself, and the small files other programs leave; then the folder, when nothing else is in it.
+      for (const info of await this.#shared.list()) {
+        if (info.folder || !info.path.startsWith(`${path}/`)) continue
+        if (isNote(info.path) || isClutter(nameOf(info.path))) await this.#shared.remove(info.path)
+        else others = true
+      }
+    }
+    if (!others) await this.#shared.remove(path)
+    else if (binned(path)) {
+      const from = this.#records.get(nameOf(path))?.from ?? ''
+      await this.#shared.move(path, await this.#freeFolder(from !== '' && this.#folders.some((f) => f.path === from) && !inBin(from) ? from : '', nameOf(path)))
+    }
     if (binned(path)) await this.#record(nameOf(path), undefined)
+    return !others
   }
 
   deleteForever(item: ItemRef): Promise<void> {
@@ -942,7 +960,10 @@ export class FolderLibrary implements LibraryStore {
         if (state) await this.#removeForGood(state.path, false)
       } else {
         const found = this.#folders.find((info) => folderId(info.path) === item.id)
-        if (found) await this.#removeForGood(found.path, true)
+        if (found && !(await this.#removeForGood(found.path, true))) {
+          await this.#look()
+          throw new Error(`The notes in "${nameOf(found.path)}" are removed for good. The folder holds other files too, which ShellNote never removes, so it is back in your library with them.`)
+        }
       }
     })
   }
@@ -963,8 +984,7 @@ export class FolderLibrary implements LibraryStore {
       for (const item of this.#inBin()) {
         const record = this.#records.get(nameOf(item.path))
         if (!record || now - record.at <= KEPT_DAYS * DAY) continue
-        await this.#removeForGood(item.path, item.folder)
-        gone++
+        if (await this.#removeForGood(item.path, item.folder)) gone++
       }
       return gone
     })

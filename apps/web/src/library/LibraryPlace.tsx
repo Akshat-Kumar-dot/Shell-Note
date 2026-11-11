@@ -78,7 +78,8 @@ export function LibraryPlace({ beforeChange }: { beforeChange?: (() => Promise<v
       <button type="button" className="button" disabled={doing !== undefined} onClick={() => void (place === undefined ? toFolder() : toApp())}>
         {place === undefined ? 'Keep them in a folder…' : 'Keep them in the app instead'}
       </button>
-      <p className="settings-answer" role="status">
+      {/* Said as it changes, without being a second status line of the dialog's. */}
+      <p className="settings-answer" aria-live="polite" data-testid="library-doing">
         {doing ?? ''}
       </p>
       <p className="settings-hint">

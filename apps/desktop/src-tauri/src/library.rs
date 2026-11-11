@@ -130,6 +130,10 @@ pub async fn library_choose(app: AppHandle, window: tauri::WebviewWindow) -> Res
     if !folder.is_absolute() || !folder.is_dir() {
         return Err("That is not a folder on this computer.".into());
     }
+    // The library makes folders of its own in it, and lists all it holds: a folder for the notes, not a whole drive.
+    if folder.parent().is_none() {
+        return Err("Choose a folder for your notes, not a whole drive.".into());
+    }
     let file = choice_file(&app)?;
     if let Some(parent) = file.parent() {
         fs::create_dir_all(parent).map_err(|error| error.to_string())?;
