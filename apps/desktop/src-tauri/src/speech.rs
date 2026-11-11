@@ -7,6 +7,7 @@
 //! then what is heard so far as it grows, then the last of it, then an end;
 //! or an error, named as the browser names it, then an end.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
 
@@ -14,6 +15,7 @@ use tauri::ipc::Channel;
 use windows::core::{Ref, HSTRING};
 use windows::Foundation::{TimeSpan, TypedEventHandler};
 use windows::Globalization::Language;
+use windows::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
 use windows::Media::SpeechRecognition::{SpeechRecognitionHypothesisGeneratedEventArgs, SpeechRecognitionResultStatus, SpeechRecognizer};
 
 /// What the page is told, as the browser's speech recognition tells it (its events, by `kind`).
@@ -43,15 +45,35 @@ const WAIT_FOR_SPEECH: Duration = Duration::from_secs(8);
 const PAUSE_ENDS: Duration = Duration::from_millis(1200);
 
 /// Listen for one request in `lang` ("en-IN"), or the language Windows speaks when it has no recognizer for that one.
+///
+/// The microphone is the person's: it opens only for the window they are in (their press on the microphone button is
+/// in the window in front), never for one in the background, and for one request at a time, with the one being
+/// stopped beside it at most. A page gone wrong cannot keep it open unseen, nor start a hundred listeners.
 #[tauri::command]
-pub fn listen(lang: String, events: Channel<Heard>) {
+pub fn listen(window: tauri::WebviewWindow, lang: String, events: Channel<Heard>) {
+    // Windows' own word on which window is in front: the web view inside the window holds the keyboard, the window
+    // itself is the one in front.
+    let in_front = window.hwnd().is_ok_and(|own| unsafe { GetForegroundWindow() }.0 as isize == own.0 as isize);
+    if !in_front || LISTENERS.load(Ordering::SeqCst) >= MOST_LISTENERS {
+        // Ended as a request the person dropped: nothing heard, and no fault to show.
+        let _ = events.send(Heard::Error { error: "aborted".into() });
+        let _ = events.send(Heard::End);
+        return;
+    }
+    LISTENERS.fetch_add(1, Ordering::SeqCst);
     std::thread::spawn(move || {
         if let Err(error) = hear(&lang, &events) {
             let _ = events.send(Heard::Error { error });
         }
+        LISTENERS.fetch_sub(1, Ordering::SeqCst);
         let _ = events.send(Heard::End);
     });
 }
+
+/// How many requests are being listened for now, and the most at once: the one being spoken, and one just stopped
+/// that Windows has not yet let go of.
+static LISTENERS: AtomicUsize = AtomicUsize::new(0);
+const MOST_LISTENERS: usize = 2;
 
 /// Stop listening: `keep`, what was heard so far is the request (the browser's stop); else it is dropped (abort).
 #[tauri::command]
