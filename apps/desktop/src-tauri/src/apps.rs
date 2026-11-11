@@ -48,8 +48,8 @@ use windows::Win32::System::Variant::VARIANT;
 use windows::Win32::UI::Accessibility::{CUIAutomation, IUIAutomation, SetWinEventHook, TreeScope_Descendants, UnhookWinEvent, HWINEVENTHOOK, UIA_NamePropertyId};
 use windows::Win32::UI::HiDpi::{SetProcessDpiAwarenessContext, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2};
 use windows::Win32::UI::WindowsAndMessaging::{
-    DrawIconEx, EnumWindows, GetClassLongPtrW, GetClassNameW, GetWindow, GetWindowLongPtrW, GetWindowPlacement, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, IsZoomed, SendMessageTimeoutW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPlacement, SetWindowPos, ShowWindow,
-    ShowWindowAsync, GWLP_HWNDPARENT, GWL_EXSTYLE, GW_OWNER, HWND_TOP, SET_WINDOW_POS_FLAGS, SHOW_WINDOW_CMD, SMTO_ABORTIFHUNG, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER, SW_HIDE, SW_RESTORE,
+    DrawIconEx, EnumWindows, GetAncestor, GetClassLongPtrW, GetClassNameW, GetWindow, GetWindowLongPtrW, GetWindowPlacement, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindow, IsWindowVisible, IsZoomed, SendMessageTimeoutW, SetForegroundWindow, SetWindowLongPtrW, SetWindowPlacement, SetWindowPos, ShowWindow,
+    ShowWindowAsync, GWLP_HWNDPARENT, GWL_EXSTYLE, GW_OWNER, HWND_TOP, SET_WINDOW_POS_FLAGS, SHOW_WINDOW_CMD, GA_ROOT, SMTO_ABORTIFHUNG, SWP_ASYNCWINDOWPOS, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE, SWP_NOZORDER, SW_HIDE, SW_RESTORE,
     SW_SHOWMAXIMIZED, SW_SHOWMINIMIZED, SW_SHOWMINNOACTIVE, SW_SHOWNA, SW_SHOWNOACTIVATE, WINDOWPLACEMENT, WINDOWPLACEMENT_FLAGS, WM_NULL, WS_EX_TOOLWINDOW, DI_NORMAL, GCLP_HICON, GCLP_HICONSM, HICON,
     ICON_BIG, ICON_SMALL2, WM_GETICON,
 };
@@ -196,6 +196,11 @@ fn save_record() {
 /// its watcher not have done it already).
 pub fn recover(app: &AppHandle) {
     let _ = APP.set(app.clone());
+    // Never while ShellNote runs as administrator: the record is a file any program of the person's can write, and
+    // an administrator's ShellNote would place the windows it names with rights an ordinary program has not.
+    if switched_off().is_some() {
+        return;
+    }
     if let Some(path) = record_path() {
         give_back(&path);
     }
@@ -215,7 +220,10 @@ fn give_back(path: &Path) {
         let [id, pid, covered, pl, pt, pr, pb, show, flags, nl, nt, nr, nb, minx, miny, maxx, maxy] = numbers[..] else { continue };
         let program = parts.get(17).copied().unwrap_or_default();
         let window = hwnd(id as isize);
-        if !unsafe { IsWindow(Some(window)) }.as_bool() || process_of(window) != pid as u32 || program_of(pid as u32).map(|(file, _)| file).as_deref() != Some(program) {
+        // The same window still: the same program file in the same process, and not one run as administrator (none
+        // is ever held, so a record naming one was not written by ShellNote).
+        let same = unsafe { IsWindow(Some(window)) }.as_bool() && process_of(window) == pid as u32 && program_of(pid as u32).is_some_and(|(file, elevated)| file == program && !elevated);
+        if !same {
             continue;
         }
         unsafe { SetWindowLongPtrW(window, GWLP_HWNDPARENT, 0) };
@@ -411,6 +419,11 @@ pub fn apps_icon(id: i64) -> Result<tauri::ipc::Response, String> {
     let window = hwnd(id as isize);
     if !unsafe { IsWindow(Some(window)) }.as_bool() {
         return Err("That window has closed".into());
+    }
+    // Only of a window the list offers, or one held: the page names a window by a number, and any number could be sent.
+    let held = HELD.lock().is_ok_and(|held| held.iter().any(|one| one.target == id as isize));
+    if !held && !offered(window) {
+        return Err(NOT_OFFERED.into());
     }
     Ok(tauri::ipc::Response::new(icon_of(window).map(|icon| pixels(icon, ICON)).unwrap_or_default()))
 }
@@ -655,6 +668,16 @@ fn listable(window: HWND) -> bool {
     !title_of(window).trim().is_empty() && !matches!(class_of(window).as_str(), "Progman" | "WorkerW" | "Shell_TrayWnd" | "Shell_SecondaryTrayWnd")
 }
 
+const NOT_OFFERED: &str = "That window is not one ShellNote offers";
+
+/// Whether a window is one the list offers: a program's own top window, as `listable` says, never a part of a
+/// window (a button, a pane), which Windows would also take for "a window". The page names a window by a number, and
+/// a page gone wrong could send any: only what a person could have chosen from the list is ever held.
+fn offered(window: HWND) -> bool {
+    let top = unsafe { GetAncestor(window, GA_ROOT) } == window;
+    top && listable(window)
+}
+
 /// The windows a person could put on a panel, in the order Windows keeps them (the one in front first). Windows of
 /// ShellNote itself are not listed; those it cannot hold are, with the reason. None at all, with the reason, while
 /// ShellNote runs as administrator.
@@ -821,6 +844,11 @@ pub fn apps_hold(window: WebviewWindow, id: i64, area: Area, border: Option<u32>
     let pid = process_of(target);
     if pid == unsafe { GetCurrentProcessId() } {
         return Err("a window of ShellNote itself".into());
+    }
+    // Only a window the list offers: never the taskbar or the desktop, a tool window, a hidden one, or a part of
+    // another program's window, whatever number the page sends.
+    if !offered(target) {
+        return Err(NOT_OFFERED.into());
     }
     match program_of(pid) {
         Some((program, false)) => {
