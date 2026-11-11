@@ -138,9 +138,17 @@ pub async fn library_choose(app: AppHandle, window: tauri::WebviewWindow) -> Res
     Ok(Some(folder.to_string_lossy().into_owned()))
 }
 
-/// Keep the notes in the app again: the folder and all in it stay as they are.
+/// Keep the notes in the app again: the folder and all in it stay as they are. This device's own copies for that
+/// folder go, since the page calls this only once every note is back in the app, read and compared: left behind, they
+/// would be taken for the folder's notes should the same folder be chosen again later, emptied meanwhile.
 #[tauri::command]
 pub fn library_forget(app: AppHandle) -> Result<(), String> {
+    if let Some(shared) = chosen(&app) {
+        let own = data_folder(&app)?.join("library").join(name_of(&shared));
+        if own.is_dir() {
+            fs::remove_dir_all(&own).map_err(|error| error.to_string())?;
+        }
+    }
     match fs::remove_file(choice_file(&app)?) {
         Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error.to_string()),
         _ => Ok(()),

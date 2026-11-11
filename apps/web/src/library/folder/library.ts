@@ -182,6 +182,8 @@ export class FolderLibrary implements LibraryStore {
 
   async #readJson(files: Files, path: string): Promise<unknown> {
     try {
+      // Asked first whether it is there: a read of what is not there is a fault, and many of these files need not be.
+      if (!(await files.info(path))) return undefined
       return JSON.parse(decoder.decode(await files.read(path))) as unknown
     } catch {
       return undefined
@@ -265,6 +267,7 @@ export class FolderLibrary implements LibraryStore {
         continue
       }
       try {
+        if (!(await this.#local.info(`assets/${hash}`))) continue
         const read = await this.#local.read(`assets/${hash}`)
         bytes[hash] = read
         if (this.#pictureBytes + read.length > PICTURES_HELD) {
@@ -775,10 +778,15 @@ export class FolderLibrary implements LibraryStore {
   }
 
   save(note: SavingNote): Promise<NoteEntry> {
-    return this.exchange({ ...note, since: note.doc }).then((kept) => kept.entry)
+    return this.#exchange(note, undefined).then((kept) => kept.entry)
   }
 
-  exchange({ doc, blob, since }: ExchangedNote): Promise<Exchanged> {
+  exchange(note: ExchangedNote): Promise<Exchanged> {
+    return this.#exchange(note, note.since)
+  }
+
+  /** Keep a note. With `since`, the note as the screen last had it from the library; without, the note given is taken to hold all the library has. */
+  #exchange({ doc, blob }: SavingNote, since: Doc | undefined): Promise<Exchanged> {
     return this.#run(async () => {
       for (const hash of Object.keys(doc.asset)) {
         const bytes = blob(hash)
@@ -787,7 +795,7 @@ export class FolderLibrary implements LibraryStore {
       let state = this.#notes.get(doc.id)
       if (!state) {
         // Open on a screen, with nothing new in it, and gone from the library: removed for good elsewhere, and not brought back.
-        if (since !== doc && sameContent(since, doc)) throw new Error('This note is not in the library any more: it was removed for good, here or on another device.')
+        if (since !== undefined && sameContent(since, doc)) throw new Error('This note is not in the library any more: it was removed for good, here or on another device.')
         // A note the library does not have: kept as a new one, at the top level.
         state = await this.#newState(doc, '')
         await this.#keep(state, doc)
@@ -798,7 +806,7 @@ export class FolderLibrary implements LibraryStore {
       }
       const mine = await this.#doc(doc.id)
       // What the screen holds, merged with what arrived since it last looked; through apply, so this device's count goes on.
-      const arrived = since !== doc && !sameContent(since, mine)
+      const arrived = since !== undefined && !sameContent(since, mine)
       const target = arrived ? merge(doc, mine, { base: since, first: 'mine' }).doc : doc
       if (!sameContent(mine, target)) await this.#changedHere(state, become(mine, target).doc)
       else if (state.dirty) await this.#write(state)
@@ -965,6 +973,7 @@ export class FolderLibrary implements LibraryStore {
   preview(id: string): Promise<Blob | undefined> {
     return this.#run(async () => {
       try {
+        if (!(await this.#shared.info(previewPath(id)))) return undefined
         return new Blob([(await this.#shared.read(previewPath(id))) as Uint8Array<ArrayBuffer>], { type: 'image/webp' })
       } catch {
         return undefined

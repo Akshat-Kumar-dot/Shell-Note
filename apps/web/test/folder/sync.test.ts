@@ -251,6 +251,29 @@ describe('a change arriving into the note that is open', () => {
   })
 })
 
+describe('a change arriving while the open note is at rest', () => {
+  it('is handed to the screen, never written over by the screen’s older copy', async () => {
+    const { cloud, laptop, phone, id, frame } = await pair()
+    // The laptop has the note open, with nothing typed since it was last kept.
+    const opened = await laptop.library.open(id)
+    const store = new EditorStore(opened.doc)
+    await edit(phone, id, text('c', frame, 'Back by Sunday.'))
+    await cloud.settle(phone)
+    await cloud.sync(laptop.folder)
+    await laptop.library.sync()
+    // The screen keeps its note as it is, the very one the library gave it.
+    const kept = await laptop.library.exchange({ doc: store.doc, since: opened.doc, blob: () => undefined })
+    expect(kept.merged).toBeDefined()
+    expect(words(kept.merged!.doc)).toContain('Back by Sunday.')
+    store.absorb(opened.doc, kept.merged!.doc)
+    expect(words(store.doc)).toContain('Back by Sunday.')
+    expect(store.canUndo).toBe(false)
+    await cloud.settle(laptop, phone)
+    expect(words(await inStep(id, laptop, phone))).toContain('Back by Sunday.')
+    expect(words(unpack(laptop.folder.peek('Trip.shellnote')!).doc)).toContain('Back by Sunday.')
+  })
+})
+
 describe('files that are not as they should be', () => {
   it('never takes a half-written file for the note, and takes the whole one when it comes', async () => {
     const { cloud, laptop, phone, id, frame } = await pair()
