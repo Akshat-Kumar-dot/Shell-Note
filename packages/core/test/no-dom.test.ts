@@ -18,8 +18,9 @@ describe('the no-DOM rule for packages/core', () => {
     expect(await rulesHit('export const t = document.title\n')).toContain('no-restricted-globals')
     expect(await rulesHit('export const w = window.innerWidth\n')).toContain('no-restricted-globals')
     expect(await rulesHit('export const s = localStorage.length\n')).toContain('no-restricted-globals')
-    // ESLint itself, three times: about 3 s alone, longer while the other test files run beside it.
-  }, 15_000)
+    // ESLint itself, three times: about 3 s alone, and 16 s and more while a hundred other test files run beside it
+    // on a busy laptop (11 November 2026), past the 15 s it had. A real hang still fails.
+  }, 60_000)
 
   it('rejects storage and network access, even where Node has it too', async () => {
     expect(await rulesHit('export const f = fetch("https://example.com")\n')).toContain('no-restricted-globals')
