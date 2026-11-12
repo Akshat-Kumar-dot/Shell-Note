@@ -35,10 +35,12 @@ export function chapterOf(line: string): { t: number; text: string } | undefined
 }
 
 async function fetchAbout(video: string, key: string): Promise<About> {
-  const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${encodeURIComponent(video)}&key=${encodeURIComponent(key)}`
+  const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${encodeURIComponent(video)}`
   let response: Response
   try {
-    response = await fetch(url)
+    // The key as a header, as Google's service takes it, never in the address: an address is what gets written
+    // down on the way (a history, a log, a proxy).
+    response = await fetch(url, { headers: { 'X-Goog-Api-Key': key } })
   } catch {
     throw new Error('YouTube could not be reached. Check the internet connection.')
   }

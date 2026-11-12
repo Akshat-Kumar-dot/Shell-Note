@@ -605,8 +605,10 @@ test('a line’s times come off with its ×, one undo step, and the ⏱ can all 
 
 test('the side panel’s description: a key of one’s own typed in, the creator’s words from YouTube’s API, a chapter tapped plays from there', async ({ page }) => {
   let asked = ''
+  let key: string | null = null
   await page.route('https://www.googleapis.com/youtube/v3/videos**', (route) => {
     asked = route.request().url()
+    key = route.request().headers()['x-goog-api-key'] ?? null
     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ items: [{ snippet: { title: 'But what is a neural network?', channelTitle: '3Blue1Brown', description: 'A first look.\n0:00 Introduction\n1:05 The structure' } }] }) })
   })
   await openNote(page)
@@ -620,7 +622,9 @@ test('the side panel’s description: a key of one’s own typed in, the creator
 
   await expect(page.getByRole('heading', { name: 'But what is a neural network?' })).toBeVisible()
   expect(asked).toContain('id=aircAruvnKk')
-  expect(asked).toContain('key=test-key-not-real')
+  // The key goes as a header, never in the address.
+  expect(key).toBe('test-key-not-real')
+  expect(asked).not.toContain('test-key-not-real')
   await expect(page.getByText('A first look.')).toBeVisible()
   await page.getByRole('button', { name: /The structure/ }).click()
   await expect.poll(() => player(page, (p) => p.getCurrentTime())).toBe(65)
