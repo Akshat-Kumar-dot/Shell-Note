@@ -3,6 +3,7 @@
 // what stays the person's, with the reason.
 import { APP_COMMANDS } from '@shellnote/core'
 import { expect, inApp, test, type Page } from './fixtures.js'
+import { standInForYouTube } from './youtube.js'
 
 test.use({ viewport: { width: 1366, height: 900 } })
 
@@ -47,13 +48,6 @@ async function look(page: Page, screen: string): Promise<void> {
   for (const c of await controls(page)) seen.push({ ...c, within: `${screen} › ${c.within}` })
 }
 
-const FAKE_YOUTUBE_API = `
-window.YT = { Player: function (element, options) { const frame = document.createElement('iframe'); frame.title = 'YouTube video player'; element.replaceWith(frame); let state = -1; let time = 0
-  this.getCurrentTime = () => time; this.seekTo = (s) => { time = s }; this.playVideo = () => { state = 1 }; this.pauseVideo = () => { state = 2 }; this.getPlayerState = () => state; this.destroy = () => frame.remove()
-  setTimeout(() => options.events.onReady(), 0) } }
-if (window.onYouTubeIframeAPIReady) window.onYouTubeIframeAPIReady()
-`
-
 /** A line typed into the terminal, which is then closed, so it covers nothing. */
 async function terminal(page: Page, ...lines: string[]): Promise<void> {
   await page.keyboard.press('Control+Shift+P')
@@ -69,7 +63,7 @@ async function terminal(page: Page, ...lines: string[]): Promise<void> {
 }
 
 async function walk(page: Page): Promise<void> {
-  await page.route('https://www.youtube.com/iframe_api', (route) => route.fulfill({ contentType: 'text/javascript', body: FAKE_YOUTUBE_API }))
+  await standInForYouTube(page)
   // The library: empty, then with a folder and a note; a card's menu, the move dialog, Settings.
   await page.goto('/')
   await expect(page.locator('.home')).toBeVisible()

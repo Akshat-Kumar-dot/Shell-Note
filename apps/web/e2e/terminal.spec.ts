@@ -2,6 +2,7 @@
 // every screen; what is typed runs through the app's own door; a model given a
 // request writes blocks of lines that run one by one, its output going back.
 import { expect, test, type Page, type Route } from './fixtures.js'
+import { standInForYouTube } from './youtube.js'
 
 /** A stand-in LM Studio, as the AI settings name it; each chat call answered from a script. */
 const FAKE = 'http://127.0.0.1:1298'
@@ -160,29 +161,8 @@ test('the library answers the terminal as its buttons do: folders and notes by n
   await expect(card('Physics').first().locator('.card-open')).toHaveAttribute('data-command', 'library.open')
 })
 
-/** YouTube's player API, as far as ShellNote uses it (as in video.spec.ts): an iframe, ready at once, no network. */
-const FAKE_YOUTUBE_API = `
-window.YT = {
-  Player: function (element, options) {
-    const frame = document.createElement('iframe')
-    frame.title = 'YouTube video player'
-    element.replaceWith(frame)
-    let state = -1
-    let time = 0
-    this.getCurrentTime = () => time
-    this.seekTo = (seconds) => { time = seconds }
-    this.playVideo = () => { state = 1 }
-    this.pauseVideo = () => { state = 2 }
-    this.getPlayerState = () => state
-    this.destroy = () => frame.remove()
-    setTimeout(() => options.events.onReady(), 0)
-  },
-}
-if (window.onYouTubeIframeAPIReady) window.onYouTubeIframeAPIReady()
-`
-
 test('the video, full view and the timer answer the terminal as their buttons do (step 3c)', async ({ page }) => {
-  await page.route('https://www.youtube.com/iframe_api', (route) => route.fulfill({ contentType: 'text/javascript', body: FAKE_YOUTUBE_API }))
+  await standInForYouTube(page)
   await page.goto('/#/new')
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
   await page.keyboard.press('Control+Shift+P')
@@ -232,7 +212,7 @@ test('the video, full view and the timer answer the terminal as their buttons do
 })
 
 test('the side panel’s tabs answer the terminal: a transcript kept, found in and taken out, a line played, a web page shown once allowed, Output’s views (step 3c)', async ({ page }) => {
-  await page.route('https://www.youtube.com/iframe_api', (route) => route.fulfill({ contentType: 'text/javascript', body: FAKE_YOUTUBE_API }))
+  await standInForYouTube(page)
   await page.route('https://example.test/**', (route) => route.fulfill({ contentType: 'text/html', body: '<h1>A page beside the note</h1>' }))
   await page.goto('/#/new')
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()

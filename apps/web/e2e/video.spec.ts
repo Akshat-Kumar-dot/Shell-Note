@@ -1,41 +1,16 @@
-// The video beside a note: a YouTube link, in a stand-in for YouTube's player API so
+// The video beside a note: a YouTube link, in a stand-in for YouTube's player (youtube.ts) so
 // the test needs no network, or a video file of one's own; beside the note, above or below it with the note moved
 // aside, or floating over it; one player throughout; Play and the pause key; an edge dragged, its size kept.
 import { readFileSync } from 'node:fs'
 import { expect, inApp, test, type Page } from './fixtures.js'
+import { player, standInForYouTube } from './youtube.js'
 
 test.use({ viewport: { width: 1280, height: 900 } })
 
 type Box = { left: number; right: number; top: number; bottom: number; width: number; height: number }
 
-/** YouTube's IFrame Player API, as far as ShellNote uses it: an iframe in place of the element, ready at once. */
-const FAKE_YOUTUBE_API = `
-window.YT = {
-  Player: function (element, options) {
-    const frame = document.createElement('iframe')
-    frame.title = 'YouTube video player'
-    frame.dataset.video = options.videoId
-    frame.dataset.host = options.host
-    element.replaceWith(frame)
-    let state = -1
-    let time = 0
-    this.getCurrentTime = () => time
-    this.seekTo = (seconds) => { time = seconds }
-    this.cueVideoById = ({ startSeconds }) => { time = startSeconds; state = 5; (this.cued ??= []).push(startSeconds) }
-    this.playVideo = () => { (this.played ??= []).push(time); state = 1 }
-    this.tapped = () => { state = 1; options.events.onStateChange?.({ data: 1 }) }
-    this.pauseVideo = () => { state = 2 }
-    this.getPlayerState = () => state
-    this.destroy = () => frame.remove()
-    ;(window.__players ??= []).push(this)
-    setTimeout(() => options.events.onReady(), 0)
-  },
-}
-if (window.onYouTubeIframeAPIReady) window.onYouTubeIframeAPIReady()
-`
-
 test.beforeEach(async ({ page }) => {
-  await page.route('https://www.youtube.com/iframe_api', (route) => route.fulfill({ contentType: 'text/javascript', body: FAKE_YOUTUBE_API }))
+  await standInForYouTube(page)
 })
 
 function box(page: Page, selector: string): Promise<Box> {
@@ -85,8 +60,7 @@ test('a YouTube link opens beside the note; above, below and to either side the 
 
   // YouTube's own player, at its privacy-enhanced host; nothing of ours over it.
   const frame = page.locator('.nw-video iframe')
-  await expect(frame).toHaveAttribute('data-video', 'aircAruvnKk')
-  await expect(frame).toHaveAttribute('data-host', 'https://www.youtube-nocookie.com')
+  await expect(frame).toHaveAttribute('src', /^https:\/\/www\.youtube-nocookie\.com\/embed\/aircAruvnKk\?/u)
   await frame.evaluate((element) => (element.dataset.mark = 'the same player'))
 
   // On the left by default (the design sketch): the notes start where the video ends.
@@ -294,10 +268,6 @@ test('ones own video is cropped by a box moved and sized over it: the part kept 
   await expect.poll(() => page.evaluate(() => 'crop' in window.__shellnote!.doc.media![0]!)).toBe(true)
 })
 
-/** The stand-in YouTube player shown last: its clock, moved by the test. */
-type Player = { seekTo(seconds: number): void; pauseVideo(): void; getCurrentTime(): number; getPlayerState(): number }
-const player = (page: Page, act: (player: Player) => unknown) => page.evaluate((code) => new Function('p', `return (${code})(p)`)((window as unknown as { __players: Player[] }).__players.at(-1)), act.toString())
-
 test('a stroke written beside a playing video keeps its time; the ⏱ beside the line plays the video from there, opening the panel if it is closed', async ({ page }) => {
   await openNote(page)
   // The Pen first: its panel closed before the video is beside the note.
@@ -326,7 +296,7 @@ test('a stroke written beside a playing video keeps its time; the ⏱ beside the
     p.seekTo(5)
   })
   await mark.click()
-  expect(await player(page, (p) => p.getCurrentTime())).toBe(83)
+  await expect.poll(() => player(page, (p) => p.getCurrentTime())).toBe(83)
   await expect(page.getByRole('button', { name: 'Pause the video' })).toBeVisible()
   // The ⏱ was pressed, not written on.
   expect(await page.evaluate(() => Object.values(window.__shellnote!.doc.block).flatMap((b) => (b.type === 'ink' ? b.strokes : [])).length)).toBe(3)
@@ -372,7 +342,7 @@ test('a hard part marked from the panel becomes a ▶ right of the writing: a ta
     p.seekTo(5)
   })
   await mark.click()
-  expect(await player(page, (p) => p.getCurrentTime())).toBe(65)
+  await expect.poll(() => player(page, (p) => p.getCurrentTime())).toBe(65)
   await expect.poll(() => player(page, (p) => p.getPlayerState())).toBe(1)
   await player(page, (p) => p.seekTo(80.5))
   await expect.poll(() => player(page, (p) => p.getPlayerState())).toBe(2)
@@ -390,7 +360,7 @@ test('a hard part marked from the panel becomes a ▶ right of the writing: a ta
   })
   await expect.poll(async () => ((await clips()) as { y: number }[])[0]!.y - before).toBeGreaterThan(100 * per - 30)
   expect(((await clips()) as { y: number }[])[0]!.y - before).toBeLessThan(100 * per + 30)
-  expect(await player(page, (p) => p.getPlayerState())).toBe(2)
+  await expect.poll(() => player(page, (p) => p.getPlayerState())).toBe(2)
   expect(await page.evaluate(() => Object.values(window.__shellnote!.doc.block).flatMap((b) => (b.type === 'ink' ? b.strokes : [])).length)).toBe(3)
 
   await mark.hover()
@@ -527,16 +497,13 @@ test.describe('on an iPad', () => {
     await page.getByRole('button', { name: 'Video', exact: true }).click()
     await page.getByLabel('YouTube link').fill('aircAruvnKk')
     await page.getByRole('button', { name: 'Add', exact: true }).click()
-    const facts = () => page.evaluate(() => {
-      const one = (window as unknown as { __players: { cued?: number[]; played?: number[]; getCurrentTime(): number }[] }).__players.at(-1)!
-      return { cued: one.cued ?? [], played: one.played ?? [], time: one.getCurrentTime() }
-    })
+    const facts = () => player(page, (p) => ({ cued: p.cued, played: p.played, time: p.getCurrentTime() }))
     // Asked to play before any tap: told to tap, never played.
     await page.getByRole('button', { name: 'Play the video' }).click()
     await expect(page.locator('.nw-video-tap')).toContainText('Tap ▶ on the video')
     expect((await facts()).played).toEqual([])
     // Started by its own button, as a person does: from here on it obeys.
-    await page.evaluate(() => (window as unknown as { __players: { tapped(): void }[] }).__players.at(-1)!.tapped())
+    await player(page, (p) => p.tapped())
     await expect(page.locator('.nw-video-tap')).toHaveCount(0)
     await player(page, (p) => p.seekTo(83))
     const sheet = (await page.locator('.nw-page').first().boundingBox())!
