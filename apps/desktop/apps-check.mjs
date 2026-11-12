@@ -12,7 +12,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { chromium } from '@playwright/test'
@@ -389,13 +389,33 @@ try {
   // Private browser windows: never listed, held nor pictured.
   // Chrome's Incognito says so only in its own toolbar, read once through UI Automation. Two Chrome windows, each with an
   // empty profile of its own in the temporary folder (never the person's own), one Incognito; both closed after.
-  const windowOf = async (pid) => {
+  // A browser may hand over to another process as it starts (Edge does, 13 November 2026: the process started ends,
+  // and another holds the window). So a test browser is known by the empty profile folder made for it, whose name
+  // only the check's own browser has in its command line: never one of the person's.
+  const ofProfile = (profile) => `Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'msedge.exe' -or $_.Name -eq 'chrome.exe') -and $_.CommandLine -like '*${basename(profile)}*' }`
+  /** The window of the browser started as `pid` on `profile`: the process's own, else the one its profile's browser has. */
+  const windowOf = async (pid, profile) => {
+    const own = `$own = Get-Process -Id ${pid} -ErrorAction SilentlyContinue; if ($own -and $own.MainWindowHandle -ne 0) { $own.MainWindowHandle.ToInt64() }`
+    const handedOver = `${ofProfile(profile)} | Where-Object { $_.CommandLine -notlike '*--type=*' } | ForEach-Object { (Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue).MainWindowHandle.ToInt64() } | Where-Object { $_ -ne 0 } | Select-Object -First 1`
     for (let i = 0; i < 40; i++) {
-      const handle = Number(spawnSync('powershell.exe', ['-NoProfile', '-Command', `(Get-Process -Id ${pid}).MainWindowHandle.ToInt64()`], { encoding: 'utf8' }).stdout.trim())
+      const handle = Number(spawnSync('powershell.exe', ['-NoProfile', '-Command', `${own} else { ${handedOver} }`], { encoding: 'utf8' }).stdout.trim())
       if (handle) return handle
       await wait(250)
     }
     return 0
+  }
+  /** A test browser ended: the process started and all it started, and any other process on the check's own profile. */
+  const closeBrowser = (pid, profile) => {
+    spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'], { stdio: 'ignore' })
+    spawnSync('powershell.exe', ['-NoProfile', '-Command', `${ofProfile(profile)} | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }`], { stdio: 'ignore' })
+  }
+  /** A folder the check made, removed; one a program still holds is left in the temporary folder, and the check goes on. */
+  const removeFolder = (folder) => {
+    try {
+      rmSync(folder, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
+    } catch {
+      console.error(`Left in the temporary folder, still held by a program: ${folder}`)
+    }
   }
   const chromeFile = ['C:/Program Files/Google/Chrome/Application/chrome.exe', 'C:/Program Files (x86)/Google/Chrome/Application/chrome.exe'].find((file) => existsSync(file))
   if (chromeFile) {
@@ -405,7 +425,7 @@ try {
       return { incognito, profile, proc }
     })
     try {
-      const [incognito, normal] = await Promise.all(chromes.map((chrome) => windowOf(chrome.proc.pid)))
+      const [incognito, normal] = await Promise.all(chromes.map((chrome) => windowOf(chrome.proc.pid, chrome.profile)))
       // The toolbar is read on a thread of its own: listed as being checked until then; read within 8 s.
       let seen = []
       for (let i = 0; i < 32; i++) {
@@ -420,9 +440,9 @@ try {
       const picturePrivate = await invoke('apps_picture', { id: incognito, width: 300, height: 200, seen: true })
       check('a Chrome Incognito window: neither held nor pictured, even asked without the list', Boolean(holdPrivate.error) && Boolean(picturePrivate.error) && (await ask(`owner ${incognito}`)).owner === 0, `${holdPrivate.error}; ${picturePrivate.error}`)
     } finally {
-      for (const chrome of chromes) spawnSync('taskkill', ['/PID', String(chrome.proc.pid), '/T', '/F'], { stdio: 'ignore' })
+      for (const chrome of chromes) closeBrowser(chrome.proc.pid, chrome.profile)
       await wait(1500)
-      for (const chrome of chromes) rmSync(chrome.profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
+      for (const chrome of chromes) removeFolder(chrome.profile)
     }
   } else {
     check('a Chrome Incognito window: never listed (Chrome not installed: not tried)', true, 'not tried')
@@ -484,13 +504,13 @@ try {
     const profile = mkdtempSync(join(tmpdir(), 'shellnote-apps-check-place-profile-'))
     const proc = spawn(file, [`--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', '--new-window', fileUrl('place.html')], { stdio: 'ignore' })
     try {
-      const id = await windowOf(proc.pid)
+      const id = await windowOf(proc.pid, profile)
       // Listed first (a Chrome window once its toolbar is read): only a window the list offers has a place.
       for (let i = 0; i < 32 && !((await invoke('apps_list')).value ?? []).some((w) => w.id === id && w.left_out === null); i++) await wait(250)
       // Said when it is not: whether the browser's window was found at all, and what the list offers in its place (a
       // browser may hand over to another process as it starts, and then the one started has no window).
       const listed = (await invoke('apps_list')).value ?? []
-      if (!listed.some((w) => w.id === id)) check(`${browser}: its window is on the list`, false, `the window asked for: ${id || 'none found for the process started'}; the list offers: ${JSON.stringify(listed.map((w) => `${w.program} "${w.title}" ${w.left_out ?? ''}`.trim()))}`)
+      if (!listed.some((w) => w.id === id)) check(`${browser}: its window is on the list`, false, `the window asked for: ${id || 'none found for the browser started'}; the list offers: ${JSON.stringify(listed.map((w) => `${w.program} "${w.title}" ${w.left_out ?? ''}`.trim()))}`)
       const address = await placeOf(id, (place) => place?.address === fileUrl('place.html'))
       check(`${browser}: a page's address`, address.value?.address === fileUrl('place.html'), JSON.stringify(address))
       // Its words, as a line is written there: the page's own, never a password box's.
@@ -541,16 +561,16 @@ try {
         check('200 places read: no threads left behind', after <= before + 3, `${before} threads before, ${after} after; ${each.toFixed(0)} ms a read`)
       }
     } finally {
-      spawnSync('taskkill', ['/PID', String(proc.pid), '/T', '/F'], { stdio: 'ignore' })
+      closeBrowser(proc.pid, profile)
       await wait(1500)
-      rmSync(profile, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
+      removeFolder(profile)
     }
     // DevTools docked: a page of the window too, listed first and larger than the tab (6 November 2026): the tab's
     // address is the place, never DevTools'.
     const toolsProfile = mkdtempSync(join(tmpdir(), 'shellnote-apps-check-place-profile-'))
     const tools = spawn(file, [`--user-data-dir=${toolsProfile}`, '--no-first-run', '--no-default-browser-check', '--new-window', '--auto-open-devtools-for-tabs', fileUrl('place.html')], { stdio: 'ignore' })
     try {
-      const id = await windowOf(tools.pid)
+      const id = await windowOf(tools.pid, toolsProfile)
       for (let i = 0; i < 32 && !((await invoke('apps_list')).value ?? []).some((w) => w.id === id && w.left_out === null); i++) await wait(250)
       await placeOf(id, (place) => place?.address === fileUrl('place.html'))
       // DevTools takes a moment to open and be read.
@@ -558,9 +578,9 @@ try {
       const docked = await invoke('apps_place_of', { id })
       check(`${browser}: DevTools docked, the tab's address all the same`, docked.value?.address === fileUrl('place.html'), JSON.stringify(docked))
     } finally {
-      spawnSync('taskkill', ['/PID', String(tools.pid), '/T', '/F'], { stdio: 'ignore' })
+      closeBrowser(tools.pid, toolsProfile)
       await wait(1500)
-      rmSync(toolsProfile, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
+      removeFolder(toolsProfile)
     }
   }
   papers.close()
@@ -584,25 +604,37 @@ try {
     const vscode = spawn(codeFile, [...profile, '--disable-workspace-trust', '--skip-welcome', '--new-window', project, '--goto', `${waves}:20`], { stdio: 'ignore' })
     try {
       let id = 0
-      for (let i = 0; i < 80 && !id; i++) {
+      // Up to a minute: VS Code with a new profile and an extension just installed is slow to open its first file on
+      // a laptop on battery (20 s were not enough, 13 November 2026).
+      for (let i = 0; i < 240 && !id; i++) {
         id = ((await invoke('apps_list')).value ?? []).find((w) => w.program.toLowerCase() === 'code.exe' && w.title.includes('waves.ts'))?.id ?? 0
         if (!id) await wait(250)
       }
-      // VS Code writes the drive's letter small.
-      const sameFile = (file) => file?.toLowerCase() === waves.toLowerCase()
-      const at = await placeOf(id, (place) => sameFile(place?.file) && place?.line === 20)
-      check('VS Code: its whole path and line, from the companion', sameFile(at.value?.file) && at.value?.line === 20, JSON.stringify(at))
-      const backCode = await invoke('apps_go_to', { id, place: { file: waves, line: 42 }, front: true })
-      const atBack = await placeOf(id, (place) => place?.line === 42)
-      check("VS Code: a line's mark, back to its file and line", backCode.value === true && atBack.value?.line === 42, `${JSON.stringify(backCode)} ${JSON.stringify(atBack)}`)
-      const named = await invoke('apps_go_to', { id, place: { file: 'waves.ts', line: 2 }, front: true })
-      const absent = await invoke('apps_go_to', { id, place: { file: join(project, 'no-such-file.ts'), line: 2 }, front: true })
-      const flag = await invoke('apps_go_to', { id, place: { file: '--install-extension=C:/evil.vsix', line: 2 }, front: true })
-      check('VS Code: a file only named, not there, or a switch goes nowhere', named.value === false && absent.value === false && flag.value === false, JSON.stringify([named, absent, flag]))
-      const codePicture = await invoke('apps_may_keep_picture', { id })
-      check('VS Code: no picture kept, as it cannot be asked about password boxes', codePicture.value === false, JSON.stringify(codePicture))
-      const codeWords = await invoke('apps_words_of', { id })
-      check("VS Code: gives no words of its own, its picture's are read", codeWords.value === null, JSON.stringify(codeWords))
+      if (!id) {
+        // What the check's own VS Code did: whether the process started still runs, and the windows of every Code.exe on
+        // the check's own folder. A VS Code waiting to update itself (a newer version downloaded, the old one still
+        // open) starts no second copy: the one started ends at once (13 November 2026).
+        const own = spawnSync('powershell.exe', ['-NoProfile', '-Command', `Get-CimInstance Win32_Process -Filter "Name='Code.exe'" | Where-Object { $_.CommandLine -like '*${basename(code)}*' -and $_.CommandLine -notlike '*--type=*' } | ForEach-Object { "$($_.ProcessId) [" + (Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue).MainWindowTitle + "]" }`], { encoding: 'utf8' }).stdout.trim().replace(/\s+/gu, ' ')
+        const updating = existsSync(join(dirname(codeFile), 'updating_version'))
+        const why = updating ? 'VS Code is waiting to update itself and starts no second copy until then: restart VS Code, then run this check again' : 'no window of Code.exe shows waves.ts'
+        check('VS Code: started for the check, its window on the list (its other checks not tried)', false, `${why}; the process started (${vscode.pid}) ${vscode.exitCode === null ? 'still runs' : `ended with ${vscode.exitCode}`}; VS Code on the check's own folder (process [window]): ${own || 'none'}; the list offers: ${JSON.stringify(((await invoke('apps_list')).value ?? []).filter((w) => w.program.toLowerCase() === 'code.exe').map((w) => `"${w.title}" ${w.left_out ?? ''}`.trim()))}`)
+      } else {
+        // VS Code writes the drive's letter small.
+        const sameFile = (file) => file?.toLowerCase() === waves.toLowerCase()
+        const at = await placeOf(id, (place) => sameFile(place?.file) && place?.line === 20)
+        check('VS Code: its whole path and line, from the companion', sameFile(at.value?.file) && at.value?.line === 20, JSON.stringify(at))
+        const backCode = await invoke('apps_go_to', { id, place: { file: waves, line: 42 }, front: true })
+        const atBack = await placeOf(id, (place) => place?.line === 42)
+        check("VS Code: a line's mark, back to its file and line", backCode.value === true && atBack.value?.line === 42, `${JSON.stringify(backCode)} ${JSON.stringify(atBack)}`)
+        const named = await invoke('apps_go_to', { id, place: { file: 'waves.ts', line: 2 }, front: true })
+        const absent = await invoke('apps_go_to', { id, place: { file: join(project, 'no-such-file.ts'), line: 2 }, front: true })
+        const flag = await invoke('apps_go_to', { id, place: { file: '--install-extension=C:/evil.vsix', line: 2 }, front: true })
+        check('VS Code: a file only named, not there, or a switch goes nowhere', named.value === false && absent.value === false && flag.value === false, JSON.stringify([named, absent, flag]))
+        const codePicture = await invoke('apps_may_keep_picture', { id })
+        check('VS Code: no picture kept, as it cannot be asked about password boxes', codePicture.value === false, JSON.stringify(codePicture))
+        const codeWords = await invoke('apps_words_of', { id })
+        check("VS Code: gives no words of its own, its picture's are read", codeWords.value === null, JSON.stringify(codeWords))
+      }
     } finally {
       spawnSync('taskkill', ['/PID', String(vscode.pid), '/T', '/F'], { stdio: 'ignore' })
       await wait(1500)
