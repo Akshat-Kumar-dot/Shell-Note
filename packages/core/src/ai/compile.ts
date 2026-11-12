@@ -197,9 +197,9 @@ function rewrite(op: AiOpOf<'rewrite'>, input: CompileInput): Op[] {
     case 'diagram':
       return content === block.src ? [] : [spliceFor(block.id, 'src', block.src, content)]
     case 'image':
-      return [{ op: 'update', id: block.id, set: { alt: content === '' ? null : content } }]
+      return content === (block.alt ?? '') ? [] : [{ op: 'update', id: block.id, set: { alt: content === '' ? null : content } }]
     case 'ink':
-      return [{ op: 'update', id: block.id, set: { text: content === '' ? null : content } }]
+      return content === (block.text ?? '') ? [] : [{ op: 'update', id: block.id, set: { text: content === '' ? null : content } }]
     case 'table': {
       // The whole table comes back as a pipe table (v1.1). New columns get equal widths.
       const { rows, head } = table(content)

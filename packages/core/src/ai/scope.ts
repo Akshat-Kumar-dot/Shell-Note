@@ -20,6 +20,8 @@ export function outsideScope(before: Doc, after: Doc, selection: Selection, alia
   for (const s of aliases.selected) if (s.words) pieces.set(s.id, [...(pieces.get(s.id) ?? []), s.words])
   const near = new Set(aliases.near.map((n) => n.id))
   const box = inBox(selection) ? (selection.here as Extract<Here, { page: Id }>) : undefined
+  // A place marked in a text column: between two of its blocks, or at its start or end.
+  const spot = selection.here !== undefined && 'parent' in selection.here ? selection.here : undefined
 
   if (before.title !== after.title || JSON.stringify(before.rules) !== JSON.stringify(after.rules)) {
     return 'The note\'s title and rules are not part of the selection: leave them as they are.'
@@ -53,7 +55,7 @@ export function outsideScope(before: Doc, after: Doc, selection: Selection, alia
       return 'Only what is selected may be removed.'
     }
     if (!old && now) {
-      const problem = placed(now, before, after, whole, pieces, near, box)
+      const problem = placed(now, before, after, whole, pieces, near, box, spot)
       if (problem) return problem
     }
   }
@@ -66,7 +68,7 @@ function same(a: Block, b: Block): boolean {
 }
 
 /** Whether a new block stands where the AI may add: inside the box, or next to the selection. */
-function placed(block: Block, before: Doc, after: Doc, whole: Set<Id>, pieces: Map<Id, WordRange[]>, near: Set<Id>, box: Extract<Here, { page: Id }> | undefined): string | null {
+function placed(block: Block, before: Doc, after: Doc, whole: Set<Id>, pieces: Map<Id, WordRange[]>, near: Set<Id>, box: Extract<Here, { page: Id }> | undefined, spot?: Extract<Here, { parent: Id }>): string | null {
   if ('parent' in block) {
     // In a new frame: the frame is checked itself.
     if (before.block[block.parent] === undefined) return null
@@ -84,6 +86,8 @@ function placed(block: Block, before: Doc, after: Doc, whole: Set<Id>, pieces: M
     const from = previous === undefined ? -1 : was.indexOf(previous)
     const to = following === undefined ? was.length : was.indexOf(following)
     if (was.slice(from + 1, to < 0 ? was.length : to).some(chosen)) return null
+    // At the place marked in this column: between the blocks that stood on either side of it, which an empty column has none of.
+    if (spot && block.parent === spot.parent && previous === was[spot.at - 1] && following === was[spot.at]) return null
     // In a box, new blocks follow what it holds; elsewhere they may also stand before it, or next to a neighbour.
     if (box ? chosen(previous) : chosen(previous) || chosen(following) || near.has(previous ?? '') || near.has(following ?? '')) return null
     return 'A new block goes only next to what is selected.'

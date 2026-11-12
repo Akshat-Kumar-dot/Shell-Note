@@ -110,3 +110,5 @@ export { CLEAR_GAP, Finder, MEANING_CUTOFF, MEANING_GAP, OVERLAP_CUTOFF, type By
 export { checkInput, COMMAND_NAME, describe as describeCommand, FIELDS, inputs, valuesOf, type CommandInput, type CommandSpec, type Field, type Limit } from './command/spec.js'
 export { blockDetail, blockOf, blocksList } from './command/page.js'
 export { areaLine, areaNames, argsOf, blocksOf, commandLine, exampleLine, FENCE, linesOf, parseLine, POSITIONAL, stepsOf, terminalGuide, typed, WORD_AREAS, type Line, type TerminalStep } from './command/terminal.js'
+export { editById, MAX_EDIT_CONTENT, MAX_EDIT_OPS, type IdEdit, type IdEdited } from './ai/byId.js'
+export { blockContent, readBlocks } from './read.js'
