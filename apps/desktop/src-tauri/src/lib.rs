@@ -180,7 +180,10 @@ fn open_outside(url: &Url) {
         use std::os::windows::process::CommandExt;
         /// No console window flashing up for the helper.
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        let _ = std::process::Command::new("rundll32")
+        // Windows' own helper, by its whole path: by its name alone, a program of that name lying beside ShellNote or
+        // in the folder it was started from would be found first, and run.
+        let Some(helper) = system_folder().map(|folder| folder.join("rundll32.exe")) else { return };
+        let _ = std::process::Command::new(helper)
             .args(["url.dll,FileProtocolHandler", url.as_str()])
             .creation_flags(CREATE_NO_WINDOW)
             .spawn();
@@ -193,6 +196,36 @@ fn open_outside(url: &Url) {
     {
         let _ = std::process::Command::new("xdg-open").arg(url.as_str()).spawn();
     }
+}
+
+/// Windows' own folder of programs (C:\Windows\System32), as Windows itself names it, never as a variable of the
+/// environment does: whoever starts ShellNote sets those.
+#[cfg(windows)]
+fn system_folder() -> Option<PathBuf> {
+    use windows::Win32::System::SystemInformation::GetSystemDirectoryW;
+    let mut buffer = [0u16; 512];
+    let length = unsafe { GetSystemDirectoryW(Some(&mut buffer)) } as usize;
+    (length > 0 && length < buffer.len()).then(|| PathBuf::from(String::from_utf16_lossy(&buffer[..length])))
+}
+
+/// Libraries by name alone are looked for in ShellNote's own folder and Windows' folders only, never in the folder
+/// ShellNote was started from nor along the PATH: a note opened from a folder someone else filled must not bring a
+/// library of theirs with it. Called first of all (main.rs). The libraries ShellNote names itself are found in Windows'
+/// folder alone (build.rs).
+#[cfg(windows)]
+pub fn only_known_libraries() {
+    use windows::Win32::System::LibraryLoader::{SetDefaultDllDirectories, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS};
+    let _ = unsafe { SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS) };
+}
+
+/// Where a window of the app may go: to the app's own pages, and nowhere else. A page from elsewhere in the app's
+/// window would look like ShellNote and be anyone's: a web page opens in the person's browser instead, and anything
+/// else is not opened. (The pages in the side panel's web tab and a video's player are frames, not the window; and
+/// only the app's own pages may call its commands, whatever a window shows.) In development the pages come from
+/// this computer's own server, and the browser tests take the window to theirs.
+fn may_go_to(url: &Url) -> bool {
+    let local = matches!(url.host_str(), Some("localhost" | "127.0.0.1"));
+    own_page(None, url) || url.as_str() == "about:blank" || (tauri::is_dev() && local) || testing()
 }
 
 /// Whether the browser tests run this copy: they set each window's size (SHELLNOTE_WINDOW_SIZE).
@@ -343,6 +376,14 @@ fn app_window(app: &AppHandle, label: &str, page: WebviewUrl) -> tauri::Result<W
             if payload.event() == PageLoadEvent::Finished {
                 show(&window);
             }
+        })
+        // The window stays on the app's own pages: a link that would take it elsewhere opens outside, as any link does.
+        .on_navigation(|url| {
+            let own = may_go_to(url);
+            if !own {
+                open_outside(url);
+            }
+            own
         })
         // Files dropped from the desktop go to the page, as in the browser (pictures onto a note); Tauri's own
         // handler would take them, and the page would see nothing.
@@ -550,4 +591,51 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("shellnote could not start");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn url(text: &str) -> Url {
+        Url::parse(text).unwrap()
+    }
+
+    #[test]
+    fn a_window_goes_only_to_the_apps_own_pages() {
+        for own in ["http://tauri.localhost/", "http://tauri.localhost/index.html#/note/n1", "https://tauri.localhost/?sample=mixed", "tauri://localhost/index.html", "about:blank"] {
+            assert!(may_go_to(&url(own)), "{own}");
+        }
+        // Another site, however its address is dressed; and what is no page of a site at all.
+        for other in [
+            "https://example.com/",
+            "http://tauri.localhost.example.com/",
+            "https://example.com/tauri.localhost/",
+            "https://tauri.localhost@example.com/",
+            "http://tauri-localhost/",
+            "data:text/html,<h1>ShellNote</h1>",
+            "file:///D:/pages/page.html",
+            "javascript:alert(1)",
+            "ms-settings:privacy",
+        ] {
+            assert!(!may_go_to(&url(other)), "{other}");
+        }
+    }
+
+    #[test]
+    fn only_web_pages_and_email_open_outside_the_app() {
+        for fine in ["https://example.com/a?b=c", "http://127.0.0.1:8000/", "mailto:someone@example.com"] {
+            assert!(may_open(&url(fine)), "{fine}");
+        }
+        for refused in ["file:///C:/Windows/System32/calc.exe", "javascript:alert(1)", "ms-word:x", "search-ms:x", "data:text/html,x", "shell:startup", "vscode://file/C:/x"] {
+            assert!(!may_open(&url(refused)), "{refused}");
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_own_folder_is_named_by_windows() {
+        let folder = system_folder().expect("Windows says where its programs are");
+        assert!(folder.is_absolute() && folder.join("rundll32.exe").is_file(), "{folder:?}");
+    }
 }

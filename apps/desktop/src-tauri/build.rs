@@ -1,4 +1,10 @@
 fn main() {
+    // The libraries the program names (dwmapi.dll, d3d11.dll, propsys.dll and the rest) are loaded from Windows' own
+    // folder only (the linker's /DEPENDENTLOADFLAG, 0x800: search System32). Without it Windows looks first in the
+    // folder the program lies in, where a file of the same name would be loaded in its place.
+    if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
+        println!("cargo:rustc-link-arg-bins=/DEPENDENTLOADFLAG:0x800");
+    }
     // The app's own commands, each a permission of its own ("allow-apps-hold"), so a window may call only those its
     // capability lists (capabilities/default.json).
     let commands = tauri_build::AppManifest::new().commands(&[
