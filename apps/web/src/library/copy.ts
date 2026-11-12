@@ -4,8 +4,8 @@
 // where it went and compared before the next is copied, so a copy that is not
 // exact stops the move, with everything still where it was.
 import { sameContent } from '@shellnote/core'
-import type { LibraryStore } from './store.js'
-import { folderPath, hidden } from './tree.js'
+import type { LibraryStore } from '@shellnote/library'
+import { folderPath, hidden } from '@shellnote/library/tree'
 
 export interface Copied {
   /** Notes copied. */

@@ -106,7 +106,8 @@ On a Mac, use ⌘ in place of Ctrl.
 | [`packages/core`](packages/core) | The note itself: its schema, the one function that changes it, the AI's steps, the pen's maths and the commands. No DOM and no Node APIs, so it runs anywhere |
 | [`packages/editor`](packages/editor) | The note on screen, in React and Tiptap: pages, frames, the pen layer, toolbars, panels and the command line |
 | [`packages/providers`](packages/providers) | The adapter for OpenAI-compatible servers (LM Studio, OpenRouter) |
-| [`apps/web`](apps/web) | The app: the library, settings, saving, and the workspace around the editor |
+| [`packages/library`](packages/library) | The library of notes and folders, and the one kept in a folder of files that a cloud service can sync |
+| [`apps/web`](apps/web) | The app: the library's screens, settings, saving, and the workspace around the editor |
 | [`apps/desktop`](apps/desktop) | The same app in a Tauri window, with the Rust side for what a browser cannot do |
 | [`apps/vscode-companion`](apps/vscode-companion) | A small VS Code extension that tells ShellNote the open file and line |
 | [`docs`](docs) | [Architecture](docs/ARCHITECTURE.md), the [file format](docs/file-format.md) and the [AI protocol](docs/protocol.md) |

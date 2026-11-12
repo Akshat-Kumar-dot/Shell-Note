@@ -21,6 +21,7 @@ const io = ['localStorage', 'sessionStorage', 'navigator', 'fetch', 'WebSocket']
 const NO_DOM = 'packages/core must not touch the DOM. Pass browser behaviour in from the editor.'
 const NO_NODE = 'packages/core must also run in browsers. Pass Node behaviour in from the caller.'
 const NO_IO = 'packages/core is pure logic: no storage, network or host access. Pass it in from the caller.'
+const NO_HOST = 'packages/library runs in a browser and in Node alike. Pass files and anything of the host in from the caller.'
 
 export default defineConfig(
   globalIgnores(['**/dist/', '**/dist-check/', '**/dist-desktop/', '**/src-tauri/target/', '**/src-tauri/gen/', '**/coverage/']),
@@ -51,6 +52,19 @@ export default defineConfig(
     // The app's configs and end-to-end tests run in Node.
     files: ['apps/web/*.ts', 'apps/web/e2e/**/*.ts'],
     languageOptions: { globals: globals.node },
+  },
+  {
+    // The library runs in the app's page and in Node: it reaches files only through the Files it is given.
+    files: ['packages/library/src/**/*.ts'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        ...browserOnly.map((name) => ({ name, message: NO_HOST })),
+        ...nodeOnly.map((name) => ({ name, message: NO_HOST })),
+        ...io.map((name) => ({ name, message: NO_HOST })),
+      ],
+      'no-restricted-imports': ['error', { patterns: [{ group: ['node:*', 'react', 'react/*', '@tauri-apps/*'], message: NO_HOST }] }],
+    },
   },
   {
     files: ['packages/core/src/**/*.ts'],

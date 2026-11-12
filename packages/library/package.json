@@ -1,0 +1,16 @@
+{
+  "name": "@shellnote/library",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The ShellNote library: notes and folders behind one storage interface, and the library kept in a folder of files. No DOM, no framework.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tree": "./src/tree.ts",
+    "./layout": "./src/layout.ts"
+  },
+  "dependencies": {
+    "@shellnote/core": "workspace:*"
+  }
+}

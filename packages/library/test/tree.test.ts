@@ -2,9 +2,9 @@
 // sit, what may move where, sorting, searching and Recently deleted.
 import { createDoc } from '@shellnote/core'
 import { describe, expect, it } from 'vitest'
-import { MIXED } from '../../../packages/core/test/fixtures/index.js'
-import type { FolderEntry, Library, NoteEntry } from '../src/library/store.js'
-import { blank, canMove, contents, counts, daysLeft, deletedItems, entryFor, expired, folderPath, hidden, inside, isWithin, onlyUsedBy, search, sorted, uniqueName, unsaved } from '../src/library/tree.js'
+import { MIXED } from '../../core/test/fixtures/index.js'
+import type { FolderEntry, Library, NoteEntry } from '../src/store.js'
+import { blank, canMove, contents, counts, daysLeft, deletedItems, entryFor, expired, folderPath, hidden, inside, isWithin, onlyUsedBy, search, sorted, uniqueName, unsaved } from '../src/tree.js'
 
 const DAY = 24 * 60 * 60 * 1000
 const folder = (id: string, name: string, parent: string | null, edited = 0, deleted?: number): FolderEntry => ({ id, name, parent, created: edited, edited, ...(deleted === undefined ? {} : { deleted }) })

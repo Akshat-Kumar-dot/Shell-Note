@@ -5,8 +5,8 @@ import { apply, sameContent } from '@shellnote/core'
 import { describe, expect, it } from 'vitest'
 import { MIXED, PHYSICS } from '../../../../packages/core/test/fixtures/index.js'
 import { copyLibrary } from '../../src/library/copy.js'
-import { hidden } from '../../src/library/tree.js'
-import { Clock, device, edit } from './devices.js'
+import { hidden } from '@shellnote/library/tree'
+import { Clock, device, edit } from '../../../../packages/library/test/devices.js'
 
 const pictures = (doc: typeof MIXED): Map<string, Blob> => new Map(Object.keys(doc.asset).map((hash) => [hash, new Blob([new Uint8Array([7, 7])], { type: 'image/png' })]))
 

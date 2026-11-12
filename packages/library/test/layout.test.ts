@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isClutter, isNote, safeName, titleStem } from '../../src/library/folder/layout.js'
+import { isClutter, isNote, safeName, titleStem } from '../src/layout.js'
 
 describe('names in the library folder', () => {
   it('a folder name never ends in a dot or a space, which Windows would drop', () => {

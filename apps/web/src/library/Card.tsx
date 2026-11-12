@@ -5,7 +5,7 @@
 import { Ellipsis, FileText, Folder } from 'lucide-react'
 import { tabWord } from '@shellnote/editor'
 import { useEffect, useRef, type KeyboardEvent, type PointerEvent } from 'react'
-import type { FolderEntry, NoteEntry } from './store.js'
+import type { FolderEntry, NoteEntry } from '@shellnote/library'
 
 export type CardItem = { kind: 'note'; entry: NoteEntry } | { kind: 'folder'; entry: FolderEntry }
 

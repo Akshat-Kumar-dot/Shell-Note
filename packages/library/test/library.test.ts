@@ -3,11 +3,11 @@
 // file, Recently deleted a folder of its own.
 import { apply, createDoc, pack, unpack, type TextBlock } from '@shellnote/core'
 import { describe, expect, it } from 'vitest'
-import { MIXED, PHYSICS } from '../../../../packages/core/test/fixtures/index.js'
-import { MemoryFiles } from '../../src/library/folder/files.js'
-import { BIN } from '../../src/library/folder/layout.js'
-import { FolderLibrary } from '../../src/library/folder/library.js'
-import { KEPT_DAYS, type Library } from '../../src/library/store.js'
+import { MIXED, PHYSICS } from '../../core/test/fixtures/index.js'
+import { MemoryFiles } from '../src/files.js'
+import { BIN } from '../src/layout.js'
+import { FolderLibrary } from '../src/library.js'
+import { KEPT_DAYS, type Library } from '../src/store.js'
 import { Clock, device, edit, restarted, type Device } from './devices.js'
 
 const paths = async (on: Device): Promise<string[]> => (await on.folder.list()).map((info) => info.path).filter((path) => !path.startsWith('.shellnote')).sort()

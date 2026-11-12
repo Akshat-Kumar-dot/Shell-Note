@@ -4,8 +4,8 @@
 import { apply, createDoc, pack, sameContent, unpack, type Doc, type Frame, type Op, type TextBlock } from '@shellnote/core'
 import { EditorStore } from '@shellnote/editor'
 import { describe, expect, it } from 'vitest'
-import { BIN } from '../../src/library/folder/layout.js'
-import { Clock, Cloud, device, edit, restarted, type Device } from './devices.js'
+import { BIN } from '@shellnote/library/layout'
+import { Clock, Cloud, device, edit, restarted, type Device } from '../../../../packages/library/test/devices.js'
 
 const text = (id: string, parent: string, md: string, at?: number): Op => ({ op: 'add', block: { id, r: 0, type: 'text', parent, role: 'p', indent: 0, md }, ...(at === undefined ? {} : { at }) })
 const words = (doc: Doc): string[] => Object.values(doc.block).flatMap((block) => (block.type === 'text' ? [block.md] : []))

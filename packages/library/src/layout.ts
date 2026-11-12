@@ -3,7 +3,7 @@
 // own, and a hidden folder holds what belongs to the library and to no note:
 // thumbnails, the pen profile, and when and from where each deleted item went.
 import { idFrom } from '@shellnote/core'
-import { EXTENSION, fileName } from '../../storage/files.js'
+import { EXTENSION, fileName } from './names.js'
 
 /** The library's own hidden folder. */
 export const HIDDEN = '.shellnote'

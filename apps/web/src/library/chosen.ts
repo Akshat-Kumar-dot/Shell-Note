@@ -7,9 +7,9 @@ import type { Doc, PenProfile } from '@shellnote/core'
 import { inDesktopApp } from '@shellnote/editor/host'
 import type { FileState } from '../storage/cache.js'
 import { DesktopFiles, libraryFolder } from './folder/desktopFiles.js'
-import { FolderLibrary } from './folder/library.js'
+import { FolderLibrary } from '@shellnote/library'
 import { BrowserLibrary } from './indexeddb.js'
-import type { Exchanged, ExchangedNote, FolderEntry, ItemRef, Library, LibraryStore, NoteEntry, OpenedNote, OutsideChange, SavingNote } from './store.js'
+import type { Exchanged, ExchangedNote, FolderEntry, ItemRef, Library, LibraryStore, NoteEntry, OpenedNote, OutsideChange, SavingNote } from '@shellnote/library'
 
 /** One piece of work on the folder at a time, across every window of the app. */
 function oneAtATime<T>(work: () => Promise<T>): Promise<T> {

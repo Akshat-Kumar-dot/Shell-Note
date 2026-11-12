@@ -1,10 +1,9 @@
 // The library's rules, as plain functions over its entries, with no storage:
 // names for new items, where a folder sits, what a folder holds, what may move
 // where, sorting, searching and Recently deleted. The storage and the home
-// page both use them, and unit tests check them (apps/web/test/tree.test.ts).
+// page both use them, and unit tests check them (test/tree.test.ts).
 import type { Doc } from '@shellnote/core'
-import type { FileState } from '../storage/cache.js'
-import { KEPT_DAYS, type FolderEntry, type ItemRef, type Library, type NoteEntry } from './store.js'
+import { KEPT_DAYS, type FileState, type FolderEntry, type ItemRef, type Library, type NoteEntry } from './store.js'
 
 const DAY = 24 * 60 * 60 * 1000
 

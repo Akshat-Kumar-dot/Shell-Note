@@ -56,6 +56,9 @@ importers:
       '@shellnote/editor':
         specifier: workspace:*
         version: link:../../packages/editor
+      '@shellnote/library':
+        specifier: workspace:*
+        version: link:../../packages/library
       '@shellnote/providers':
         specifier: workspace:*
         version: link:../../packages/providers
@@ -194,6 +197,12 @@ importers:
       react-dom:
         specifier: 19.3.0
         version: 19.3.0(react@19.3.0)
+
+  packages/library:
+    dependencies:
+      '@shellnote/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/providers:
     dependencies:

@@ -1,10 +1,27 @@
 // The library behind one storage interface: the
 // home page and the note screen ask it for everything, and never learn where
-// notes are kept. The browser keeps them in IndexedDB (indexeddb.ts). Later,
-// the Windows and phone apps keep real folders of .shellnote files through
-// the same interface, so the library's folders become folders on disk.
+// notes are kept. The browser keeps them in IndexedDB (the app's
+// indexeddb.ts). A folder of .shellnote files is kept through the same
+// interface (library.ts), so the library's folders are folders on disk.
 import type { Doc, PenProfile } from '@shellnote/core'
-import type { FileState } from '../storage/cache.js'
+
+declare global {
+  // The browser's handle to a file a person picked. Only the app's own screens use one; it is named here so that
+  // this package also reads where there is no browser, and there it is nothing.
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  interface FileSystemFileHandle {}
+}
+
+/** The file the note was last saved to or opened from. */
+export interface FileState {
+  name: string
+  /** The note's rev in the file: changes since are not in it yet. */
+  rev: number
+  /** When the file was written. */
+  savedAt: number
+  /** Lets Save write to the same file again without asking (Chrome and Edge). */
+  handle?: FileSystemFileHandle
+}
 
 /** A folder in the library. `parent` is null at the top level. */
 export interface FolderEntry {

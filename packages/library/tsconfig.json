@@ -1,0 +1,9 @@
+{
+  // The library runs in the app's page and in Node. Node's types declare what
+  // both have (Blob, TextEncoder, timers) for the checker; there is no DOM here.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["src", "test"]
+}

@@ -5,18 +5,10 @@
 // it keeps (Safari, after seven days of use without a visit to the app), so
 // the file the person saves is the copy that lasts, and the app says so.
 import { parseDoc, type Doc } from '@shellnote/core'
+import type { FileState } from '@shellnote/library'
 import { get } from './db.js'
 
-/** The file the note was last saved to or opened from. */
-export interface FileState {
-  name: string
-  /** The note's rev in the file: changes since are not in it yet. */
-  rev: number
-  /** When the file was written. */
-  savedAt: number
-  /** Lets Save write to the same file again without asking (Chrome and Edge). */
-  handle?: FileSystemFileHandle
-}
+export type { FileState }
 
 interface Kept {
   doc: unknown

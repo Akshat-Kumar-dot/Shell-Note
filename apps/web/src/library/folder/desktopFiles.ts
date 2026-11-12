@@ -5,7 +5,7 @@
 // the app's data folder; the Rust side keeps the choice, and refuses any path
 // that would leave the folder.
 import { invoke } from '@tauri-apps/api/core'
-import type { FileInfo, Files } from './files.js'
+import type { FileInfo, Files } from '@shellnote/library'
 
 export class DesktopFiles implements Files {
   constructor(private readonly rootName: 'shared' | 'own') {}

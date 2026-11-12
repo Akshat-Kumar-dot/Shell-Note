@@ -3,7 +3,7 @@
 // editor's penProfile, which the pen learns from, and kept again each time it
 // changes: a recording taught, a correction undone, the profile forgotten.
 import { penProfile } from '@shellnote/editor'
-import type { LibraryStore } from './store.js'
+import type { LibraryStore } from '@shellnote/library'
 
 /** Read the profile into the pen, then keep every change to it, one write after another. */
 export async function loadPenProfile(library: LibraryStore): Promise<void> {

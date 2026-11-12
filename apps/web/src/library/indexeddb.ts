@@ -6,8 +6,8 @@ import { apply, createDoc, newId, parseDoc, PenProfile, type Doc } from '@shelln
 import { loadWorkingCopy, type FileState } from '../storage/cache.js'
 import { get, keys, result, transact, type StoreName } from '../storage/db.js'
 import { migrateOldNote, type MigrationIO, type MigrationResult } from './migrate.js'
-import type { FolderEntry, ItemRef, Library, LibraryStore, NoteEntry, OpenedNote, SavingNote } from './store.js'
-import { canMove, contents, deletedItems, entryFor, expired, inside, isOpenFolder, onlyUsedBy, uniqueName } from './tree.js'
+import type { FolderEntry, ItemRef, Library, LibraryStore, NoteEntry, OpenedNote, SavingNote } from '@shellnote/library'
+import { canMove, contents, deletedItems, entryFor, expired, inside, isOpenFolder, onlyUsedBy, uniqueName } from '@shellnote/library/tree'
 
 /** A note as kept in `docs`: the document, and the file it belongs to. */
 interface DocRecord {

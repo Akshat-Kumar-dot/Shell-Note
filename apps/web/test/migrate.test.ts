@@ -5,7 +5,7 @@ import type { Doc } from '@shellnote/core'
 import { describe, expect, it } from 'vitest'
 import { MIXED } from '../../../packages/core/test/fixtures/index.js'
 import { migrateOldNote, sameDoc, type MigrationIO, type OldNote } from '../src/library/migrate.js'
-import type { NoteEntry } from '../src/library/store.js'
+import type { NoteEntry } from '@shellnote/library'
 
 /** Storage in memory, which records what was asked of it, in order. */
 function memory(old: OldNote | undefined | 'damaged', change: (doc: Doc) => unknown = (doc) => structuredClone(doc)) {

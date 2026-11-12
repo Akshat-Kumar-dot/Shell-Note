@@ -21,10 +21,9 @@
 // The merging knows nothing of files, and the files nothing of notes
 // (files.ts), so a drive reached another way can use both as they are.
 import { apply, become, compare, contentId, createDoc, idFrom, includes, lineageText, merge, mergeOptions, newId, pack, parseDoc, PenProfile, sameContent, seenByBoth, unpack, validateDoc, ValidationError, type Doc, type Lineage, type Opened, type Seen } from '@shellnote/core'
-import type { FileState } from '../../storage/cache.js'
-import { EXTENSION } from '../../storage/files.js'
-import { KEPT_DAYS, type Exchanged, type ExchangedNote, type FolderEntry, type ItemRef, type Library, type LibraryStore, type NoteEntry, type OpenedNote, type OutsideChange, type SavingNote } from '../store.js'
-import { canMove, contents, onlyUsedBy, uniqueName } from '../tree.js'
+import { EXTENSION } from './names.js'
+import { KEPT_DAYS, type Exchanged, type ExchangedNote, type FileState, type FolderEntry, type ItemRef, type Library, type LibraryStore, type NoteEntry, type OpenedNote, type OutsideChange, type SavingNote } from './store.js'
+import { canMove, contents, onlyUsedBy, uniqueName } from './tree.js'
 import type { FileInfo, Files } from './files.js'
 import { BIN, binned, folderId, folderOf, freeName, HIDDEN, inBin, isClutter, isHidden, isNote, join, MARK, namedFor, nameOf, PEN_PROFILE, previewPath, recordPath, safeName, stem, titleStem } from './layout.js'
 

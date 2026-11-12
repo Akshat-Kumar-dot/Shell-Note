@@ -4,7 +4,7 @@
 // a picture only by its description, its caption and its note.
 import type { PictureSource } from '@shellnote/core'
 import type { PicturesPlace } from '@shellnote/editor'
-import type { LibraryStore } from './store.js'
+import type { LibraryStore } from '@shellnote/library'
 
 /** The pictures of every note in the library but the one open (`open`, its id), Recently deleted left out. */
 export function libraryPictures(library: LibraryStore, open: string | undefined): PicturesPlace {

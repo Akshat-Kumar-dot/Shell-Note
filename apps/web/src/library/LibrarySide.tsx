@@ -5,9 +5,9 @@
 import { commands } from '@shellnote/editor'
 import { ChevronRight, ChevronsLeft, ChevronsRight, FilePlus, FileText, Folder, FolderOpen, FolderPlus, LibraryBig, PanelLeft, PanelRight, Plus, Search, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import type { FolderEntry, Library, LibraryStore, NoteEntry } from './store.js'
+import type { FolderEntry, Library, LibraryStore, NoteEntry } from '@shellnote/library'
 import type { Tabs } from './tabs.js'
-import { contents, folderPath, hidden, search } from './tree.js'
+import { contents, folderPath, hidden, search } from '@shellnote/library/tree'
 
 const SHOWN = 'shellnote:library-side'
 const OPENED = 'shellnote:library-side-open'

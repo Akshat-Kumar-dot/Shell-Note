@@ -5,8 +5,8 @@
 // again at the next start, and the old note is still where it was.
 import { parseDoc, type Doc } from '@shellnote/core'
 import type { FileState } from '../storage/cache.js'
-import type { NoteEntry } from './store.js'
-import { entryFor } from './tree.js'
+import type { NoteEntry } from '@shellnote/library'
+import { entryFor } from '@shellnote/library/tree'
 
 /** The note as version 1 kept it. */
 export interface OldNote {

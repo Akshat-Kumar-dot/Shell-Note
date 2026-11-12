@@ -2,9 +2,9 @@
 // of the synced folder, and a cloud service that copies files between them
 // the way such services do, conflicted copies included.
 import { apply, type Doc, type Op } from '@shellnote/core'
-import { MemoryFiles } from '../../src/library/folder/files.js'
-import { FolderLibrary } from '../../src/library/folder/library.js'
-import type { OutsideChange } from '../../src/library/store.js'
+import { MemoryFiles } from '../src/files.js'
+import { FolderLibrary } from '../src/library.js'
+import type { OutsideChange } from '../src/store.js'
 
 /** One clock for every device and folder of a test. Each look at it moves it on, so no two writes share a time. */
 export class Clock {

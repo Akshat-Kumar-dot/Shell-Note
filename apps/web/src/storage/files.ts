@@ -5,9 +5,7 @@
 // Open uses the browser's file input.
 import { pack, unpack, type Doc, type Opened } from '@shellnote/core'
 import type { AssetStore } from '@shellnote/editor'
-
-/** The file name extension of a note. */
-export const EXTENSION = '.shellnote'
+import { EXTENSION, fileName } from '@shellnote/library'
 
 const TYPES = [{ description: 'shellnote note', accept: { 'application/zip': [EXTENSION] } }]
 const OPENS = TYPES
@@ -21,17 +19,6 @@ type Permission = 'granted' | 'denied' | 'prompt'
 interface Permitted {
   queryPermission?: (options: { mode: 'readwrite' }) => Promise<Permission>
   requestPermission?: (options: { mode: 'readwrite' }) => Promise<Permission>
-}
-
-/** A file name from the note's title: control characters become spaces, and characters no system allows, dashes. */
-export function fileName(title: string): string {
-  const visible = Array.from(title, (ch) => (ch < ' ' ? ' ' : ch)).join('')
-  const safe = visible
-    .replace(/[\\/:*?"<>|]+/gu, '-')
-    .replace(/\s+/gu, ' ')
-    .trim()
-    .slice(0, 100)
-  return `${safe === '' || safe === '.' || safe === '..' ? 'Untitled' : safe}${EXTENSION}`
 }
 
 /** The note as file bytes, with the pictures its image blocks show. Pictures it no longer shows are left out. */

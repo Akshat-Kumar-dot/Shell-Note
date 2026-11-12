@@ -9,8 +9,8 @@
 // note closed and kept, then the library), and waits for that screen, so its
 // next line finds it there.
 import { commands, inDesktopApp, type AppPlace, type By, type HomePlace, type ItemRef, type LibraryAt, type Places } from '@shellnote/editor'
-import type { Library, LibraryStore } from './library/store.js'
-import { deletedItems, folderPath, hidden } from './library/tree.js'
+import type { Library, LibraryStore } from '@shellnote/library'
+import { deletedItems, folderPath, hidden } from '@shellnote/library/tree'
 import { loadSettings, modelsNow, saveSettings, withModel } from './ai/settings.js'
 import { applyAppearance, type Appearance } from './theme.js'
 

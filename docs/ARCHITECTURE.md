@@ -10,7 +10,8 @@ actions through the code, from the hand to the saved note.
 | `packages/core` | The note and everything worked out about it: its schema, its one way of changing, the AI's steps, the pen's maths, the commands | Touch a browser or Node: no DOM, no files. What differs by platform is passed in |
 | `packages/editor` | The note on screen, in React and Tiptap: pages, frames, the pen layer, the toolbars, the panels, the command line | Know about Tauri: the app gives it what the system can do (`program/host.ts`) |
 | `packages/providers` | The adapter that talks to OpenAI-compatible servers, such as LM Studio and OpenRouter (`openai.ts`) | |
-| `apps/web` | The app itself: the library, settings, saving, and the workspace around the editor | |
+| `packages/library` | The library of notes and folders behind one interface (`store.ts`), and the one kept in a folder of files (`library.ts`) | Touch a browser, Node or Tauri: it reaches files only through the `Files` it is given |
+| `apps/web` | The app itself: the library's screens, settings, saving, and the workspace around the editor | |
 | `apps/desktop` | The same app in a Tauri window, and the Rust side, chiefly other programs on a panel (`src-tauri/src`) | |
 | `apps/vscode-companion` | A small VS Code extension that tells ShellNote the open file and line | |
 
@@ -40,7 +41,7 @@ changed since.
    shows. A change from elsewhere (undo, the AI) comes back into Tiptap as the smallest replacement, so the caret stays.
 4. `overflow.ts` moves text that ran past the page's bottom margin onto the next page.
 5. A moment later `apps/web/src/Workspace.tsx` keeps the note through the library (`library/chosen.ts`): in IndexedDB
-   (`library/indexeddb.ts`), or, in the desktop app, in a folder the person chose (`library/folder/library.ts`).
+   (`library/indexeddb.ts`), or, in the desktop app, in a folder the person chose (`packages/library/src/library.ts`).
 
 ### The library in a folder, and sync
 
@@ -52,10 +53,10 @@ notes the same. Three parts, kept apart so that another way for files to travel 
   in through `apply`; `lineage.ts` is what a file says of its past (`sync.json`, [the file format](file-format.md#sync)),
   from which a device tells a newer version from one written apart; `rebase.ts` fits the undo steps to a note that
   took in a change.
-- **The files** are behind a small interface (`library/folder/files.ts`: list, read, write, move, remove). The desktop
-  app reaches a real folder through its own commands (`desktopFiles.ts`, `src-tauri/src/library.rs`), which refuse any
+- **The files** are behind a small interface (`packages/library/src/files.ts`: list, read, write, move, remove). The desktop
+  app reaches a real folder through its own commands (`apps/web/src/library/folder/desktopFiles.ts`, `src-tauri/src/library.rs`), which refuse any
   path outside the chosen folder and write each file whole or not at all; the tests keep the files in memory.
-- **The library** (`library/folder/library.ts`) keeps this device's own copy of every note outside the folder, looks
+- **The library** (`packages/library/src/library.ts`) keeps this device's own copy of every note outside the folder, looks
   at the folder every two seconds, and brings each note together with its file: taken as it is, merged, or written
   again. A second file of the same note, as cloud services leave after a conflict, is merged and moved to Recently
   deleted.
@@ -134,7 +135,7 @@ companion's small file), and what it reads is data, never instructions.
 | Add a command | `core/src/command/app.ts` (what it takes and how it is said), `editor/src/commands/` (what it does) |
 | Change the panels | `editor/src/layout/tree.ts` (the layout, no React), `layout/DockArea.tsx` |
 | Change where a menu opens, or how a bar fits down a side | `editor/src/popover.ts`, `layout/stripFit.ts` |
-| Change how two versions of a note are merged | `core/src/sync/merge.ts`, with `core/test/sync/` and `apps/web/test/folder/` (devices and a cloud service, in memory) |
+| Change how two versions of a note are merged | `core/src/sync/merge.ts`, with `core/test/sync/`, `packages/library/test/` and `apps/web/test/folder/` (devices and a cloud service, in memory) |
 | Follow a Rust call | `apps/web/src/desktop.ts` (the page's side), `src-tauri/src/lib.rs` (the list of commands) |
 
 ## Running and testing

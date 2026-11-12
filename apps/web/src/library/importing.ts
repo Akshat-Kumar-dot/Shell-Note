@@ -7,8 +7,8 @@ import { AssetStore } from '@shellnote/editor'
 import type { FileState } from '../storage/cache.js'
 import { pickFile, readNote } from '../storage/files.js'
 import { sameDoc } from './migrate.js'
-import type { LibraryStore } from './store.js'
-import { hidden } from './tree.js'
+import type { LibraryStore } from '@shellnote/library'
+import { hidden } from '@shellnote/library/tree'
 
 export interface Imported {
   /** The note to open. */

@@ -4,8 +4,8 @@
 import { CornerDownRight, Folder, LibraryBig } from 'lucide-react'
 import { useState } from 'react'
 import { Dialog } from './Dialog.js'
-import type { ItemRef, Library } from './store.js'
-import { canMove, contents, sorted } from './tree.js'
+import type { ItemRef, Library } from '@shellnote/library'
+import { canMove, contents, sorted } from '@shellnote/library/tree'
 
 interface Place {
   id: string | null
