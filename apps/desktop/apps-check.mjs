@@ -487,6 +487,10 @@ try {
       const id = await windowOf(proc.pid)
       // Listed first (a Chrome window once its toolbar is read): only a window the list offers has a place.
       for (let i = 0; i < 32 && !((await invoke('apps_list')).value ?? []).some((w) => w.id === id && w.left_out === null); i++) await wait(250)
+      // Said when it is not: whether the browser's window was found at all, and what the list offers in its place (a
+      // browser may hand over to another process as it starts, and then the one started has no window).
+      const listed = (await invoke('apps_list')).value ?? []
+      if (!listed.some((w) => w.id === id)) check(`${browser}: its window is on the list`, false, `the window asked for: ${id || 'none found for the process started'}; the list offers: ${JSON.stringify(listed.map((w) => `${w.program} "${w.title}" ${w.left_out ?? ''}`.trim()))}`)
       const address = await placeOf(id, (place) => place?.address === fileUrl('place.html'))
       check(`${browser}: a page's address`, address.value?.address === fileUrl('place.html'), JSON.stringify(address))
       // Its words, as a line is written there: the page's own, never a password box's.

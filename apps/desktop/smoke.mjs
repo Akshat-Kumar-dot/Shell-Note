@@ -104,8 +104,9 @@ try {
   // 'unsafe-inline' that Mermaid's and KaTeX's styles need.
   check(
     'the page comes under the content security policy',
-    directive('script-src').startsWith("script-src 'self' 'sha256-") && !/'unsafe-|https?:/u.test(directive('script-src')) && directive('frame-ancestors') === "frame-ancestors 'none'" && directive('style-src') === "style-src 'self' 'unsafe-inline'" && directive('object-src') === "object-src 'none'",
-    `${directive('style-src')}; script-src with ${directive('script-src').match(/'sha256-/gu)?.length ?? 0} hashes of the app's scripts`,
+    // Scripts from the app alone: its own address, and the hash Tauri adds of each of its scripts; no other site.
+    directive('script-src').split(/\s+/u).slice(1).every((source) => source === "'self'" || source.startsWith("'sha256-")) && directive('script-src').includes("'self'") && directive('frame-ancestors') === "frame-ancestors 'none'" && directive('style-src') === "style-src 'self' 'unsafe-inline'" && directive('object-src') === "object-src 'none'",
+    `${directive('style-src')}; ${directive('script-src').replace(/( 'sha256-[^']+')+/u, '')} with ${directive('script-src').match(/'sha256-/gu)?.length ?? 0} hashes of the app's scripts; ${directive('frame-ancestors')}`,
   )
   // A script that got into the page, as a bug or a pasted note could write one: a handler in a tag, a script element.
   const errorsBefore = errors.length
