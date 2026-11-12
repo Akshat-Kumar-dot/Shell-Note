@@ -26,3 +26,9 @@ the release notes unless you prefer not to be.
   `apps/desktop/src-tauri/src/apps.rs`. Private browser windows must never be listed, shown or pictured, and no
   command may control another program.
 - **Text from other programs and from notes:** it is always treated as data, never as instructions to the AI.
+- **The content security policy:** the website and the desktop app take scripts from ShellNote alone, and none made
+  at run time. One policy serves both (`apps/desktop/src-tauri/tauri.conf.json`); the website carries it in its page
+  (`apps/web/vite.config.ts`), since its host sends no header of the site's own.
+- **The library's folder in the desktop app:** the page may read, write and remove notes and the library's own files
+  in the folder you chose, and nothing else there, and nothing outside it (`apps/desktop/src-tauri/src/library.rs`).
+- **Anything a note file can make the app fetch or open** without a click.

@@ -34,6 +34,22 @@ All notable changes to ShellNote are listed here. The format follows
 
 - ShellNote is now licensed under the Apache License 2.0 alone, in place of a choice of MIT or Apache-2.0.
 
+### Security
+
+- The website carries a content security policy in its own page, and both the website and the Windows app take
+  scripts from ShellNote alone. YouTube's player is spoken to through its frame: no script of YouTube's runs in
+  ShellNote's page any more.
+- A picture or video in a note file is kept only as one of the kinds ShellNote takes; anything else a file calls a
+  picture is plain bytes, which a browser neither shows nor runs.
+- The website draws nothing when another site shows it in a frame.
+- The YouTube Data API key is sent to Google as a header, never in the address.
+- In the Windows app, the library's folder commands reach notes and the library's own files, and no other file of the
+  folder you chose; a folder is removed only once it holds no file, and a rename never takes another file's place.
+- In the Windows app: only a window offered in the list can be put on a panel; a place kept with a line opens a file
+  on this computer only; the app's window stays on the app's own pages; the microphone opens only for the window in
+  front; Windows' own libraries are loaded from Windows' folder.
+- The build's GitHub Actions are named by commit, and each job has only the permissions it needs.
+
 ### Fixed
 
 - Full screen in the desktop app fills the whole screen from a maximised window, keeps the window buttons, and Esc
