@@ -14,15 +14,18 @@
     "security": {
       "csp": {
         "default-src": "'self'",
-        "script-src": "'self' https://www.youtube.com",
+        "script-src": "'self'",
         "style-src": "'self' 'unsafe-inline'",
         "img-src": "'self' data: blob: https: http:",
         "font-src": "'self'",
         "connect-src": "'self' ipc: http://ipc.localhost https: http:",
         "frame-src": "https: http:",
         "media-src": "'self' blob:",
+        "worker-src": "'none'",
         "object-src": "'none'",
-        "base-uri": "'self'"
+        "base-uri": "'none'",
+        "form-action": "'none'",
+        "frame-ancestors": "'none'"
       }
     }
   },
