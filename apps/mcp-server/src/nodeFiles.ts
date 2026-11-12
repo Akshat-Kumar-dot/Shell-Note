@@ -12,7 +12,7 @@
 //   another file's place.
 // - A file is written whole or not at all: to a temporary file beside it,
 //   then renamed over it.
-import { promises as fs } from 'node:fs'
+import { promises as fs, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { EXTENSION, type FileInfo, type Files } from '@shellnote/library'
 import { HIDDEN, isClutter } from '@shellnote/library/layout'
@@ -100,6 +100,15 @@ async function renameOver(from: string, to: string): Promise<void> {
 }
 
 let writes = 0
+
+/** The file that says a server is at work in its own place, and the one that says its copies changed. */
+const LOCK = 'lock'
+const WORD = 'word'
+/** A lock is touched this often while its work goes on; one not touched for STALE was left by a server that ended. */
+const BEAT = 3_000
+const STALE = 15_000
+/** How long a call waits for another server's work before it gives up. */
+const PATIENCE = 60_000
 
 export class NodeFiles implements Files {
   private constructor(
@@ -260,5 +269,68 @@ export class NodeFiles implements Files {
     // A folder of the person's, in the folder chosen: the library's own folders are made as its files are written.
     if (this.root !== 'shared' || inHidden(rel)) throw new Error(NOT_THE_LIBRARYS)
     await fs.mkdir(full, { recursive: true })
+  }
+
+  /**
+   * One piece of work at a time across every server on this computer that keeps its copies in this place: each AI
+   * app starts a server of its own, and two must never write the same copies at once. A small file says one is at
+   * work; a server that ended without removing it is found by the file no longer being touched.
+   */
+  async lock<T>(work: () => Promise<T>): Promise<T> {
+    const file = path.join(this.folder, LOCK)
+    const mine = `${process.pid}-${Date.now()}-${writes++}`
+    const started = Date.now()
+    for (;;) {
+      try {
+        const handle = await fs.open(file, 'wx')
+        try {
+          await handle.writeFile(mine)
+        } finally {
+          await handle.close()
+        }
+        break
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST' && !held(error)) throw error
+        const meta = await fs.stat(file).catch(() => undefined)
+        if (meta !== undefined && Date.now() - meta.mtimeMs > STALE) {
+          // Left behind: removed, unless another server took it over in this very moment.
+          const again = await fs.stat(file).catch(() => undefined)
+          if (again?.mtimeMs === meta.mtimeMs) await fs.rm(file, { force: true }).catch(() => undefined)
+          continue
+        }
+        if (Date.now() - started > PATIENCE) throw new Error('Another program has been at work on the library for a long time. Try again in a moment.', { cause: error })
+        await wait(20 + Math.random() * 40)
+      }
+    }
+    const beat = setInterval(() => {
+      const now = new Date()
+      void fs.utimes(file, now, now).catch(() => undefined)
+    }, BEAT)
+    beat.unref()
+    try {
+      return await work()
+    } finally {
+      clearInterval(beat)
+      // Only its own: a lock taken over meanwhile is another server's.
+      if ((await fs.readFile(file, 'utf8').catch(() => undefined)) === mine) await fs.rm(file, { force: true }).catch(() => undefined)
+    }
+  }
+
+  /** A word every server keeping its copies here can read and set: one that changed the copies leaves a new one, so the others read them again. */
+  readonly word = {
+    read: (): string | null => {
+      try {
+        return readFileSync(path.join(this.folder, WORD), 'utf8')
+      } catch {
+        return null
+      }
+    },
+    write: (value: string): void => {
+      try {
+        writeFileSync(path.join(this.folder, WORD), value)
+      } catch {
+        // Not written: one server alone still works.
+      }
+    },
   }
 }

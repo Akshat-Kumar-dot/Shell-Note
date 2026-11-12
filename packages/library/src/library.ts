@@ -742,6 +742,14 @@ export class FolderLibrary implements LibraryStore {
     })
   }
 
+  /** A note alone, without its pictures' bytes: for a reader of its words. */
+  read(id: string): Promise<Doc> {
+    return this.#run(async () => {
+      if (!this.#notes.has(id)) throw new Error('This note is not in the library any more.')
+      return this.#doc(id)
+    })
+  }
+
   async #blobs(doc: Doc): Promise<Map<string, Blob>> {
     const assets = new Map<string, Blob>()
     for (const [hash, bytes] of Object.entries(await this.#assetBytes(doc))) assets.set(hash, new Blob([bytes as Uint8Array<ArrayBuffer>], { type: doc.asset[hash]!.mime }))
