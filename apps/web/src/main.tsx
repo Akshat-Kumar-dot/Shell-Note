@@ -6,6 +6,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App, library } from './App.js'
 import { defineAppCommands } from './commands.js'
+import { FRAMED, inAFrame } from './framed.js'
 import { keepChoices } from './library/choices.js'
 import { TerminalHost } from './TerminalHost.js'
 import { applyAppearance, savedAppearance } from './theme.js'
@@ -22,13 +23,18 @@ if (inWindowsApp()) document.documentElement.dataset.ownTitlebar = ''
 // Light or dark before the first paint, so the app does not flash the other look.
 applyAppearance(savedAppearance(), false)
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <div className="app-area">
-      <App />
-    </div>
-    <TerminalHost />
- {/* The desktop app on Windows has no Windows title bar: its own minimise, maximise and close, on every screen. */}
-    {inWindowsApp() ? <WindowControls /> : null}
-  </StrictMode>,
-)
+const root = document.getElementById('root')!
+// Inside another page's frame nothing of the app is drawn (framed.ts): there is nothing there to click.
+if (inAFrame()) root.textContent = FRAMED
+else {
+  createRoot(root).render(
+    <StrictMode>
+      <div className="app-area">
+        <App />
+      </div>
+      <TerminalHost />
+      {/* The desktop app on Windows has no Windows title bar: its own minimise, maximise and close, on every screen. */}
+      {inWindowsApp() ? <WindowControls /> : null}
+    </StrictMode>,
+  )
+}
