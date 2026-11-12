@@ -69,6 +69,9 @@ export function kindOf(root: Root, rel: string): Kind {
       return end !== undefined && isId(last.slice(0, -end.length)) ? 'own' : 'other'
     }
     if (parts.length === 2 && parts[0] === 'assets') return /^[0-9a-f]{4,64}$/u.test(last) ? 'own' : 'other'
+    // What the server keeps for the person (keeper.ts): each note's log, and copies of a note as it was.
+    if (parts.length === 2 && parts[0] === 'log') return last.endsWith('.json') && isId(last.slice(0, -'.json'.length)) ? 'own' : 'other'
+    if (parts.length === 3 && parts[0] === 'copies') return isId(parts[1]!) && /^(?:index|[0-9]{1,16})\.json$/u.test(last) ? 'own' : 'other'
     return 'other'
   }
   if ((parts[0] ?? '').toLowerCase() === HIDDEN) {

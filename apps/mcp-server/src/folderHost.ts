@@ -9,6 +9,7 @@ import { FolderLibrary } from '@shellnote/library'
 import { MARK } from '@shellnote/library/layout'
 import { folderPath, hidden } from '@shellnote/library/tree'
 import { NoteError, type Changed, type Listing, type NoteHost } from './host.js'
+import { Keeper, type LogItem } from './keeper.js'
 import { NodeFiles } from './nodeFiles.js'
 
 /** Runs one piece of work at a time, across every program that keeps this library through the same place. */
@@ -22,19 +23,24 @@ export class FolderHost implements NoteHost {
   constructor(
     private readonly library: FolderLibrary,
     private readonly lock: Lock = (work) => work(),
+    /** Keeps each note's log, and a note as it was before it is changed here. */
+    private readonly keeper?: Keeper,
   ) {}
+
+  /** One piece of work at a time, here and in every other server on this place. */
+  #alone<T>(work: () => Promise<T>): Promise<T> {
+    const next = this.#queue.then(() => this.lock(work))
+    this.#queue = next.catch(() => undefined)
+    return next
+  }
 
   /** One call at a time, and the folder looked at first: what is read is what is there. */
   #run<T>(work: () => Promise<T>): Promise<T> {
-    const next = this.#queue.then(() =>
-      this.lock(async () => {
-        await this.library.sync()
-        if (this.library.problem() !== undefined) throw new NoteError('unreachable', UNREACHABLE)
-        return work()
-      }),
-    )
-    this.#queue = next.catch(() => undefined)
-    return next
+    return this.#alone(async () => {
+      await this.library.sync()
+      if (this.library.problem() !== undefined) throw new NoteError('unreachable', UNREACHABLE)
+      return work()
+    })
   }
 
   list(): Promise<Listing> {
@@ -68,10 +74,16 @@ export class FolderHost implements NoteHost {
       const before = await this.#note(id)
       const applied = make(before)
       if (applied.changed.length === 0) return { doc: before, changed: [], inverse: [] }
+      // The note as it was is kept first: when that cannot be done, the note is not changed.
+      await this.keeper?.copy(id, before)
       // Kept as a screen keeps an open note: with `since`, so anything that arrived meanwhile is merged, never written over.
       await this.library.exchange({ doc: applied.doc, since: before, blob: () => undefined })
       return { doc: await this.library.read(id), changed: applied.changed, inverse: applied.inverse }
     })
+  }
+
+  async record(id: string, item: LogItem): Promise<void> {
+    if (this.keeper) await this.#alone(() => this.keeper!.log(id, item))
   }
 }
 
@@ -87,5 +99,5 @@ export async function openFolderHost(folder: string, own: string): Promise<Folde
     throw new Error('That folder is not a ShellNote library. Choose it in ShellNote first: Settings, "Where your notes are kept", "Keep them in a folder…".')
   }
   const local = await NodeFiles.open(own, 'own')
-  return new FolderHost(new FolderLibrary({ shared, local, mark: local.word }), (work) => local.lock(work))
+  return new FolderHost(new FolderLibrary({ shared, local, mark: local.word }), (work) => local.lock(work), new Keeper(local))
 }

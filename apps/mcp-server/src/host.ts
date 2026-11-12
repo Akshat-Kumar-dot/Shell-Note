@@ -3,6 +3,7 @@
 // (folderHost.ts). Another place, such as the app itself while it runs, would
 // be another NoteHost, and no tool would change.
 import type { Applied, Doc, Id, Op } from '@shellnote/core'
+import type { LogItem } from './keeper.js'
 
 export interface NoteSummary {
   id: string
@@ -55,4 +56,10 @@ export interface NoteHost {
    * kept before this answers.
    */
   change(id: string, make: (doc: Doc) => Applied): Promise<Changed>
+  /**
+   * Where a host keeps a log the person can read: note what was asked of a
+   * note and what came of it. A log that cannot be written never undoes the
+   * edit it tells of.
+   */
+  record?(id: string, item: LogItem): Promise<void>
 }

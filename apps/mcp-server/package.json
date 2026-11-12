@@ -6,7 +6,9 @@
   "license": "Apache-2.0",
   "type": "module",
   "dependencies": {
+    "@modelcontextprotocol/server": "2.4.0",
     "@shellnote/core": "workspace:*",
-    "@shellnote/library": "workspace:*"
+    "@shellnote/library": "workspace:*",
+    "zod": "^4.6.7"
   }
 }

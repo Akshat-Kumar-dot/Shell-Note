@@ -34,7 +34,8 @@
     "desktop:e2e": "node apps/desktop/run.mjs e2e",
     "desktop:apps": "node apps/desktop/run.mjs apps",
     "companion": "node apps/vscode-companion/pack.mjs",
-    "licences:rust": "node scripts/licences-rust.mjs"
+    "licences:rust": "node scripts/licences-rust.mjs",
+    "mcp:build": "vite build apps/mcp-server"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

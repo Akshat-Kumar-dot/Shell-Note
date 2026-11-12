@@ -14,6 +14,7 @@ actions through the code, from the hand to the saved note.
 | `apps/web` | The app itself: the library's screens, settings, saving, and the workspace around the editor | |
 | `apps/desktop` | The same app in a Tauri window, and the Rust side, chiefly other programs on a panel (`src-tauri/src`) | |
 | `apps/vscode-companion` | A small VS Code extension that tells ShellNote the open file and line | |
+| `apps/mcp-server` | A program an AI app starts to list, read and edit the notes of a library kept in a folder ([the MCP server](mcp.md)) | Reach anything but that folder and its own place; open a port; print anything but the protocol on standard output |
 
 ## Three things to know first
 

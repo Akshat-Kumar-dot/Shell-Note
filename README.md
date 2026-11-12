@@ -110,7 +110,8 @@ On a Mac, use ⌘ in place of Ctrl.
 | [`apps/web`](apps/web) | The app: the library's screens, settings, saving, and the workspace around the editor |
 | [`apps/desktop`](apps/desktop) | The same app in a Tauri window, with the Rust side for what a browser cannot do |
 | [`apps/vscode-companion`](apps/vscode-companion) | A small VS Code extension that tells ShellNote the open file and line |
-| [`docs`](docs) | [Architecture](docs/ARCHITECTURE.md), the [file format](docs/file-format.md) and the [AI protocol](docs/protocol.md) |
+| [`apps/mcp-server`](apps/mcp-server) | A local [MCP server](docs/mcp.md): an AI assistant on your computer can list, read and edit your notes |
+| [`docs`](docs) | [Architecture](docs/ARCHITECTURE.md), the [file format](docs/file-format.md), the [AI protocol](docs/protocol.md) and the [MCP server](docs/mcp.md) |
 
 ## Development
 
