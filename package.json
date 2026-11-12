@@ -22,7 +22,7 @@
     "app": "vite build apps/web && vite preview apps/web",
     "e2e": "playwright test -c apps/web/playwright.config.ts",
     "lint": "eslint .",
-    "typecheck": "tsc -p packages/core/tsconfig.json && tsc -p packages/core/test/tsconfig.json && tsc -p packages/providers/tsconfig.json && tsc -p packages/library/tsconfig.json && tsc -p packages/editor/tsconfig.json && tsc -p apps/web/tsconfig.json",
+    "typecheck": "tsc -p packages/core/tsconfig.json && tsc -p packages/core/test/tsconfig.json && tsc -p packages/providers/tsconfig.json && tsc -p packages/library/tsconfig.json && tsc -p packages/editor/tsconfig.json && tsc -p apps/web/tsconfig.json && tsc -p apps/mcp-server/tsconfig.json",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "rules": "node scripts/build-rules.mjs",
     "font-licences": "node scripts/font-licences.mjs",

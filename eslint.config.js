@@ -54,6 +54,12 @@ export default defineConfig(
     languageOptions: { globals: globals.node },
   },
   {
+    // The MCP server runs in Node. What it prints on stdout is the protocol itself, so nothing else may print there.
+    files: ['apps/mcp-server/**/*.ts'],
+    languageOptions: { globals: globals.node },
+    rules: { 'no-console': ['error', { allow: ['error'] }] },
+  },
+  {
     // The library runs in the app's page and in Node: it reaches files only through the Files it is given.
     files: ['packages/library/src/**/*.ts'],
     rules: {

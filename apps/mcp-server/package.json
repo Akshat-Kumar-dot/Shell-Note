@@ -1,0 +1,12 @@
+{
+  "name": "@shellnote/mcp-server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A local MCP server over a ShellNote library kept in a folder: an AI app on the same computer can list the notes, read them and edit them.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "dependencies": {
+    "@shellnote/core": "workspace:*",
+    "@shellnote/library": "workspace:*"
+  }
+}

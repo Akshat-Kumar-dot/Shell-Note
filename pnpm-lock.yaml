@@ -48,6 +48,15 @@ importers:
         specifier: 2.12.2
         version: 2.12.2
 
+  apps/mcp-server:
+    dependencies:
+      '@shellnote/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@shellnote/library':
+        specifier: workspace:*
+        version: link:../../packages/library
+
   apps/web:
     dependencies:
       '@shellnote/core':
