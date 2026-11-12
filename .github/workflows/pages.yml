@@ -5,10 +5,8 @@ on:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
+# Each job asks for what it needs, and no more: the build only reads the code.
+permissions: {}
 
 concurrency:
   group: pages
@@ -19,17 +17,26 @@ jobs:
     name: Build the web app
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      # Read only: the Pages set-up step asks how the site is configured.
+      pages: read
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      # Every action is named by its commit, with its version beside it: a tag can be moved to other code, a commit cannot.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - name: The built page carries its content security policy
+        run: node scripts/check-site.mjs apps/web/dist
+      - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3
         with:
           path: apps/web/dist
 
@@ -38,9 +45,12 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

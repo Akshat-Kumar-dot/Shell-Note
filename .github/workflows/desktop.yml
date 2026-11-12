@@ -17,19 +17,22 @@ concurrency:
 
 jobs:
   rust:
-    name: Rust build check and licences
+    name: Rust build check, tests and licences
     runs-on: windows-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v7
+      # Every action is named by its commit, with its version beside it: a tag can be moved to other code, a commit cannot.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: rustup toolchain install stable --profile minimal
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
         with:
           workspaces: apps/desktop/src-tauri
       - name: The web app the desktop app carries
@@ -39,3 +42,5 @@ jobs:
           pnpm licences:rust
           git diff --exit-code -- apps/desktop/licences/third-party-rust.txt
       - run: cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml --locked
+      # The Rust side's own tests: what the page may reach of the library's folder, of other programs and of the web.
+      - run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --lib
