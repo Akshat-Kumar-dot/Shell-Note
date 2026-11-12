@@ -1,0 +1,8 @@
+# Control Flow Guard, Windows' check that a call through a pointer lands on the start of a real function. The app's
+# Windows code hands callbacks to Windows and takes pointers from it, where one slip of memory would otherwise let a
+# call go anywhere. Read when cargo runs from this folder, as the app's build does.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "control-flow-guard"]
+
+[target.aarch64-pc-windows-msvc]
+rustflags = ["-C", "control-flow-guard"]

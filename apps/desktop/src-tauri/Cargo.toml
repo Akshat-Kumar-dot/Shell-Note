@@ -65,3 +65,8 @@ windows = { version = "=0.62.2", features = [
 # WebView2's shared buffers, a program's live picture given to the page with no copy (src/picture.rs): the crate
 # Tauri already brings, at its locked version (MIT).
 webview2-com = "=0.39.1"
+
+[profile.release]
+# Arithmetic that would wrap round stops the program instead: sizes that come from the page or from Windows are
+# multiplied here before memory is read by them.
+overflow-checks = true
