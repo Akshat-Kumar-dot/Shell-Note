@@ -15,6 +15,17 @@ export const VIDEO_TYPES: readonly string[] = ['video/mp4', 'video/webm']
 /** The largest video taken: 300 MiB; a note lives in the browser's storage. */
 export const MAX_VIDEO_BYTES = 300 * 1024 * 1024
 
+/**
+ * The type a note's picture or video is kept under in the page: its own when it is a kind ShellNote takes, else plain
+ * bytes. A note can be someone else's file, and its file says what each asset is: one called an SVG picture or a web
+ * page would get an address of this site's own, and opened by that address (a browser's "Open image in new tab") its
+ * script would run as ShellNote, with the notes and the keys in reach. Plain bytes are shown as nothing and run as
+ * nothing.
+ */
+export function shownType(mime: string): string {
+  return PICTURE_TYPES.includes(mime) || VIDEO_TYPES.includes(mime) ? mime : 'application/octet-stream'
+}
+
 /** A picture ready to add: its key, and its metadata for doc.asset. */
 export interface NewPicture {
   hash: string
@@ -94,7 +105,9 @@ export class AssetStore {
   async put(hash: string, bytes: Blob, mime: string, check = false): Promise<boolean> {
     if (this.#urls[hash] !== undefined) return true
     if (check && (await hashBytes(new Uint8Array(await bytes.arrayBuffer()))) !== hash) return false
-    const blob = bytes.type === mime ? bytes : new Blob([bytes], { type: mime })
+    // Never under a type the note's file made up (shownType), whatever type the bytes came with.
+    const type = shownType(mime)
+    const blob = bytes.type === type ? bytes : new Blob([bytes], { type })
     if (this.#urls[hash] !== undefined) return true
     this.#blobs.set(hash, blob)
     this.#urls = { ...this.#urls, [hash]: URL.createObjectURL(blob) }
