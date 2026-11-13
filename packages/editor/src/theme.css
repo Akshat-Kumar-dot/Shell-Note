@@ -619,6 +619,17 @@
   max-width: 100%;
   height: auto;
 }
+/*
+ * While Mermaid draws, it works in an element of its own at the end of the body (diagram.ts gives it the name). There
+ * it made the document taller than the window, so the window gained a scrollbar until the drawing was done, and
+ * everything moved sideways twice. Kept under the window still, as wide as before, but taking no room.
+ */
+body > div[id^='dnw-diagram-'] {
+  position: fixed;
+  left: 0;
+  top: 100%;
+  width: 100%;
+}
 /* ----- pictures ----- */
 
 /* In a frame's text: the picture at its own size, up to the frame's width, with the caption under it. */
