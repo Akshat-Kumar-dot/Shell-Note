@@ -235,3 +235,57 @@ describe('what the program is told', () => {
     expect(place).not.toContain(path.join(os.tmpdir(), 'Notes'))
   })
 })
+
+describe('a note kept as it was', () => {
+  it(
+    'is listed for the person at a terminal, and brought back, which can itself be taken back',
+    async () => {
+      const { folder, own, app, note } = await library()
+      const args = ['--library', folder, '--data', own]
+      const none = new Running([...args, '--copies'])
+      expect(await none.ended).toBe(0)
+      expect(none.lines).toEqual(['No note has been kept as it was: no assistant has changed one yet.'])
+
+      // An assistant deletes a paragraph: the note as it was is kept first.
+      const server = new Running(args)
+      await server.ask('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'test-client', version: '1' } })
+      server.send({ method: 'notifications/initialized' })
+      const edited = await server.ask('tools/call', { name: 'edit_note', arguments: { note, rev: PHYSICS.rev, ops: [{ op: 'delete', ids: ['t2'] }] } })
+      expect(text(edited)).toContain('removed: t2')
+      expect(await server.close()).toBe(0)
+
+      const listed = new Running([...args, '--copies'])
+      expect(await listed.ended).toBe(0)
+      expect(listed.lines[0]).toBe(`Physics lecture 4  (${note})`)
+      const time = /^ {2}(\d+) {2}kept \d{4}-\d\d-\d\d \d\d:\d\d UTC$/u.exec(listed.lines[1]!)![1]!
+      expect(listed.lines.at(-1)).toBe('To bring one back: --restore <note id> <time>')
+
+      const back = new Running([...args, '--restore', note, time])
+      expect(await back.ended).toBe(0)
+      expect(back.lines[0]).toMatch(/^The note is as it was on /u)
+      expect(back.stderr).toBe('')
+      await app.sync()
+      expect(((await app.open(note)).doc.block.t2 as TextBlock).md).toBe((PHYSICS.block.t2 as TextBlock).md)
+
+      // The note from before it was brought back is kept too, and the log tells of both.
+      const again = new Running([...args, '--copies'])
+      expect(await again.ended).toBe(0)
+      expect(again.lines.filter((line) => line.startsWith('  '))).toHaveLength(2)
+      const log = JSON.parse(readFileSync(path.join(own, 'log', `${note}.json`), 'utf8')) as { entry: Record<string, unknown>; undo?: unknown }[]
+      expect(log.map((item) => item.entry.model)).toEqual(['test-client 1', 'shellnote-mcp --restore'])
+      expect(log[1]!.undo).toBeDefined()
+
+      // Asked for what is not there, it says so and changes nothing.
+      for (const wrong of [[note, '12345'], ['no-such-note', time]]) {
+        const refused = new Running([...args, '--restore', ...wrong])
+        expect(await refused.ended).toBe(1)
+        expect(refused.stderr).toMatch(/There is no (copy of that note from that time|note )/u)
+        expect(refused.lines).toEqual([])
+      }
+      const unsaid = new Running([...args, '--restore', note])
+      expect(await unsaid.ended).toBe(2)
+      expect(unsaid.stderr).toContain('--restore needs')
+    },
+    SLOW,
+  )
+})

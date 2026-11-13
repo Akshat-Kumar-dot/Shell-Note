@@ -29,7 +29,7 @@ export interface Changed {
   inverse: Op[]
 }
 
-export type NoteProblem = 'unknown_note' | 'deleted_note' | 'unreachable'
+export type NoteProblem = 'unknown_note' | 'deleted_note' | 'unreachable' | 'unknown_copy'
 
 /** A note that cannot be reached, with words that say what to do about it. */
 export class NoteError extends Error {

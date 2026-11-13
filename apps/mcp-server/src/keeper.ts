@@ -69,6 +69,16 @@ export class Keeper {
     return Array.isArray(kept) ? kept.filter((at): at is number => Number.isSafeInteger(at) && at > 0).sort((a, b) => a - b) : []
   }
 
+  /** The notes a copy is kept of. */
+  async kept(): Promise<string[]> {
+    const notes = new Set<string>()
+    for (const info of await this.files.list()) {
+      const found = /^copies\/([A-Za-z0-9_-]{1,64})\/index\.json$/u.exec(info.path)
+      if (found && !info.folder) notes.add(found[1]!)
+    }
+    return [...notes].sort()
+  }
+
   /** A copy of a note, as it was kept at that time. */
   async copyAt(note: string, at: number): Promise<Doc | undefined> {
     const kept = named(note) && Number.isSafeInteger(at) ? await this.#read(`copies/${note}/${at}.json`) : undefined
@@ -82,14 +92,16 @@ export class Keeper {
   /**
    * Keep a note as it is, before an assistant changes it; not when a copy was
    * kept within the hour, so a run of edits has the note from before the run.
-   * Returns whether a copy was kept now.
+   * With `always`, whatever was kept before: a note brought back from a copy
+   * is first kept as it was. Returns whether a copy was kept now.
    */
-  async copy(note: string, doc: Doc): Promise<boolean> {
+  async copy(note: string, doc: Doc, always = false): Promise<boolean> {
     if (!named(note)) return false
-    const now = this.now()
     const had = await this.copies(note)
     const last = had.at(-1)
-    if (last !== undefined && now - last < COPY_EVERY && now >= last) return false
+    // Never the time of a copy already kept: two in one moment are two.
+    const now = Math.max(this.now(), always && last !== undefined ? last + 1 : 0)
+    if (!always && last !== undefined && now - last < COPY_EVERY && now >= last) return false
     await this.#write(`copies/${note}/${now}.json`, doc)
     // The oldest go once there are too many, and any kept longer than they are promised for.
     const all = [...had, now]

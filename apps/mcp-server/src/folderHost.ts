@@ -4,7 +4,7 @@
 // outside the folder, and the same rules for bringing a note together with
 // its file (packages/library). So a change made here reaches the app, open or
 // not, as any device's does, merged with what the person wrote meanwhile.
-import type { Applied, Doc } from '@shellnote/core'
+import { become, type Applied, type Doc } from '@shellnote/core'
 import { FolderLibrary } from '@shellnote/library'
 import { MARK } from '@shellnote/library/layout'
 import { folderPath, hidden } from '@shellnote/library/tree'
@@ -88,6 +88,39 @@ export class FolderHost implements NoteHost {
 
   async record(id: string, item: LogItem): Promise<void> {
     if (this.keeper) await this.#alone(() => this.keeper!.log(id, item))
+  }
+
+  /** The notes kept as they were before an assistant changed them, and when each copy was kept: for the person, never for a tool. */
+  copies(): Promise<{ id: string; title: string; times: number[] }[]> {
+    return this.#run(async () => {
+      if (!this.keeper) return []
+      const library = await this.library.list()
+      const out: { id: string; title: string; times: number[] }[] = []
+      for (const id of await this.keeper.kept()) {
+        const times = await this.keeper.copies(id)
+        const entry = library.notes.find((note) => note.id === id)
+        if (entry && times.length > 0) out.push({ id, title: entry.title, times })
+      }
+      return out
+    })
+  }
+
+  /**
+   * Bring a note back to a copy kept of it. The note as it is now is kept
+   * first, so bringing back can itself be taken back; the change reaches the
+   * app as any other does, and is in the note's log.
+   */
+  restore(id: string, at: number): Promise<Changed> {
+    return this.#run(async () => {
+      const before = await this.#note(id)
+      const copy = await this.keeper?.copyAt(id, at)
+      if (!copy || copy.id !== id) throw new NoteError('unknown_copy', 'There is no copy of that note from that time.')
+      const applied = become(before, copy)
+      if (applied.changed.length === 0) return { doc: before, changed: [], inverse: [] }
+      await this.keeper!.copy(id, before, true)
+      await this.library.exchange({ doc: applied.doc, since: before, blob: () => undefined })
+      return { doc: await this.library.read(id), changed: applied.changed, inverse: applied.inverse }
+    })
   }
 }
 

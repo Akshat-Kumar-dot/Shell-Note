@@ -29,6 +29,11 @@ All notable changes to ShellNote are listed here. The format follows
   replaces a note. Notes already in the app are copied into the folder, and nothing is removed from the app.
 - A change from another device goes into the open note beside what is being typed; Undo still takes back only what
   you did.
+- An MCP server for AI assistants on your own computer ([docs/mcp.md](docs/mcp.md)): with the library kept in a
+  folder, an assistant can list your notes, read them and edit them by block, and you see each edit in the open note a
+  moment later. It reaches that one folder and nothing else, has no network code, and cannot delete a note. An edit
+  made with an out-of-date view of a block is refused. Each edit shows in the note's AI log with an Undo, and the note
+  as it was is kept before a run of edits, to be brought back from the command line.
 
 ### Changed
 

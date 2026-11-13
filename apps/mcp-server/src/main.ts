@@ -8,7 +8,8 @@
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { openFolderHost } from './folderHost.js'
+import { blockPrint, RULEBOOK } from '@shellnote/core'
+import { openFolderHost, type FolderHost } from './folderHost.js'
 import { serve, VERSION } from './serve.js'
 
 const HELP = `ShellNote MCP server ${VERSION}
@@ -24,7 +25,16 @@ const HELP = `ShellNote MCP server ${VERSION}
   --help              Print this.
 
 It speaks the Model Context Protocol on its standard input and output: an AI
-app starts it, and nothing else can reach it.`
+app starts it, and nothing else can reach it.
+
+For you, at a terminal, and never for an assistant:
+
+  --copies            List the notes kept as they were before an assistant
+                      changed them, and when each copy was kept.
+  --restore <note> <time>
+                      Bring a note back to one of those copies: the note's id
+                      and the copy's time, as --copies prints them. The note
+                      as it is now is kept first, so this too can be taken back.`
 
 /** Where programs keep their own data on this system. */
 function dataHome(): string {
@@ -49,6 +59,10 @@ export interface Asked {
   library?: string
   data?: string
   show?: 'help' | 'version'
+  /** List the notes kept as they were. */
+  copies?: true
+  /** Bring a note back to the copy kept at a time. */
+  restore?: { note: string; at: number }
 }
 
 /** What the program was asked, from its arguments; throws, in plain words, on one it does not know. */
@@ -62,9 +76,38 @@ export function asked(args: readonly string[]): Asked {
       const value = args[++i]
       if (value === undefined || value.startsWith('--')) throw new Error(`${arg} needs a folder after it.`)
       out[arg === '--library' ? 'library' : 'data'] = value
+    } else if (arg === '--copies') out.copies = true
+    else if (arg === '--restore') {
+      const [note, time] = [args[++i], args[++i]]
+      if (note === undefined || time === undefined || !/^[0-9]{1,16}$/u.test(time)) throw new Error('--restore needs a note\'s id and a copy\'s time after it, as --copies prints them.')
+      out.restore = { note, at: Number(time) }
     } else throw new Error(`Unknown argument ${JSON.stringify(arg.slice(0, 60))}. Try --help.`)
   }
   return out
+}
+
+const when = (at: number): string => new Date(at).toISOString().slice(0, 16).replace('T', ' ')
+
+/** The notes kept as they were, for a person to read: each with its id, and each copy with its time. */
+export async function copiesKept(host: FolderHost): Promise<string> {
+  const kept = await host.copies()
+  if (kept.length === 0) return 'No note has been kept as it was: no assistant has changed one yet.'
+  const lines = kept.flatMap((note) => [`${note.title.replace(/\s+/gu, ' ').slice(0, 80) || '(untitled)'}  (${note.id})`, ...note.times.map((at) => `  ${at}  kept ${when(at)} UTC`)])
+  return [...lines, '', 'To bring one back: --restore <note id> <time>'].join('\n')
+}
+
+/** Bring a note back to a copy, write that into its log, and say what was done. */
+export async function restored(host: FolderHost, note: string, at: number): Promise<string> {
+  const started = Date.now()
+  const kept = await host.restore(note, at)
+  if (kept.changed.length === 0) return 'The note already is as that copy has it. Nothing was changed.'
+  const after: Record<string, string | null> = {}
+  for (const id of kept.changed) if (kept.doc.block[id]) after[id] = blockPrint(kept.doc.block[id])
+  await host.record(note, {
+    entry: { at: started, source: 'mcp', model: 'shellnote-mcp --restore', rulebook: RULEBOOK.version, instruction: `Brought back as it was on ${when(at)} UTC.`, targets: [], ops: [], result: 'applied', tier: 1, calls: 0, retries: 0, tokensIn: 0, tokensOut: 0, ms: Math.max(0, Date.now() - started) },
+    undo: { inverse: kept.inverse, rev: kept.doc.rev, after },
+  })
+  return `The note is as it was on ${when(at)} UTC. As it was a moment ago, it is kept too: --copies lists it.`
 }
 
 export async function main(args: readonly string[]): Promise<number> {
@@ -86,6 +129,11 @@ export async function main(args: readonly string[]): Promise<number> {
   }
   try {
     const host = await openFolderHost(path.resolve(want.library), want.data === undefined ? ownPlace(want.library) : path.resolve(want.data))
+    if (want.copies || want.restore) {
+      // Asked by a person at a terminal: answered in words, and nothing is served.
+      process.stdout.write(`${want.restore ? await restored(host, want.restore.note, want.restore.at) : await copiesKept(host)}\n`)
+      return 0
+    }
     serve(host)
     return -1
   } catch (error) {

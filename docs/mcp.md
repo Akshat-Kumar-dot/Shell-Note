@@ -15,7 +15,17 @@ The [Model Context Protocol](https://modelcontextprotocol.io) (MCP) is the commo
 | | Reach the internet: the server has no network code at all |
 | | Touch other programs, or the program panel |
 
-Everything an assistant changes is kept twice over, on this computer only: each edit is written in the note's log with what undoes it, and the note as it was is kept before a run of edits (the last 20 for each note, for 30 days).
+Everything an assistant changes can be taken back, and what it takes is kept on this computer only:
+
+- **The note's AI log.** Each edit an assistant makes shows in the note's AI log in the desktop app, marked as from outside the app, with the name the AI app gave itself and the reason it gave. **Undo** takes the edit back while its blocks are still as the edit left them. An edit that was refused is listed too, with why.
+- **The note as it was.** Before a run of edits the whole note is kept (the last 20 for each note, for 30 days). To see what is kept, and to bring a note back:
+
+  ```
+  node apps/mcp-server/dist/shellnote-mcp.mjs --library D:\Notes --copies
+  node apps/mcp-server/dist/shellnote-mcp.mjs --library D:\Notes --restore <note id> <time>
+  ```
+
+  Bringing a note back keeps the note as it is first, so that too can be taken back. These two are for you at a terminal; no assistant can call them.
 
 ## Setting it up
 
@@ -41,6 +51,8 @@ Everything an assistant changes is kept twice over, on this computer only: each 
    ```
 
    Where an app takes a command line instead, it is the same three parts: `node`, the file, then `--library` and the folder. For example, with Claude's command-line app: `claude mcp add shellnote -- node D:\ShellNote\apps\mcp-server\dist\shellnote-mcp.mjs --library D:\Notes`.
+
+Give the folder as ShellNote shows it in Settings: the app finds the server's log of your notes by the folder's path.
 
 Only an app that runs on your computer can start the server. A website cannot: an assistant in a browser tab needs a server on the internet, which ShellNote does not have.
 

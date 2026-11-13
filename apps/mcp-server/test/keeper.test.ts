@@ -88,3 +88,19 @@ describe('a note as it was', () => {
     expect(kindOf('shared', 'log/n1.json')).toBe('other')
   })
 })
+
+describe('the notes a copy is kept of', () => {
+  it('are named, and a copy asked for whatever was kept before is always kept, at a time of its own', async () => {
+    const { keeper, clock } = fresh()
+    expect(await keeper.kept()).toEqual([])
+    await keeper.copy('n2', PHYSICS)
+    await keeper.copy('n1', PHYSICS)
+    await keeper.log('n3', { entry: entry(1) })
+    expect(await keeper.kept()).toEqual(['n1', 'n2'])
+    // Within the hour, and in the very same moment: still kept when it must be.
+    expect(await keeper.copy('n1', PHYSICS)).toBe(false)
+    expect(await keeper.copy('n1', PHYSICS, true)).toBe(true)
+    expect(await keeper.copy('n1', PHYSICS, true)).toBe(true)
+    expect(await keeper.copies('n1')).toEqual([clock.time, clock.time + 1, clock.time + 2])
+  })
+})
