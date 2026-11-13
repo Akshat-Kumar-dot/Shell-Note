@@ -13,6 +13,7 @@ import { aiEdit, AiLayer, AskPanel, AssetStore, CHANGED_SINCE, checkDiagram, com
 import { openAICompatible } from '@shellnote/providers'
 import { ChevronLeft, FilePlus, FolderOpen, Minus, Plus, Save, ScrollText, TriangleAlert } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { assistantLog, withAssistants } from './ai/assistants.js'
 import { loadLog, saveLog } from './ai/log.js'
 import { loadSettings, missing, modelFrom, savedKey } from './ai/settings.js'
 import { keepWhenClosing } from './desktop.js'
@@ -144,6 +145,9 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
   const [log, setLog] = useState<LogItem[]>([])
   const logRef = useRef(log)
   logRef.current = log
+  const noteRef = useRef(note)
+  noteRef.current = note
+  const takeAssistants = useRef<() => void>(() => undefined)
   const [settings, setSettings] = useState(false)
   // The library beside the note, on the side the person keeps it.
   const [sideAt, moveSide] = useLibrarySideAt()
@@ -286,8 +290,11 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
     if (note === undefined || !library.watch) return
     return library.watch((change) => {
       if (!change.notes.has(note)) return
-      if (modeRef.current === 'edit') void keepNow.current()
-      else if (modeRef.current === 'view') void reload()
+      const taken = modeRef.current === 'edit' ? keepNow.current() : modeRef.current === 'view' ? reload() : Promise.resolve()
+      // The change may be an assistant's (docs/mcp.md): once it is in the note, what it wrote of it joins the note's
+      // log. Looked for again a moment later, as the server writes its log just after the note.
+      void taken.then(() => takeAssistants.current())
+      setTimeout(() => takeAssistants.current(), 1500)
     })
   }, [library, note, reload])
 
@@ -371,7 +378,12 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
     if (note === undefined) return
     let live = true
     loadLog(note).then(
-      (items) => live && setLog(items),
+      (items) => {
+        if (!live) return
+        logRef.current = items
+        setLog(items)
+        takeAssistants.current()
+      },
       (error: unknown) => console.warn('shellnote: the AI log could not be read', error),
     )
     return () => {
@@ -386,6 +398,18 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
     },
     [note],
   )
+  // What assistants did to this note through the MCP server, read from the server's own log on this computer: only
+  // in the desktop app, with the library kept in a folder, where a server can be.
+  takeAssistants.current = (): void => {
+    if (note === undefined || !inDesktopApp() || library.place?.() === undefined) return
+    const [of, on] = [note, store]
+    void assistantLog(of).then((kept) => {
+      // The person may have opened another note meanwhile.
+      if (noteRef.current !== of) return
+      const next = withAssistants(logRef.current, kept, on.doc)
+      if (next) keepLog(next)
+    })
+  }
   const host = useMemo<AiHost>(
     () => ({
       model: () => {
@@ -399,7 +423,8 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
         setAnswer((now) => ({ n: (now?.n ?? 0) + 1, answer: asked }))
         showSideTab('output')
       },
-      recent: () => logRef.current.map((item) => item.entry),
+      // What an assistant outside the app did is shown to the person, never to the app's own model: its words are another program's.
+      recent: () => logRef.current.map((item) => item.entry).filter((entry) => entry.source !== 'mcp'),
       paid: () => loadSettings().provider === 'openrouter',
     }),
     [keepLog],

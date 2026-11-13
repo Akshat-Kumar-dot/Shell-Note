@@ -3,7 +3,7 @@
 // model call, into the Select box or after what was asked about. And the edit
 // log: every request, newest first, with its model, tier, tokens and time,
 // and Undo while the edit is still the latest change to its blocks.
-import { answerBlocks, parseInline, parsePipeTable, type LogEntry } from '@shellnote/core'
+import { answerBlocks, logLine, parseInline, parsePipeTable, type LogEntry } from '@shellnote/core'
 import { X } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { InlineView } from '../blocks.js'
@@ -135,15 +135,22 @@ export function LogPanel({ items, store, onUndone, onClose }: { items: readonly 
             <li key={`${entry.at}-${index}`} className="nw-log-entry" data-result={entry.result}>
               <div className="nw-log-top">
                 <span>{time(entry.at)}</span>
-                <span>{entry.tier === 0 ? 'no model' : modelName(entry.model)}</span>
+                {/* An edit from outside the app, through the MCP server: the program that made it, by the name it gave itself. */}
+                <span>{entry.source === 'mcp' ? `assistant: ${entry.model}` : entry.tier === 0 ? 'no model' : modelName(entry.model)}</span>
                 <span>{RESULT[entry.result]}</span>
               </div>
-              <p className="nw-log-request">{entry.instruction}</p>
+              <p className="nw-log-request">{entry.instruction || (entry.source === 'mcp' ? logLine(entry) : '')}</p>
               <div className="nw-log-used">
-                <span>Tier {entry.tier}</span>
-                <span>
-                  {entry.tokensIn.toLocaleString('en')} in / {entry.tokensOut.toLocaleString('en')} out
-                </span>
+                {entry.source === 'mcp' ? (
+                  <span>From outside the app</span>
+                ) : (
+                  <>
+                    <span>Tier {entry.tier}</span>
+                    <span>
+                      {entry.tokensIn.toLocaleString('en')} in / {entry.tokensOut.toLocaleString('en')} out
+                    </span>
+                  </>
+                )}
                 {entry.cost === undefined ? null : <span>${entry.cost.toFixed(4)}</span>}
                 <span>{(entry.ms / 1000).toFixed(1)} s</span>
               </div>

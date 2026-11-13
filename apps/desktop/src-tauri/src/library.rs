@@ -3,6 +3,8 @@
 //! "shared" (the folder chosen here, in a dialog of the system's, and kept on this side) or "own" (this device's own
 //! copies, in the app's data folder), and a path inside it. A path that would leave the folder, by ".." or a drive or
 //! through a link to elsewhere, is refused, so nothing the page is given can read or write outside what the person chose.
+//! A third word, "server", is the place the MCP server keeps for this library (apps/mcp-server): there the page may
+//! read each note's log of what assistants did, to show it, and may do nothing else.
 //!
 //! Inside the folder, the page reaches the library's files and no others, whatever script runs in it: it reads,
 //! writes and removes notes (`.shellnote` files) and the library's own small files (its hidden `.shellnote` folder;
@@ -63,13 +65,17 @@ fn name_of(path: &Path) -> String {
     format!("{hash:016x}")
 }
 
-/// Which of the two folders the page means.
+/// Which folder the page means.
 #[derive(Clone, Copy, PartialEq, Debug)]
 enum Root {
     /// The folder the person chose.
     Shared,
     /// This device's own copies, in the app's data folder.
     Own,
+    /// What the MCP server keeps for this library, in a place of its own beside the app's data (apps/mcp-server):
+    /// the page may read each note's log of what assistants did, and nothing more. It is never listed, written,
+    /// moved or removed from here, and never made: it is there only once a server has run.
+    Server,
 }
 
 fn root(app: &AppHandle, which: &str) -> Result<(Root, PathBuf), String> {
@@ -81,6 +87,7 @@ fn root(app: &AppHandle, which: &str) -> Result<(Root, PathBuf), String> {
             fs::create_dir_all(&own).map_err(|error| error.to_string())?;
             Ok((Root::Own, own))
         }
+        "server" => Ok((Root::Server, data_folder(app)?.join("mcp").join(name_of(&shared)))),
         _ => Err("There is no such place.".into()),
     }
 }
@@ -178,6 +185,11 @@ fn kind_of(root: Root, path: &str) -> Kind {
             ["assets", hash] => {
                 if (4..=64).contains(&hash.len()) && hash.bytes().all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c)) { Kind::Own } else { Kind::Other }
             }
+            _ => Kind::Other,
+        },
+        // A note's log, and no other file the server keeps (its copies of the notes, its lock).
+        Root::Server => match parts[..] {
+            ["log", name] if name.strip_suffix(".json").is_some_and(id) => Kind::Own,
             _ => Kind::Other,
         },
         Root::Shared if parts[0].eq_ignore_ascii_case(HIDDEN) => {
@@ -280,7 +292,10 @@ pub fn library_forget(app: AppHandle) -> Result<(), String> {
 /// Everything in the folder, at any depth.
 #[tauri::command]
 pub async fn library_list(app: AppHandle, root_name: String) -> Result<Vec<Entry>, String> {
-    let (_, folder) = root(&app, &root_name)?;
+    let (which, folder) = root(&app, &root_name)?;
+    if which == Root::Server {
+        return Err(NOT_THE_LIBRARYS.into());
+    }
     let list = move || {
         let mut out = Vec::new();
         walk(&folder, "", 0, &mut out)?;
@@ -292,7 +307,10 @@ pub async fn library_list(app: AppHandle, root_name: String) -> Result<Vec<Entry
 /// One file or folder as it is now; none when it is not there.
 #[tauri::command]
 pub fn library_info(app: AppHandle, root_name: String, path: String) -> Result<Option<Entry>, String> {
-    let (_, folder) = root(&app, &root_name)?;
+    let (which, folder) = root(&app, &root_name)?;
+    if which == Root::Server {
+        return Err(NOT_THE_LIBRARYS.into());
+    }
     let full = inside(&folder, &path)?;
     Ok(fs::symlink_metadata(full).ok().map(|meta| entry(path, &meta)))
 }
@@ -353,7 +371,7 @@ fn rename_over(from: &Path, to: &Path) -> std::io::Result<()> {
 /// A note, or one of the library's own files, written whole or not at all: never a file of another kind.
 fn write_at(root: Root, folder: &Path, path: &str, bytes: &[u8]) -> Result<(), String> {
     let full = inside(folder, path)?;
-    if !matches!(kind_of(root, path), Kind::Note | Kind::Own) {
+    if root == Root::Server || !matches!(kind_of(root, path), Kind::Note | Kind::Own) {
         return Err(NOT_THE_LIBRARYS.into());
     }
     let parent = full.parent().ok_or("No folder to write in.")?;
@@ -452,6 +470,9 @@ fn remove_empty(folder: &Path) -> std::io::Result<()> {
 /// holds no file. Never another file, never a folder with what it holds, never the library's hidden folder itself.
 fn remove_at(root: Root, folder: &Path, path: &str) -> Result<(), String> {
     let full = inside(folder, path)?;
+    if root == Root::Server {
+        return Err(NOT_THE_LIBRARYS.into());
+    }
     let Ok(meta) = fs::symlink_metadata(&full) else { return Ok(()) };
     if meta.is_dir() {
         if path.eq_ignore_ascii_case(HIDDEN) {
@@ -656,6 +677,25 @@ mod tests {
         assert!(write_at(Root::Own, &own, "notes/n1.exe", b"x").is_err());
         remove_at(Root::Own, &own, "notes/n1.doc.json").unwrap();
         assert!(move_at(Root::Own, &own, "assets/0a1b2c3d", "assets/0a1b2c3e").is_err());
+
+        // The MCP server's place: a note's log is read, and nothing else is; nothing is written, moved or removed.
+        let server = fresh("kinds-server");
+        fs::create_dir_all(server.join("log")).unwrap();
+        fs::create_dir_all(server.join("notes")).unwrap();
+        fs::write(server.join("log").join("n1.json"), b"[]").unwrap();
+        fs::write(server.join("notes").join("n1.doc.json"), b"{}").unwrap();
+        fs::write(server.join("lock"), b"1").unwrap();
+        assert_eq!(read_at(Root::Server, &server, "log/n1.json").unwrap(), b"[]");
+        for other in ["notes/n1.doc.json", "lock", "device.json", "log/n1.exe", "log/a/n1.json", "copies/n1/1.json"] {
+            assert!(read_at(Root::Server, &server, other).is_err(), "{other} was read");
+        }
+        assert!(read_at(Root::Server, &server, "log/../notes/n1.doc.json").is_err());
+        assert!(write_at(Root::Server, &server, "log/n1.json", b"x").is_err());
+        assert!(write_at(Root::Server, &server, "log/n2.json", b"x").is_err());
+        assert!(remove_at(Root::Server, &server, "log/n1.json").is_err());
+        assert!(move_at(Root::Server, &server, "log/n1.json", "log/n2.json").is_err());
+        assert_eq!(fs::read(server.join("log").join("n1.json")).unwrap(), b"[]");
+        fs::remove_dir_all(&server).unwrap();
 
         fs::remove_dir_all(&root).unwrap();
         fs::remove_dir_all(&own).unwrap();
