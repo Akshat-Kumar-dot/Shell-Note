@@ -21,6 +21,8 @@ export function AiSettingsPart() {
   useEffect(() => onSettings(() => setSettings(loadSettings())), [])
   const [address, setAddress] = useState(settings.baseUrl)
   const [hasKey, setHasKey] = useState(() => savedKey() !== undefined)
+  // The key kept by Windows is known a moment after the app starts, and may change in another window.
+  useEffect(() => onSettings(() => setHasKey(savedKey() !== undefined)), [])
   const [typedKey, setTypedKey] = useState('')
   const [models, setModels] = useState<Listed[]>()
   const [filter, setFilter] = useState('')

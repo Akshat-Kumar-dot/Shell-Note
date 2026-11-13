@@ -38,6 +38,9 @@ fn main() {
         "library_move",
         "library_remove",
         "library_make_folder",
+        "key_read",
+        "key_keep",
+        "key_forget",
     ]);
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(commands)).expect("the app's build failed");
 }

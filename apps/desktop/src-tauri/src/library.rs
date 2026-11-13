@@ -37,7 +37,7 @@ const NOT_THE_LIBRARYS: &str = "That is not a note, nor a file of the library's 
 
 /// Beside the web view's own data, as the window's place is: a copy of the app the checks open never shares the
 /// person's choice.
-fn data_folder(app: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn data_folder(app: &AppHandle) -> Result<PathBuf, String> {
     std::env::var_os("WEBVIEW2_USER_DATA_FOLDER")
         .map(PathBuf::from)
         .or_else(|| app.path().app_local_data_dir().ok())

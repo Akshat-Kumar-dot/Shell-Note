@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the app's windows may use (the first, main, and those opened from it, window-2 and on): of Tauri's core only what the page uses, each by name and never the whole of it (hearing the app's events, asking whether the window is maximised and where it is), setting the page's zoom, which Ctrl and + or - does through Tauri on macOS and Linux, and the app's own commands, each by name (build.rs): where it runs, closing once the note is kept, the tests' window size, the microphone, other programs on a panel (src/apps.rs), and the app's own title bar: the snap window over its maximise button (src/titlebar.rs) and Tauri's minimise, maximise, close and window drag, and the library kept in a folder the person chooses: its files and the choice, never a path outside it (src/library.rs). Each system feature is added here when the app needs it.",
+  "description": "What the app's windows may use (the first, main, and those opened from it, window-2 and on): of Tauri's core only what the page uses, each by name and never the whole of it (hearing the app's events, asking whether the window is maximised and where it is), setting the page's zoom, which Ctrl and + or - does through Tauri on macOS and Linux, and the app's own commands, each by name (build.rs): where it runs, closing once the note is kept, the tests' window size, the microphone, other programs on a panel (src/apps.rs), and the app's own title bar: the snap window over its maximise button (src/titlebar.rs) and Tauri's minimise, maximise, close and window drag, and the library kept in a folder the person chooses: its files and the choice, never a path outside it (src/library.rs), and the key of a hosted AI service, kept sealed by Windows for this account (src/keys.rs). Each system feature is added here when the app needs it.",
   "windows": ["main", "window-*"],
   "permissions": [
     "core:event:allow-listen",
@@ -39,6 +39,9 @@
     "allow-library-move",
     "allow-library-remove",
     "allow-library-make-folder",
+    "allow-key-read",
+    "allow-key-keep",
+    "allow-key-forget",
     "core:window:allow-minimize",
     "core:window:allow-toggle-maximize",
     "core:window:allow-internal-toggle-maximize",

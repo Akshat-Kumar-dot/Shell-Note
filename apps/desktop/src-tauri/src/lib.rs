@@ -16,6 +16,8 @@ use std::time::Duration;
 use tauri::webview::{NewWindowResponse, PageLoadEvent, ScrollBarStyle};
 use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Window, WindowEvent};
 
+/// The key of a hosted AI service, kept for the person by Windows itself.
+mod keys;
 /// The library kept in a folder the person chooses: its files, and the choice.
 mod library;
 #[cfg(windows)]
@@ -542,7 +544,10 @@ pub fn run() {
             library::library_write,
             library::library_move,
             library::library_remove,
-            library::library_make_folder
+            library::library_make_folder,
+            keys::key_read,
+            keys::key_keep,
+            keys::key_forget
         ])
         .setup(|app| {
             // Programs a ShellNote that ended without letting them go left held (a crash, End task): given back.

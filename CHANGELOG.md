@@ -56,6 +56,9 @@ All notable changes to ShellNote are listed here. The format follows
 - In the Windows app: only a window offered in the list can be put on a panel; a place kept with a line opens a file
   on this computer only; the app's window stays on the app's own pages; the microphone opens only for the window in
   front; Windows' own libraries are loaded from Windows' folder.
+- In the Windows app, the OpenRouter key is kept by Windows, sealed for your account, and no longer as plain text in
+  the app's own storage; a key kept before moves over the first time the app starts.
+- KaTeX, minimatch and tokio are at versions past known faults, and a workflow looks for new ones every week.
 - A private browser window is known in the browser's own words in other languages too: Firefox's, Chrome's and
   Brave's in their twenty-two most used languages beside English (Edge's word is the same in all). Before, a private
   window of a browser set to another language could be listed for the panel.

@@ -81,6 +81,33 @@ try {
   const apps = await page.evaluate("window.__TAURI_INTERNALS__.invoke('apps_list')")
   check('the Rust side lists the windows a panel could hold', Array.isArray(apps) && apps.every((a) => typeof a.id === 'number' && typeof a.title === 'string'), `${apps?.length} windows, ${apps?.filter((a) => a.left_out).length} left out`)
 
+  // The key of a hosted AI service (src/keys.rs): kept by Windows, sealed for this account. A key of no account, made
+  // up here, is kept through the page as Settings keeps one; the file on the disk holds nothing of it as written; it
+  // comes back; forgotten, it is gone. A service the app does not know has no key, and a key with a space is none.
+  const madeUp = `sk-or-v1-smoke-${Date.now().toString(36)}`
+  const keys = await page.evaluate(async (key) => {
+    const { invoke } = window.__TAURI_INTERNALS__
+    const refused = async (call) => call.then(() => false, () => true)
+    await invoke('key_keep', { service: 'openrouter', value: key })
+    const back = await invoke('key_read', { service: 'openrouter' })
+    const inStorage = Object.keys(localStorage).some((name) => (localStorage.getItem(name) ?? '').includes(key))
+    const other = await refused(invoke('key_read', { service: '../openrouter' }))
+    const notAKey = await refused(invoke('key_keep', { service: 'openrouter', value: 'two words' }))
+    return { back, inStorage, other, notAKey }
+  }, madeUp)
+  const sealedFile = join(data, 'keys', 'openrouter.key')
+  const sealed = existsSync(sealedFile) ? readFileSync(sealedFile) : Buffer.alloc(0)
+  const forgotten = await page.evaluate(async () => {
+    const { invoke } = window.__TAURI_INTERNALS__
+    await invoke('key_forget', { service: 'openrouter' })
+    return (await invoke('key_read', { service: 'openrouter' })) === null
+  })
+  check(
+    "a hosted AI's key is kept by Windows, sealed: not on the disk as written, back when asked, gone when forgotten",
+    keys.back === madeUp && !keys.inStorage && keys.other && keys.notAKey && sealed.length > madeUp.length && !sealed.includes(madeUp) && !sealed.includes(madeUp.slice(0, 12)) && forgotten && !existsSync(sealedFile),
+    `${sealed.length} sealed bytes; ${JSON.stringify({ ...keys, back: keys.back === madeUp ? 'the key' : keys.back, forgotten })}`,
+  )
+
   // The content security policy (tauri.conf.json), as Tauri sends it with the app's own pages: watched from here on,
   // the library opened again under watch. Whatever it refuses is written down; nothing the app does may be refused.
   const refused = []

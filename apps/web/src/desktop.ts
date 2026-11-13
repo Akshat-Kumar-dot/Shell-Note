@@ -17,6 +17,7 @@ import { Channel, invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import type { Place } from '@shellnote/core'
 import { inDesktopApp, inWindowsApp, PROGRAM_ICON, programHost, type ProgramFrame, type ProgramHost, type ProgramTold, type ProgramWindow } from '@shellnote/editor'
+import { keepKeyWith } from './ai/settings.js'
 
 /**
  * A program's live picture (stage 3; src-tauri/src/picture.rs): WebView2 shares two buffers a window with the page
@@ -173,6 +174,13 @@ if (inDesktopApp()) {
     else void document.documentElement.requestFullscreen().catch(() => undefined)
   })
   if (inWindowsApp()) {
+    // The key of a hosted AI service is kept by Windows here, sealed for the person's account (src-tauri/src/keys.rs),
+    // not in the web view's storage, which lies on the disk as plain text.
+    void keepKeyWith({
+      read: async () => (await invoke<string | null>('key_read', { service: 'openrouter' })) ?? undefined,
+      keep: (value) => invoke('key_keep', { service: 'openrouter', value }),
+      forget: () => invoke('key_forget', { service: 'openrouter' }),
+    })
     programHost.set(windowsHost)
     const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown }
     if ((w.SpeechRecognition === undefined || isNative(w.SpeechRecognition)) && (w.webkitSpeechRecognition === undefined || isNative(w.webkitSpeechRecognition))) {

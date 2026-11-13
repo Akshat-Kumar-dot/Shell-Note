@@ -2,7 +2,8 @@
 // They are this browser's own, kept in localStorage, and the app works without
 // them. An OpenRouter key is kept apart from them, on this device only, until
 // "Forget key": never in a note, the library, the edit log or an error message,
-// and sent only to openrouter.ai.
+// and sent only to openrouter.ai. In the Windows app it is kept by Windows,
+// sealed for the person's account, and not in the browser's storage.
 import type { Caps, Model, OpSet } from '@shellnote/core'
 import { listModels, openAICompatible, openRouter, openRouterModels, type PageSetting } from '@shellnote/providers'
 
@@ -69,29 +70,125 @@ export function saveSettings(settings: AiSettings): void {
   for (const listener of [...heard]) listener()
 }
 
-/** The OpenRouter key kept on this device, if any. */
-export function savedKey(): string | undefined {
+/**
+ * Where the key is kept when the browser's own storage is not the place: in the Windows app, Windows itself, which
+ * seals it for the person's account (apps/desktop/src-tauri/src/keys.rs). The browser's storage lies on the disk
+ * as plain text.
+ */
+export interface KeyKeeper {
+  read(): Promise<string | undefined>
+  keep(key: string): Promise<void>
+  forget(): Promise<void>
+}
+
+/** The keeper in use, and the key as it last gave it: asked once as the app starts, then held while the page lives. */
+let keeper: KeyKeeper | undefined
+let held: string | undefined
+
+const fromStorage = (): string | undefined => {
   try {
     return localStorage.getItem(KEY) || undefined
   } catch {
     return undefined
   }
 }
+const outOfStorage = (): void => {
+  try {
+    localStorage.removeItem(KEY)
+  } catch {
+    // Nothing was kept.
+  }
+}
+
+/**
+ * Keep the key with a keeper from here on (the Windows app, as it starts). A key the browser's storage still holds,
+ * from before, moves to the keeper and leaves the storage, once the keeper has it. A keeper that cannot be asked
+ * (a page that is not the app's own) is not used: the key stays where it was.
+ */
+export async function keepKeyWith(next: KeyKeeper): Promise<void> {
+  let kept: string | undefined
+  try {
+    kept = await next.read()
+    const before = fromStorage()
+    if (before !== undefined) {
+      if (kept === undefined) {
+        await next.keep(before)
+        kept = before
+      }
+      outOfStorage()
+    }
+  } catch {
+    return
+  }
+  keeper = next
+  held = kept
+  for (const listener of [...heard]) listener()
+  // Another window of the app that keeps or forgets the key says so, and this one asks the keeper again: each
+  // window holds the key in its own memory, where the browser's storage was shared between them.
+  if (typeof BroadcastChannel !== 'undefined') {
+    told = new BroadcastChannel(KEY)
+    told.onmessage = () => {
+      void next.read().then(
+        (now) => {
+          if (keeper !== next) return
+          held = now
+          for (const listener of [...heard]) listener()
+        },
+        () => undefined,
+      )
+    }
+  }
+}
+
+/** The word between the app's windows that the key changed. */
+let told: BroadcastChannel | undefined
+
+/** For tests: the key kept in the browser's storage again, as with no keeper. */
+export function keepKeyInStorage(): void {
+  keeper = undefined
+  held = undefined
+  told?.close()
+  told = undefined
+}
+
+/** The OpenRouter key kept on this device, if any. */
+export function savedKey(): string | undefined {
+  return keeper ? held : fromStorage()
+}
 
 export function saveKey(key: string): void {
+  const value = key.trim()
+  if (keeper) {
+    held = value
+    // Should the keeper fail, the key is kept as before rather than lost when the app closes.
+    keeper.keep(value).then(
+      () => told?.postMessage('kept'),
+      () => {
+        try {
+          localStorage.setItem(KEY, value)
+        } catch {
+          // Not kept: it holds until the page closes.
+        }
+      },
+    )
+    return
+  }
   try {
-    localStorage.setItem(KEY, key.trim())
+    localStorage.setItem(KEY, value)
   } catch {
     // Not kept, as in a private window.
   }
 }
 
 export function forgetKey(): void {
-  try {
-    localStorage.removeItem(KEY)
-  } catch {
-    // Nothing was kept.
+  if (keeper) {
+    held = undefined
+    keeper.forget().then(
+      () => told?.postMessage('forgotten'),
+      () => undefined,
+    )
   }
+  outOfStorage()
 }
 
 /** Why the AI cannot run with these settings, in words for the person; undefined when it can. */
