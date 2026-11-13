@@ -87,7 +87,7 @@ export function editById(input: IdEdit): IdEdited {
   const hrefs: (string | undefined)[] = []
   let here: { parent: Id; at: number } | undefined
   const block = (id: unknown, index: number): Doc['block'][string] => {
-    const found = typeof id === 'string' ? doc.block[id] : undefined
+    const found = typeof id === 'string' && Object.hasOwn(doc.block, id) ? doc.block[id] : undefined
     if (!found) throw at(teach('unknown_id', `There is no block ${JSON.stringify(typeof id === 'string' ? id.slice(0, 80) : id)} in this note. ${NEEDS_ID}`, { got: id }), index)
     return found
   }

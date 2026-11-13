@@ -25,6 +25,8 @@ export class FolderHost implements NoteHost {
     private readonly lock: Lock = (work) => work(),
     /** Keeps each note's log, and a note as it was before it is changed here. */
     private readonly keeper?: Keeper,
+    /** Whether the folder is a library still: asked before each call, so the server never makes one where there is none. */
+    private readonly still?: () => Promise<boolean>,
   ) {}
 
   /** One piece of work at a time, here and in every other server on this place. */
@@ -37,6 +39,8 @@ export class FolderHost implements NoteHost {
   /** One call at a time, and the folder looked at first: what is read is what is there. */
   #run<T>(work: () => Promise<T>): Promise<T> {
     return this.#alone(async () => {
+      // The library's mark gone (the folder emptied, or another put under its name): nothing is read or written.
+      if (this.still && !(await this.still().catch(() => false))) throw new NoteError('unreachable', UNREACHABLE)
       await this.library.sync()
       if (this.library.problem() !== undefined) throw new NoteError('unreachable', UNREACHABLE)
       return work()
@@ -99,5 +103,5 @@ export async function openFolderHost(folder: string, own: string): Promise<Folde
     throw new Error('That folder is not a ShellNote library. Choose it in ShellNote first: Settings, "Where your notes are kept", "Keep them in a folder…".')
   }
   const local = await NodeFiles.open(own, 'own')
-  return new FolderHost(new FolderLibrary({ shared, local, mark: local.word }), (work) => local.lock(work), new Keeper(local))
+  return new FolderHost(new FolderLibrary({ shared, local, mark: local.word }), (work) => local.lock(work), new Keeper(local), async () => (await shared.info(MARK)) !== undefined)
 }

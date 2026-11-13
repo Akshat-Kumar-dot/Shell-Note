@@ -68,7 +68,8 @@ function about(block: Block): string {
 export function readBlocks(doc: Doc, ids: readonly Id[]): string {
   return ids
     .map((id) => {
-      const block = doc.block[id]
+      // Only a block the note holds itself: "constructor" names nothing here.
+      const block = Object.hasOwn(doc.block, id) ? doc.block[id] : undefined
       if (!block) throw new ValidationError('unknown_id', `There is no block ${JSON.stringify(String(id).slice(0, 80))} in this note. Use a block id that the outline of this note gives.`, { got: id })
       const content = blockContent(block)
       return content === '' ? `${block.id} ${about(block)}` : `${block.id} ${about(block)}\n${content}`

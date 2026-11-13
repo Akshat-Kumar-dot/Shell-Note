@@ -193,3 +193,37 @@ describe('on a real disk', () => {
     expect(await two.lock(async () => 'next')).toBe('next')
   })
 })
+
+describe('a folder that stops being a library', () => {
+  it('is left alone: the server reads and writes nothing, and never puts the mark back', async () => {
+    const base = mkdtempSync(path.join(os.tmpdir(), 'shellnote-host-mark-'))
+    try {
+      const folder = path.join(base, 'Notes')
+      await NodeFiles.open(folder, 'own')
+      const app = new FolderLibrary({ shared: await NodeFiles.open(folder, 'shared'), local: await NodeFiles.open(path.join(base, 'app'), 'own') })
+      await app.sync()
+      const host = await openFolderHost(folder, path.join(base, 'server'))
+      expect((await host.list()).notes).toEqual([])
+      // The folder is emptied, as when another is put under its name.
+      rmSync(path.join(folder, '.shellnote'), { recursive: true, force: true })
+      await expect(host.list()).rejects.toMatchObject({ code: 'unreachable' })
+      expect(existsSync(path.join(folder, '.shellnote'))).toBe(false)
+    } finally {
+      rmSync(base, { recursive: true, force: true })
+    }
+  })
+
+  it('a copy under a note\'s name that is another note\'s is not read as it', async () => {
+    const clock = new Clock()
+    const app = device(clock)
+    const one = (await app.library.newNote(null, { doc: PHYSICS, assets: pictures() })).id
+    const two = (await app.library.newNote(null)).id
+    const server = device(clock, app.folder)
+    const host = new FolderHost(server.library)
+    await host.read(one)
+    // Another note's copy lies where this note's should, as two ids in other letters would on a disk that takes them for one name.
+    server.own.put(`notes/${one}.doc.json`, server.own.peek(`notes/${two}.doc.json`)!)
+    const again = new FolderHost(device(clock, app.folder, server.own).library)
+    await expect(again.read(one)).rejects.toThrow("another note's")
+  })
+})

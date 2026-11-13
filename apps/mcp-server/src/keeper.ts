@@ -10,8 +10,12 @@ import type { Files } from '@shellnote/library'
 /** One edit in a note's log: what was asked and done, and the operations that undo it. */
 export interface LogItem {
   entry: LogEntry
-  /** What takes the edit back, and the note's rev just after it. */
-  undo?: { inverse: Op[]; rev: number }
+  /**
+   * What takes the edit back, and the note's rev just after it on this device. `after` holds the mark of each
+   * block the edit touched, as it left it (core's blockPrint; null for a block it removed): another device counts
+   * its own revs, so it is by these marks that the app knows the blocks are still as the edit left them.
+   */
+  undo?: { inverse: Op[]; rev: number; after?: Record<string, string | null> }
 }
 
 /** The most entries kept for one note: the oldest go first. The same as the app keeps. */

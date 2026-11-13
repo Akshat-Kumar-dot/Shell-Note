@@ -2,7 +2,7 @@
 // contract (contract.json): a tool is never renamed or taken away, and what a
 // tool takes only ever grows. New abilities arrive inside the tools, as new
 // operations, kinds and guide topics (guide.ts), or as a new tool at the end.
-import { blockLine, editById, MAX_EDIT_OPS, outline, readBlocks, RULEBOOK, toMarkdown, toText, ValidationError, type Doc, type IdEdited, type LogEntry } from '@shellnote/core'
+import { blockLine, blockPrint, editById, MAX_EDIT_OPS, outline, readBlocks, RULEBOOK, toMarkdown, toText, ValidationError, type Doc, type IdEdited, type LogEntry } from '@shellnote/core'
 import { z } from 'zod'
 import { guide, MAX_READ_BLOCKS, TOPICS } from '../guide.js'
 import type { LogItem } from '../keeper.js'
@@ -119,7 +119,16 @@ const editNote = define({
         if (error instanceof ValidationError && before) await logged(context, note, started, why, ops, [], 'failed', undefined, `${error.code}: ${error.hint}`)
         throw error
       })
-    if (edited?.result) await logged(context, note, started, why, edited.ai, edited.targets, 'applied', { inverse: kept.inverse, rev: kept.doc.rev })
+    if (before && edited?.result) {
+      // The blocks the edit touched, as it left them: what the app checks before it takes the edit back (core's blockPrint).
+      const after: Record<string, string | null> = {}
+      for (const id of kept.changed) {
+        const block = kept.doc.block[id]
+        if (block) after[id] = blockPrint(block)
+        else if ((before as Doc).block[id]) after[id] = null
+      }
+      await logged(context, note, started, why, edited.ai, edited.targets, 'applied', { inverse: kept.inverse, rev: kept.doc.rev, after })
+    }
     if (!before || !edited?.result) return { text: `No change: the note already is as this edit would leave it.\nrev ${kept.doc.rev}`, data: { rev: kept.doc.rev, changed: [], added: [], removed: [] } }
     const was = before
     const now = edited.result.doc
@@ -140,13 +149,34 @@ const editNote = define({
 /** The longest content an operation keeps in the log: the note holds the whole of it. */
 const LOG_CONTENT = 300
 
+const WORDS = ['op', 'id', 'ref', 'at', 'kind', 'into', 'role', 'size', 'color', 'font', 'align', 'indent', 'action'] as const
+const SWITCHES = ['bold', 'italic', 'strike', 'code', 'highlight', 'underline', 'sub', 'sup', 'link', 'done'] as const
+
+/**
+ * An operation as the log keeps it: the fields an operation has, and each kept short. What was sent is another
+ * program's words, a refused edit's most of all, and the app reads the log: it is given nothing it does not know.
+ */
+function brief(op: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {}
+  const cut = (value: unknown, most: number): string | undefined => (typeof value !== 'string' ? undefined : value.length > most ? `${value.slice(0, most)}…` : value)
+  for (const key of WORDS) {
+    const value = cut(op[key], 64)
+    if (value !== undefined) out[key] = value
+  }
+  if (Array.isArray(op.ids)) out.ids = op.ids.filter((id): id is string => typeof id === 'string').slice(0, 50).map((id) => id.slice(0, 64))
+  for (const key of SWITCHES) if (typeof op[key] === 'boolean') out[key] = op[key]
+  const content = cut(op.content, LOG_CONTENT)
+  if (content !== undefined) out.content = content
+  return out
+}
+
 /** Write an edit into the note's log. A log that cannot be written is said on stderr, and the edit stands. */
 async function logged(context: Context, note: string, started: number, why: string | undefined, ops: readonly unknown[], targets: readonly string[], result: LogEntry['result'], undo?: LogItem['undo'], error?: string): Promise<void> {
   if (!context.host.record) return
   const short = ops
     .filter((op): op is Record<string, unknown> => typeof op === 'object' && op !== null && !Array.isArray(op))
     .slice(0, MAX_EDIT_OPS)
-    .map((op) => (typeof op.content === 'string' && op.content.length > LOG_CONTENT ? { ...op, content: `${op.content.slice(0, LOG_CONTENT)}…` } : op))
+    .map(brief)
   const entry: LogEntry = {
     at: started,
     source: 'mcp',

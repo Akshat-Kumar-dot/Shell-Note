@@ -222,6 +222,9 @@ export class FolderLibrary implements LibraryStore {
     const kept = await this.#readJson(this.#local, `notes/${id}.doc.json`)
     if (kept === undefined) throw new Error('This note is not in the library any more.')
     const doc = parseDoc(kept)
+    // The copy under a note's name must be that note's: where names differing only in case are one file, a note
+    // whose id is another's in other letters would else be read as it.
+    if (doc.id !== id) throw new Error('This note cannot be read: its copy on this computer is another note\'s.')
     this.#docs.set(id, doc)
     // The copy was written and the app ended before what is known of it was: it counts as a change made here.
     const state = this.#notes.get(id)

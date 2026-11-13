@@ -139,7 +139,12 @@ export class NodeFiles implements Files {
     for (const part of rel.split('/')) {
       if (!plain(part)) throw new Error(OUTSIDE)
       full = path.join(full, part)
-      const meta = await fs.lstat(full).catch(() => undefined)
+      const meta = await fs.lstat(full).catch((error: unknown) => {
+        // Not there is an answer. Anything else (a name that may not be looked at) leaves it unknown what the name
+        // leads to, and an unknown is refused.
+        if (['ENOENT', 'ENOTDIR'].includes((error as NodeJS.ErrnoException).code ?? '')) return undefined
+        throw new Error(OUTSIDE, { cause: error })
+      })
       if (meta === undefined) continue
       // A symbolic link, and on Windows a junction, which any program may leave in a folder it can write to.
       if (meta.isSymbolicLink()) throw new Error(OUTSIDE)
