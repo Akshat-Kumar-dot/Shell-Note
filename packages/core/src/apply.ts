@@ -3,7 +3,7 @@
 // edit checkable and undoable with no extra code.
 import { Draft } from './draft.js'
 import { idTaken } from './ids.js'
-import { BLOCK_SHAPES, DocFields, type Block, type BlockType, type Doc, type Frame, type Id } from './schema/doc.js'
+import { BLOCK_SHAPES, DocFields, MAX_BLOCKS, type Block, type BlockType, type Doc, type Frame, type Id } from './schema/doc.js'
 import { checkOp, type MoveTo, type Op, type OpOf } from './schema/ops.js'
 import { has, isWellFormed, splitsCharacter } from './util.js'
 import { CONTENT_FIELDS, checkContent, type ContentField, type ContentValidators } from './validate/content.js'
@@ -77,11 +77,20 @@ function run(draft: Draft, op: Op): Op[] {
 
 // ----- add and remove -------------------------------------------------------
 
+/** Whether a note holds as many blocks as it may: counted no further than that. */
+function full(doc: Doc): boolean {
+  let count = 0
+  for (const id in doc.block) if (has(doc.block, id) && ++count >= MAX_BLOCKS) return true
+  return false
+}
+
 function add(draft: Draft, op: OpOf<'add'>): Op[] {
   const block = op.block
   if (idTaken(draft.doc, block.id)) {
     fail('duplicate_id', `The id ${block.id} is already used in this document. Choose a new id.`, { got: block.id })
   }
+  // A note never grows past what its own file may hold (MAX_BLOCKS): it could be saved, and never opened again.
+  if (full(draft.doc)) fail('bad_doc', `A note holds at most ${MAX_BLOCKS.toLocaleString('en')} blocks, and this one is full. Start another note for more.`)
   if (block.type === 'frame') {
     if (block.kids.length > 0) {
       fail('not_empty', `Frame ${block.id}: add a frame with empty kids, then add each child with its own add.`)

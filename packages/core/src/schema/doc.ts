@@ -14,6 +14,14 @@ import { isWellFormed } from '../util.js'
  */
 export const SCHEMA_VERSION = 4
 
+/**
+ * The most blocks a note holds. Every block of a note is checked as it is opened, so a file with very many (a small
+ * file can hold hundreds of thousands) would hold the app for seconds or minutes, on every device that looks at the
+ * folder it lies in: a file with more is refused, and a note is never grown past what its own file may hold. A
+ * note of a thousand full pages is far below it.
+ */
+export const MAX_BLOCKS = 50_000
+
 /** Any text field. It must be valid UTF-16, because saved files are UTF-8. */
 const Str = z.string().refine(isWellFormed, {
   error: 'contains a broken character (half of an emoji on its own).',

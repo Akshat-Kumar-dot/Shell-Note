@@ -10,7 +10,7 @@
 // rewrites the pages that changed. Files are written in a fixed key order, so
 // the same document always gives the same bytes.
 import { strFromU8, strToU8, unzipSync, zipSync, type Zippable } from 'fflate'
-import { Asset, Id, Page, PenOverrides, type Block, type Doc } from '../schema/doc.js'
+import { Asset, Id, MAX_BLOCKS, Page, PenOverrides, type Block, type Doc } from '../schema/doc.js'
 import { has, isRecord } from '../util.js'
 import { parseDoc } from '../validate/doc.js'
 import { lineageText, readLineage, type Lineage } from '../sync/lineage.js'
@@ -60,6 +60,8 @@ export function fromFiles(files: Readonly<Record<string, string>>): Doc {
     for (const [id, value] of Object.entries(file.block)) {
       if (!Id.safeParse(id).success) throw new ValidationError('bad_doc', `${path} holds a block with the invalid id ${JSON.stringify(id)}.`)
       if (has(block, id)) throw new ValidationError('bad_doc', `Block ${id} is stored twice, in ${storedIn.get(id)} and ${path}.`)
+      // Counted before any block is checked: checking each is what a file with too many would spend its time on.
+      if (storedIn.size >= MAX_BLOCKS) throw new ValidationError('bad_doc', `This note is too large to open: it holds more than ${MAX_BLOCKS.toLocaleString('en')} blocks.`)
       block[id] = value
       storedIn.set(id, path)
     }

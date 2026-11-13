@@ -87,7 +87,8 @@ The block types and their fields are defined in [packages/core/src/schema/doc.ts
 
 Errors are `ValidationError`s with a hint that says what is wrong, such as "Block gi is stored in pages/w1.json, but it is on page w2."
 
-Limits, from the sizes the zip declares: 100,000 entries, 64 MiB per JSON file, 1 GiB in total.
+Limits, from the sizes the zip declares: 100,000 entries, 64 MiB per JSON file, 1 GiB in total. A note holds at most
+50,000 blocks: a file with more is refused before its blocks are checked, and `apply` adds none to a note that is full.
 
 ## Saving only what changed
 
