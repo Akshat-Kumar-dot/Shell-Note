@@ -344,15 +344,54 @@ const PRIVATE: &str = "A private browser window is never put on a panel";
 /// Each Chromium window's toolbar read: none while it is being read.
 static TOOLBARS: Mutex<Vec<(isize, Option<bool>)>> = Mutex::new(Vec::new());
 
+/// A private window's mark in Chrome's toolbar, in English and in Chrome's twenty-two most used other languages, as
+/// Chromium's own translation files have it (the message "Incognito" of `generated_resources_*.xtb`, read 13
+/// November 2026): Arabic, Bengali, German, Spanish, French, Hindi, Indonesian, Italian, Japanese, Korean, Dutch,
+/// Polish, Portuguese of Brazil and of Portugal, Russian, Thai, Turkish, Ukrainian, Vietnamese, Chinese in both
+/// scripts. A Chrome in a language not here shows another word, and its private window is not known for one.
+const CHROME_PRIVATE: &[&str] = &[
+    "Incognito", "التصفح المتخفي", "ছদ্মবেশী", "Inkognito", "Incógnito", "Navigation privée", "गुप्त", "Samaran", "シークレット モード", "시크릿 모드", "Modo anônimo", "Navegação anónima", "Инкогнито",
+    "โหมดไม่ระบุตัวตน", "Gizli mod", "Анонімний перегляд", "Ẩn danh", "无痕模式", "無痕模式",
+];
+
+/// Brave's own word for it, in the same languages (the message "Private" of Brave's `generated_resources_*.xtb`).
+/// Where Brave has no word of its own it shows Chrome's, so a Brave window is looked through for both.
+const BRAVE_PRIVATE: &[&str] = &["Private", "خاص", "Privat", "Privado", "प्राइवेट", "Pribadi", "Privato", "プライベート", "Privé", "Prywatna", "Приватное", "ส่วนตัว", "Kişisel", "Приватно", "Riêng tư", "无痕"];
+
+/// What Firefox adds to its name in the title of a private window, in the same languages (the message
+/// `browser-main-private-window-title` of Firefox's translations, without the browser's name, which differs between
+/// Firefox and the browsers made from it).
+const FIREFOX_PRIVATE: &[&str] = &[
+    "Private Browsing", "التصفح الخاص", "ব্যক্তিগত ব্রাউজিং", "Privater Modus", "Navegación privada", "Navigation privée de ", "Meramban Privat ", "Navigazione anonima", "プライベートブラウジング", "사생활 보호 모드",
+    "-privénavigatie", "tryb prywatny", "navegação privativa", "Navegação privada do ", "Приватный просмотр ", "การเรียกดูแบบส่วนตัวใน ", "Gizli Gezinti", "Приватний перегляд ", "duyệt web riêng tư", "隐私浏览", "隱私瀏覽模式",
+];
+
+/// Firefox, and the browsers made from it, which word their titles as Firefox does.
+fn is_firefox_like(program: &str) -> bool {
+    matches!(program.to_ascii_lowercase().as_str(), "firefox.exe" | "librewolf.exe" | "waterfox.exe" | "floorp.exe" | "zen.exe" | "mullvadbrowser.exe")
+}
+
+/// Whether a window's title says it is private: Edge's "InPrivate", the same in every language; Firefox's "Private
+/// Browsing", in English at the end of any window's title as before, and in Firefox's other languages in the
+/// titles of Firefox and its kin.
+fn private_by_title(program: &str, title: &str) -> bool {
+    title.contains("InPrivate") || title.ends_with("Private Browsing") || (is_firefox_like(program) && FIREFOX_PRIVATE.iter().any(|words| title.contains(words)))
+}
+
+/// The marks a Chromium browser's toolbar shows in a private window, by its program; none for another program.
+fn private_marks(program: &str) -> Option<Vec<&'static str>> {
+    match program.to_ascii_lowercase().as_str() {
+        "chrome.exe" | "chromium.exe" => Some(CHROME_PRIVATE.to_vec()),
+        "brave.exe" => Some(BRAVE_PRIVATE.iter().chain(CHROME_PRIVATE).copied().collect()),
+        _ => None,
+    }
+}
+
 fn private(window: HWND, program: &str, title: &str) -> Private {
-    if title.contains("InPrivate") || title.ends_with("Private Browsing") {
+    if private_by_title(program, title) {
         return Private::Yes;
     }
-    let mark = match program.to_ascii_lowercase().as_str() {
-        "chrome.exe" => "Incognito",
-        "brave.exe" => "Private",
-        _ => return Private::No,
-    };
+    let Some(marks) = private_marks(program) else { return Private::No };
     let id = window.0 as isize;
     // The first ask of a window answers "not yet read" and starts the read: `apps_list` shows it as "checking" and
     // `apps_hold` refuses it, until a later ask finds the answer here.
@@ -365,7 +404,7 @@ fn private(window: HWND, program: &str, title: &str) -> Private {
             read.push((id, None));
             std::thread::spawn(move || {
                 // Not read (an error): taken as private, never shown.
-                let private = toolbar_holds(id, mark).unwrap_or(true);
+                let private = toolbar_holds(id, &marks).unwrap_or(true);
                 if let Ok(mut read) = TOOLBARS.lock() {
                     if let Some(one) = read.iter_mut().find(|(one, _)| *one == id) {
                         one.1 = Some(private);
@@ -377,13 +416,18 @@ fn private(window: HWND, program: &str, title: &str) -> Private {
     }
 }
 
-/// Whether the window's own toolbar holds a part named `mark` ("Incognito"), as its people see it.
-fn toolbar_holds(id: isize, mark: &str) -> windows::core::Result<bool> {
+/// Whether the window's own toolbar holds a part named as one of `marks` ("Incognito", or the word for it in
+/// another language), as its people see it. One look through the window for all the names at once.
+fn toolbar_holds(id: isize, marks: &[&str]) -> windows::core::Result<bool> {
     unsafe {
         CoInitializeEx(None, COINIT_MULTITHREADED).ok()?;
         let automation: IUIAutomation = CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER)?;
         let element = automation.ElementFromHandle(hwnd(id))?;
-        let named = automation.CreatePropertyCondition(UIA_NamePropertyId, &VARIANT::from(BSTR::from(mark)))?;
+        let name_is = |mark: &str| automation.CreatePropertyCondition(UIA_NamePropertyId, &VARIANT::from(BSTR::from(mark)));
+        let mut named = name_is(marks.first().copied().unwrap_or_default())?;
+        for mark in marks.iter().skip(1) {
+            named = automation.CreateOrCondition(&named, &name_is(mark)?)?;
+        }
         // Ok means found: the windows crate turns an answer of "nothing found" into an error. So a failure of this one
         // call reads as "not there" too, unlike a failure on the lines above, which `private` takes as private.
         Ok(element.FindFirst(TreeScope_Descendants, &named).is_ok())
@@ -1064,6 +1108,54 @@ mod tests {
     fn the_command_line_of_this_process() {
         let line = command_line_of(unsafe { GetCurrentProcessId() }).expect("Windows says");
         assert!(line.to_lowercase().contains("shellnote"), "{line}");
+    }
+
+    #[test]
+    fn a_private_window_is_known_by_its_title_in_the_browsers_own_languages() {
+        // Edge says InPrivate in every language; Firefox's English words end any window's title.
+        assert!(private_by_title("msedge.exe", "New tab - [InPrivate] - Microsoft\u{200b} Edge"));
+        assert!(private_by_title("firefox.exe", "Example Domain — Mozilla Firefox Private Browsing"));
+        // Firefox in other languages, the browser's name before its words or after them, and a browser made from it.
+        for title in [
+            "Beispiel — Mozilla Firefox Privater Modus",
+            "Exemple — Navigation privée de Mozilla Firefox",
+            "Ejemplo — Mozilla Firefox Navegación privada",
+            "Пример — Приватный просмотр Mozilla Firefox",
+            "例 — Mozilla Firefox プライベートブラウジング",
+            "示例 — Mozilla Firefox 隐私浏览",
+            "Voorbeeld — Mozilla Firefox-privénavigatie",
+            "Przykład — Mozilla Firefox — tryb prywatny",
+        ] {
+            assert!(private_by_title("firefox.exe", title), "{title}");
+            assert!(private_by_title("LibreWolf.exe", &title.replace("Mozilla Firefox", "LibreWolf")), "{title}");
+        }
+        // An ordinary window is not taken for private, in Firefox or elsewhere; and a page that only speaks of
+        // private browsing, in another program, is that program's ordinary window.
+        assert!(!private_by_title("firefox.exe", "Example Domain — Mozilla Firefox"));
+        assert!(!private_by_title("chrome.exe", "Navigation privée de Mozilla Firefox - Google Chrome"));
+        assert!(!private_by_title("notepad.exe", "notes.txt - Notepad"));
+    }
+
+    #[test]
+    fn a_chromium_browsers_private_mark_in_its_own_languages() {
+        let chrome = private_marks("chrome.exe").unwrap();
+        for word in ["Incognito", "Inkognito", "Navigation privée", "Инкогнито", "シークレット モード", "无痕模式", "गुप्त", "التصفح المتخفي"] {
+            assert!(chrome.contains(&word), "{word}");
+        }
+        // Brave's own word, and Chrome's where Brave has none of its own.
+        let brave = private_marks("Brave.exe").unwrap();
+        for word in ["Private", "Privat", "Privé", "プライベート", "Navigation privée", "시크릿 모드"] {
+            assert!(brave.contains(&word), "{word}");
+        }
+        assert_eq!(private_marks("Chromium.exe").unwrap(), chrome);
+        assert!(private_marks("msedge.exe").is_none() && private_marks("notepad.exe").is_none());
+        // No word is empty or short enough to name something else by chance, and none is there twice.
+        for list in [CHROME_PRIVATE, BRAVE_PRIVATE, FIREFOX_PRIVATE] {
+            for (at, word) in list.iter().enumerate() {
+                assert!(word.trim().chars().count() >= 2, "{word:?}");
+                assert!(!list[..at].contains(word), "{word:?} twice");
+            }
+        }
     }
 
     #[test]

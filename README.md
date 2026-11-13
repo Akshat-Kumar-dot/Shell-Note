@@ -40,6 +40,9 @@ just that part change. It runs in the browser and as a Windows desktop app, and 
 - Put a browser, a PDF reader, PowerPoint or VS Code on a panel next to the page. Lines written beside it remember the
   page, slide, or file and line ([VS Code companion](apps/vscode-companion)); tap one to go back there.
 - Private browser windows are never listed, shown or pictured, and no command or agent can control these programs.
+  A private window is known by the browser's own words for it: Edge's in any language, and Firefox's, Chrome's and
+  Brave's in English and their twenty-two most used other languages. In a browser set to another language, a private
+  window may be listed like any other: leave it off the panel.
 
 **Yours**
 - A library of notes and folders, kept on your device, and beside the note you are writing in: open another note in

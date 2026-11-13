@@ -56,6 +56,9 @@ All notable changes to ShellNote are listed here. The format follows
 - In the Windows app: only a window offered in the list can be put on a panel; a place kept with a line opens a file
   on this computer only; the app's window stays on the app's own pages; the microphone opens only for the window in
   front; Windows' own libraries are loaded from Windows' folder.
+- A private browser window is known in the browser's own words in other languages too: Firefox's, Chrome's and
+  Brave's in their twenty-two most used languages beside English (Edge's word is the same in all). Before, a private
+  window of a browser set to another language could be listed for the panel.
 - In the Windows app, a note removed for good from a library kept in a folder goes to Windows' Recycle Bin, so one
   removed by mistake can be brought back as any file can.
 - The Windows app reads none of the checks' switches from its environment (a debugging port for its web view, a
