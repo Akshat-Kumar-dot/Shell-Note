@@ -469,6 +469,46 @@ fn remove_empty(folder: &Path) -> std::io::Result<()> {
 /// A note removed, or one of the library's own files, or a small file other programs leave; or a folder, once it
 /// holds no file. Never another file, never a folder with what it holds, never the library's hidden folder itself.
 fn remove_at(root: Root, folder: &Path, path: &str) -> Result<(), String> {
+    remove_with(root, folder, path, false)
+}
+
+/// Whether a file removed goes to Windows' Recycle Bin: a note in the folder the person chose. A note removed by
+/// mistake, or by a page gone wrong, can then be brought back, as a file removed in Explorer can. The library's own
+/// small files and this device's copies are not a person's to bring back, and go at once.
+fn recycled(root: Root, kind: Kind) -> bool {
+    root == Root::Shared && kind == Kind::Note
+}
+
+/// A file moved to Windows' Recycle Bin, with no question asked and nothing shown. Windows removes it outright where
+/// there is no Recycle Bin (a network drive, some removable ones) or the file is too large for it.
+#[cfg(windows)]
+fn to_recycle_bin(file: &Path) -> std::io::Result<()> {
+    use std::os::windows::ffi::OsStrExt;
+    use windows::core::PCWSTR;
+    use windows::Win32::UI::Shell::{SHFileOperationW, FOF_ALLOWUNDO, FOF_NOCONFIRMATION, FOF_NOERRORUI, FOF_SILENT, FO_DELETE, SHFILEOPSTRUCTW};
+    // Only a whole path: Windows would read any other against the folder the app was started from.
+    if !file.is_absolute() {
+        return Err(std::io::Error::other("not a whole path"));
+    }
+    // The path, then two zeros: Windows takes a list of paths here, ended so.
+    let from: Vec<u16> = file.as_os_str().encode_wide().chain([0, 0]).collect();
+    let mut operation = SHFILEOPSTRUCTW { wFunc: FO_DELETE, pFrom: PCWSTR(from.as_ptr()), fFlags: (FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT).0 as u16, ..Default::default() };
+    let answer = unsafe { SHFileOperationW(&mut operation) };
+    if answer == 0 && !operation.fAnyOperationsAborted.as_bool() {
+        Ok(())
+    } else {
+        Err(std::io::Error::other(format!("Windows did not move it to the Recycle Bin ({answer})")))
+    }
+}
+
+/// Elsewhere there is no Recycle Bin to ask for here: removed as before.
+#[cfg(not(windows))]
+fn to_recycle_bin(_file: &Path) -> std::io::Result<()> {
+    Err(std::io::Error::other("no Recycle Bin here"))
+}
+
+/// `remove_at`, with a note going to the Recycle Bin when `bin` (the app's own command), or removed outright.
+fn remove_with(root: Root, folder: &Path, path: &str, bin: bool) -> Result<(), String> {
     let full = inside(folder, path)?;
     if root == Root::Server {
         return Err(NOT_THE_LIBRARYS.into());
@@ -483,17 +523,27 @@ fn remove_at(root: Root, folder: &Path, path: &str) -> Result<(), String> {
         }
         return remove_empty(&full).map_err(|error| error.to_string());
     }
-    if !matches!(kind_of(root, path), Kind::Note | Kind::Own | Kind::Clutter) {
+    let kind = kind_of(root, path);
+    if !matches!(kind, Kind::Note | Kind::Own | Kind::Clutter) {
         return Err(NOT_THE_LIBRARYS.into());
     }
-    fs::remove_file(&full).map_err(|error| error.to_string())
+    // To the Recycle Bin when it is a note; removed outright should Windows not take it there (a path too long for
+    // that call, say): the note must leave the folder either way, or the library would take it for one still there.
+    if bin && recycled(root, kind) && to_recycle_bin(&full).is_ok() && fs::symlink_metadata(&full).is_err() {
+        return Ok(());
+    }
+    match fs::remove_file(&full) {
+        Err(error) if error.kind() != std::io::ErrorKind::NotFound => Err(error.to_string()),
+        _ => Ok(()),
+    }
 }
 
-/// Remove a note or one of the library's own files, or a folder that holds no file; nothing happens when it is not there.
+/// Remove a note or one of the library's own files, or a folder that holds no file; nothing happens when it is not
+/// there. A note goes to Windows' Recycle Bin.
 #[tauri::command]
 pub fn library_remove(app: AppHandle, root_name: String, path: String) -> Result<(), String> {
     let (which, folder) = root(&app, &root_name)?;
-    remove_at(which, &folder, &path)
+    remove_with(which, &folder, &path, true)
 }
 
 /// Make a folder, and those on the way to it.
@@ -763,6 +813,37 @@ mod tests {
         fs::remove_dir(root.join("way-out")).unwrap();
         fs::remove_dir_all(&base).unwrap();
         assert!(!base.exists());
+    }
+
+    #[test]
+    fn only_a_note_of_the_chosen_folder_goes_to_the_recycle_bin() {
+        assert!(recycled(Root::Shared, Kind::Note));
+        for (root, kind) in [(Root::Shared, Kind::Own), (Root::Shared, Kind::Clutter), (Root::Own, Kind::Own), (Root::Own, Kind::Note), (Root::Server, Kind::Own)] {
+            assert!(!recycled(root, kind), "{root:?} {kind:?}");
+        }
+    }
+
+    /// Run by hand (`cargo test --lib -- --ignored recycle`): it leaves one small file in the Recycle Bin of whoever
+    /// runs it, which is what it checks, so it is not among the tests that run by themselves.
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "leaves a file in the Recycle Bin"]
+    fn a_note_removed_by_the_app_is_in_the_recycle_bin_and_gone_from_the_folder() {
+        let root = fresh("recycle");
+        fs::write(root.join("shellnote-recycle-test.shellnote"), b"a test note, safe to remove from the Recycle Bin").unwrap();
+        fs::create_dir_all(root.join(".shellnote")).unwrap();
+        fs::write(root.join(".shellnote").join("library.json"), b"{}").unwrap();
+        remove_with(Root::Shared, &root, "shellnote-recycle-test.shellnote", true).unwrap();
+        assert!(!root.join("shellnote-recycle-test.shellnote").exists());
+        // One of the library's own files is removed as before, and a note not there is no fault.
+        remove_with(Root::Shared, &root, ".shellnote/library.json", true).unwrap();
+        assert!(!root.join(".shellnote").join("library.json").exists());
+        remove_with(Root::Shared, &root, "not-there.shellnote", true).unwrap();
+        // Another file of the folder is refused all the same.
+        fs::write(root.join("Thesis.docx"), b"the person's own").unwrap();
+        assert!(remove_with(Root::Shared, &root, "Thesis.docx", true).is_err());
+        assert!(root.join("Thesis.docx").exists());
+        fs::remove_dir_all(&root).unwrap();
     }
 
     #[test]

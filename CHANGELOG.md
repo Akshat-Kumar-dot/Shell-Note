@@ -56,6 +56,8 @@ All notable changes to ShellNote are listed here. The format follows
 - In the Windows app: only a window offered in the list can be put on a panel; a place kept with a line opens a file
   on this computer only; the app's window stays on the app's own pages; the microphone opens only for the window in
   front; Windows' own libraries are loaded from Windows' folder.
+- In the Windows app, a note removed for good from a library kept in a folder goes to Windows' Recycle Bin, so one
+  removed by mistake can be brought back as any file can.
 - The Windows app reads none of the checks' switches from its environment (a debugging port for its web view, a
   window's size, a folder for the library): only a copy built for the checks does (`pnpm desktop:build:check`).
 - A note holds at most 50,000 blocks: a file with more is refused before it can hold the app up.
