@@ -75,6 +75,7 @@ You also need the [Rust toolchain](https://rustup.rs).
 ```bash
 pnpm desktop          # the app in a window, reloading as the code changes
 pnpm desktop:build    # a release build: apps/desktop/src-tauri/target/release/shellnote.exe
+pnpm desktop:build:check   # the copy the desktop checks run, in apps/desktop/src-tauri/target/check
 ```
 
 ### Setting up the AI
@@ -121,8 +122,10 @@ On a Mac, use ⌘ in place of Ctrl.
 | `pnpm test` | The unit tests (Vitest) |
 | `pnpm e2e` | The browser tests (Playwright, in Microsoft Edge locally and Chromium on CI) |
 | `pnpm build` | Build the web app |
-| `pnpm desktop:smoke` | Open the built desktop app and check that it works |
-| `pnpm desktop:e2e` | Run the browser tests inside the built desktop app |
+| `pnpm desktop:build:check` | Build the check copy of the desktop app, which the three checks below run |
+| `pnpm desktop:smoke` | Open the check copy and check that it works |
+| `pnpm desktop:apps` | Check other programs on a panel, in the check copy |
+| `pnpm desktop:e2e` | Run the browser tests inside the check copy |
 | `pnpm licences` | Check every dependency's licence and rewrite the notices file |
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.

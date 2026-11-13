@@ -30,6 +30,7 @@
     "perf:ui": "tsx apps/web/perf/ui.ts",
     "desktop": "node apps/desktop/run.mjs dev",
     "desktop:build": "node apps/desktop/run.mjs build",
+    "desktop:build:check": "node apps/desktop/run.mjs build-check",
     "desktop:smoke": "node apps/desktop/run.mjs smoke",
     "desktop:e2e": "node apps/desktop/run.mjs e2e",
     "desktop:apps": "node apps/desktop/run.mjs apps",

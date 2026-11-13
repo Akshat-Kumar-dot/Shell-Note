@@ -149,4 +149,6 @@ pnpm check
 
 runs the typecheck, the linter and the unit tests. `pnpm dev` serves the app at http://localhost:5190, and `pnpm e2e`
 runs the browser tests. Tests live next to what they test: `packages/*/test/`, `apps/web/test/` and `apps/web/e2e/`.
-`pnpm desktop:smoke` and `pnpm desktop:apps` check the built desktop app.
+`pnpm desktop:smoke`, `pnpm desktop:apps` and `pnpm desktop:e2e` check the desktop app as built, in a copy of its
+own (`pnpm desktop:build:check`). Only that copy reads the checks' switches from the environment (a debugging port
+for the web view, a window's size, a folder for the library): the app people run reads none of them.

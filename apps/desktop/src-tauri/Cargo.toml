@@ -15,6 +15,13 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 # Exact versions, each at least seven days old when chosen; their licences are checked by scripts/licences-rust.mjs.
 tauri-build = { version = "=2.7.2", features = [] }
 
+[features]
+# The checks' own switches: with this, the app reads the environment for a window's size, a file to write an opened
+# link's address into, more switches for the web view (a debugging port among them) and a folder to keep the library
+# in. Built into the copy the checks run (apps/desktop/run.mjs), never into the app people run: there, nothing set in
+# the environment can open the web view to a debugger or point the app at a file or a folder.
+checks = []
+
 [dependencies]
 tauri = { version = "=2.12.3", features = [] }
 serde = { version = "1", features = ["derive"] }

@@ -3,9 +3,11 @@
 // when a shell opened before Rust was installed does not have it.
 //
 //   node run.mjs dev        the app in a window, reloading as code changes (the web app on port 5194)
-//   node run.mjs build      the Rust licence check, then the app built for release
-//   node run.mjs smoke      opens the built app and checks it works (smoke.mjs)
-//   node run.mjs e2e [args] the browser tests inside the built app (apps/web/e2e/fixtures.ts); args go to Playwright
+//   node run.mjs build        the Rust licence check, then the app built for release: the copy people run
+//   node run.mjs build-check  the same, as the copy the checks run: in a folder of its own, with the checks' switches
+//   node run.mjs smoke        opens the check copy and checks it works (smoke.mjs)
+//   node run.mjs apps         other programs on a panel, in the check copy (apps-check.mjs)
+//   node run.mjs e2e [args]   the browser tests inside the check copy (apps/web/e2e/fixtures.ts); args go to Playwright
 //   node run.mjs web-dev    Tauri's beforeDevCommand: the web app's dev server on port 5194
 //   node run.mjs web-build  Tauri's beforeBuildCommand: the web app built into apps/web/dist-desktop
 //
@@ -22,12 +24,17 @@ const web = join(root, 'apps/web')
 export const DEV_PORT = 5194
 /** The web app as the desktop app ships it: apart from apps/web/dist, which `pnpm app` serves. */
 export const OUT = join(web, 'dist-desktop')
+const command = process.argv[2]
 /**
- * Where the built app goes: src-tauri/target (the copy you run), or, with SHELLNOTE_TARGET=check,
- * src-tauri/target/check, so the checks can build and run while your own copy is open (a running program
- * cannot be replaced on Windows).
+ * Where the built app goes: src-tauri/target (the copy people run), or src-tauri/target/check, the copy the checks
+ * run (another name with SHELLNOTE_TARGET). Two copies for two reasons: the checks can build and run while your own
+ * copy is open (a running program cannot be replaced on Windows); and only the check copy reads the checks' switches
+ * from the environment (a debugging port for the web view, a window's size, a folder for the library: the `checks`
+ * feature in src-tauri/Cargo.toml). The copy people run reads none of them, so the checks cannot run on it.
  */
-const targetDir = process.env.SHELLNOTE_TARGET ? join(here, 'src-tauri/target', process.env.SHELLNOTE_TARGET) : join(here, 'src-tauri/target')
+const forChecks = ['build-check', 'smoke', 'apps', 'e2e'].includes(command)
+const target = process.env.SHELLNOTE_TARGET ?? (forChecks ? 'check' : undefined)
+const targetDir = target ? join(here, 'src-tauri/target', target) : join(here, 'src-tauri/target')
 const exe = join(targetDir, 'release/shellnote.exe')
 
 /** The environment with cargo on the PATH, the build's own folder, and where the built app is. */
@@ -50,22 +57,28 @@ function node(script, args, env = process.env) {
 
 const tauri = (args) => node(createRequire(join(here, 'package.json')).resolve('@tauri-apps/cli/tauri.js'), args, withCargo())
 
-const command = process.argv[2]
+/** The checks need the check copy: said plainly when it is not built yet. */
+function needCheckCopy() {
+  if (existsSync(exe)) return
+  console.error(`No check copy of the app at ${exe}. Build it first: corepack pnpm desktop:build:check`)
+  process.exit(1)
+}
+
 if (command === 'dev') {
   tauri(['dev'])
-} else if (command === 'build') {
+} else if (command === 'build' || command === 'build-check') {
   node(join(root, 'scripts/licences-rust.mjs'), [], withCargo())
-  tauri(['build', ...process.argv.slice(3)])
+  // A copy in a folder of its own is a check copy, with the checks' switches; the copy people run has none.
+  tauri(['build', ...(target ? ['--features', 'checks'] : []), ...process.argv.slice(3)])
 } else if (command === 'apps') {
+  needCheckCopy()
   node(join(here, 'apps-check.mjs'), process.argv.slice(3), withCargo())
 } else if (command === 'smoke') {
+  needCheckCopy()
   node(join(here, 'smoke.mjs'), process.argv.slice(3), withCargo())
 } else if (command === 'e2e') {
   // The browser tests, inside the app as built: each test opens a fresh copy (apps/web/e2e/fixtures.ts).
-  if (!existsSync(exe)) {
-    console.error(`No built app at ${exe}. Build it first: corepack pnpm desktop:build`)
-    process.exit(1)
-  }
+  needCheckCopy()
   const cli = createRequire(join(root, 'package.json')).resolve('@playwright/test/cli')
   const result = spawnSync(process.execPath, [cli, 'test', '-c', join(web, 'playwright.config.ts'), ...process.argv.slice(3)], { cwd: root, stdio: 'inherit', env: { ...process.env, SHELLNOTE_APP: exe } })
   process.exit(result.status ?? 1)
@@ -84,6 +97,6 @@ if (command === 'dev') {
   mkdirSync(join(OUT, 'licences'), { recursive: true })
   cpSync(join(here, 'licences/third-party-rust.txt'), join(OUT, 'licences/third-party-rust.txt'))
 } else {
-  console.error('Use: node run.mjs dev | build | smoke | apps | e2e | web-dev | web-build (SHELLNOTE_TARGET=check: a build of its own)')
+  console.error('Use: node run.mjs dev | build | build-check | smoke | apps | e2e | web-dev | web-build')
   process.exit(1)
 }

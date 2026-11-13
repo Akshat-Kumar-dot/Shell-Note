@@ -633,7 +633,7 @@ const AS_ADMINISTRATOR: &str = "shellnote was started as administrator, so it pu
 /// check (`desktop:apps`), which never runs ShellNote as administrator: it can only switch the panel off, never on.
 fn switched_off() -> Option<&'static str> {
     static OFF: OnceLock<bool> = OnceLock::new();
-    let off = *OFF.get_or_init(|| std::env::var("SHELLNOTE_APPS_AS_ADMIN").is_ok_and(|value| value == "1") || program_of(unsafe { GetCurrentProcessId() }).is_some_and(|(_, elevated)| elevated));
+    let off = *OFF.get_or_init(|| crate::check_switch("SHELLNOTE_APPS_AS_ADMIN").is_some_and(|value| value == "1") || program_of(unsafe { GetCurrentProcessId() }).is_some_and(|(_, elevated)| elevated));
     off.then_some(AS_ADMINISTRATOR)
 }
 

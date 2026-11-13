@@ -42,5 +42,7 @@ jobs:
           pnpm licences:rust
           git diff --exit-code -- apps/desktop/licences/third-party-rust.txt
       - run: cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml --locked
+      # The copy the desktop checks run, with their switches, builds too.
+      - run: cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --features checks
       # The Rust side's own tests: what the page may reach of the library's folder, of other programs and of the web.
       - run: cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml --locked --lib

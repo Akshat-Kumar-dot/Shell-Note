@@ -51,7 +51,7 @@ fn choice_file(app: &AppHandle) -> Result<PathBuf, String> {
 /// The folder the person chose, if any. The checks name one of their own (SHELLNOTE_LIBRARY_FOLDER), so they never
 /// need the dialog.
 fn chosen(app: &AppHandle) -> Option<PathBuf> {
-    let named = std::env::var_os("SHELLNOTE_LIBRARY_FOLDER").map(PathBuf::from).filter(|path| !path.as_os_str().is_empty());
+    let named = crate::check_switch("SHELLNOTE_LIBRARY_FOLDER").map(PathBuf::from);
     let folder = named.or_else(|| fs::read_to_string(choice_file(app).ok()?).ok().map(|text| PathBuf::from(text.trim())))?;
     folder.is_absolute().then_some(folder)
 }

@@ -56,6 +56,9 @@ All notable changes to ShellNote are listed here. The format follows
 - In the Windows app: only a window offered in the list can be put on a panel; a place kept with a line opens a file
   on this computer only; the app's window stays on the app's own pages; the microphone opens only for the window in
   front; Windows' own libraries are loaded from Windows' folder.
+- The Windows app reads none of the checks' switches from its environment (a debugging port for its web view, a
+  window's size, a folder for the library): only a copy built for the checks does (`pnpm desktop:build:check`).
+- A note holds at most 50,000 blocks: a file with more is refused before it can hold the app up.
 - The build's GitHub Actions are named by commit, and each job has only the permissions it needs.
 
 ### Fixed

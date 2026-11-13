@@ -171,7 +171,7 @@ fn open_outside(url: &Url) {
         return;
     }
     // For the tests: the address written down, and no browser opened.
-    if let Ok(log) = std::env::var("SHELLNOTE_OPENED_LOG") {
+    if let Some(log) = check_switch("SHELLNOTE_OPENED_LOG") {
         let _ = std::fs::write(log, url.as_str());
         return;
     }
@@ -228,9 +228,21 @@ fn may_go_to(url: &Url) -> bool {
     own_page(None, url) || url.as_str() == "about:blank" || (tauri::is_dev() && local) || testing()
 }
 
+/// A switch of the checks' own, from the environment: read only by the copy built for the checks (the `checks`
+/// feature, Cargo.toml). The app people run reads none of them, whatever the environment it is started in holds: a
+/// program that could set one could otherwise open the web view to a debugger (SHELLNOTE_BROWSER_ARGS), have the app
+/// write to a file it names (SHELLNOTE_OPENED_LOG), or keep the library in a folder of its choosing.
+pub(crate) fn check_switch(name: &str) -> Option<std::ffi::OsString> {
+    if cfg!(feature = "checks") {
+        std::env::var_os(name).filter(|value| !value.is_empty())
+    } else {
+        None
+    }
+}
+
 /// Whether the browser tests run this copy: they set each window's size (SHELLNOTE_WINDOW_SIZE).
 fn testing() -> bool {
-    std::env::var_os("SHELLNOTE_WINDOW_SIZE").is_some()
+    check_switch("SHELLNOTE_WINDOW_SIZE").is_some()
 }
 
 /// For the browser tests only: the window made the size a test asks for midway, as Playwright resizes Edge's.
@@ -249,8 +261,8 @@ fn size_for_tests(window: WebviewWindow, width: f64, height: f64) -> Result<(), 
 /// (SHELLNOTE_WINDOW_SIZE, "1280x1200"), as Edge's window is made at that size.
 #[cfg(desktop)]
 fn window_size() -> (f64, f64) {
-    std::env::var("SHELLNOTE_WINDOW_SIZE")
-        .ok()
+    check_switch("SHELLNOTE_WINDOW_SIZE")
+        .and_then(|size| size.into_string().ok())
         .and_then(|size| {
             let (w, h) = size.split_once('x')?;
             Some((w.trim().parse().ok()?, h.trim().parse().ok()?))
@@ -344,7 +356,7 @@ fn keep_place(window: &Window) {
 #[cfg(windows)]
 fn browser_args() -> String {
     let mut args = String::from("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,msAbydos,StylusHandwritingWin");
-    if let Ok(more) = std::env::var("SHELLNOTE_BROWSER_ARGS") {
+    if let Some(more) = check_switch("SHELLNOTE_BROWSER_ARGS").and_then(|more| more.into_string().ok()) {
         args.push(' ');
         args.push_str(more.trim());
     }
@@ -629,6 +641,27 @@ mod tests {
         }
         for refused in ["file:///C:/Windows/System32/calc.exe", "javascript:alert(1)", "ms-word:x", "search-ms:x", "data:text/html,x", "shell:startup", "vscode://file/C:/x"] {
             assert!(!may_open(&url(refused)), "{refused}");
+        }
+    }
+
+    /// The app people run, built without the checks' feature (as these tests are, unless asked otherwise).
+    #[cfg(not(feature = "checks"))]
+    #[test]
+    fn the_checks_switches_do_nothing_in_the_app_people_run() {
+        // Set as a program that started the app could set them.
+        for (name, value) in [("SHELLNOTE_WINDOW_SIZE", "300x200"), ("SHELLNOTE_BROWSER_ARGS", "--remote-debugging-port=9"), ("SHELLNOTE_OPENED_LOG", "D:/pages/opened.txt"), ("SHELLNOTE_LIBRARY_FOLDER", "D:/pages")] {
+            std::env::set_var(name, value);
+            assert!(check_switch(name).is_none(), "{name} was read");
+        }
+        assert!(!testing());
+        #[cfg(desktop)]
+        assert_eq!(window_size(), (1280.0, 860.0));
+        #[cfg(windows)]
+        assert!(!browser_args().contains("remote-debugging-port"), "{}", browser_args());
+        // The window still stays on the app's own pages: the tests' leave to go elsewhere is not given.
+        assert!(!may_go_to(&url("https://example.com/")));
+        for name in ["SHELLNOTE_WINDOW_SIZE", "SHELLNOTE_BROWSER_ARGS", "SHELLNOTE_OPENED_LOG", "SHELLNOTE_LIBRARY_FOLDER"] {
+            std::env::remove_var(name);
         }
     }
 
