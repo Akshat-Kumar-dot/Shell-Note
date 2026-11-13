@@ -26,6 +26,8 @@ describe('the content security policy', () => {
       expect(policy.get('base-uri')).toEqual(["'none'"])
       expect(policy.get('form-action')).toEqual(["'none'"])
       expect(policy.get('font-src')).toEqual(["'self'"])
+      // Pictures from the note itself, never from the web: one fetched tells its site the note was opened.
+      expect(policy.get('img-src')).toEqual(["'self'", 'data:', 'blob:'])
       expect(policy.get('media-src')).toEqual(["'self'", 'blob:'])
     })
 

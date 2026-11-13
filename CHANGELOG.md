@@ -46,6 +46,9 @@ All notable changes to ShellNote are listed here. The format follows
   ShellNote's page any more.
 - A picture or video in a note file is kept only as one of the kinds ShellNote takes; anything else a file calls a
   picture is plain bytes, which a browser neither shows nor runs.
+- A diagram never fetches a picture from the web: a node that names one is drawn with its words and no picture, and
+  the app's policy loads no picture from another site. A picture so fetched would tell its site that the note was
+  opened, with no click.
 - The website draws nothing when another site shows it in a frame.
 - The YouTube Data API key is sent to Google as a header, never in the address.
 - In the Windows app, the library's folder commands reach notes and the library's own files, and no other file of the
