@@ -11,3 +11,7 @@ minimumReleaseAge: 10080
 # cleans its drawings with DOMPurify, and 3.4.16 and older let some markup past it.
 overrides:
   dompurify: ^3.4.17
+  # 13 November 2026: KaTeX, which Mermaid brings for formulas in diagrams, before 0.18.2 let an earlier fault in a
+  # page past its own limits; minimatch, which ESLint brings, before 11.0.1 could be held up by a crafted pattern.
+  katex: ^0.18.2
+  minimatch: ^11.0.1
