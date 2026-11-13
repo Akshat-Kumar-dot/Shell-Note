@@ -1,0 +1,48 @@
+name: Audit
+
+# Known security faults in the packages ShellNote is built on, looked for every week and whenever the packages
+# change: a fault found in one after it was chosen shows here, with the version that mends it.
+on:
+  schedule:
+    - cron: '17 5 * * 1'
+  push:
+    branches: [main]
+    paths: ['pnpm-lock.yaml', 'apps/desktop/src-tauri/Cargo.lock', '.github/workflows/audit.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  javascript:
+    name: The JavaScript packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Every action is named by its commit, with its version beside it: a tag can be moved to other code, a commit cannot.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 22
+      # From the lockfile alone: nothing is installed, and no package's code runs.
+      - run: pnpm audit
+
+  rust:
+    name: The Rust packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install stable --profile minimal
+      # cargo-audit (the RustSec advisories), at the versions its own lockfile names.
+      - run: cargo install cargo-audit --locked
+      - run: cargo audit --file apps/desktop/src-tauri/Cargo.lock
