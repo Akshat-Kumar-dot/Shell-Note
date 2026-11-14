@@ -80,6 +80,7 @@ export const FIELDS = {
   by: z.enum(['edited', 'created']).describe('Sort by the date last edited, or created'),
   order: z.enum(['newest', 'oldest']).describe('Which come first'),
   look: z.enum(['system', 'light', 'dark']).describe("The app's appearance; system follows Windows"),
+  accent: z.enum(['graphite', 'blue', 'teal', 'green', 'amber', 'rose', 'red']).describe("The app's own colour, on its buttons and what is chosen; graphite is no colour"),
   link: name.describe('A YouTube link, or a video id'),
   video: name.describe("One of the note's videos: its id, or its title. Left out: the first"),
   seconds: z.number().min(0).describe('A time in the video, in seconds'),

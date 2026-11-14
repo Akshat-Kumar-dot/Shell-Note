@@ -12,7 +12,7 @@ import { commands, inDesktopApp, type AppPlace, type By, type HomePlace, type It
 import type { Library, LibraryStore } from '@shellnote/library'
 import { deletedItems, folderPath, hidden } from '@shellnote/library/tree'
 import { loadSettings, modelsNow, saveSettings, withModel } from './ai/settings.js'
-import { applyAppearance, type Appearance } from './theme.js'
+import { applyAccent, applyAppearance, type Accent, type Appearance } from './theme.js'
 
 type Kind = ItemRef['kind']
 type Here = Places & { app: AppPlace }
@@ -265,6 +265,10 @@ export function defineAppCommands(store: LibraryStore): void {
   commands.define('settings.theme', [], ({ look }) => {
     applyAppearance(look as Appearance)
     return look === 'system' ? 'the appearance follows Windows' : `the appearance is ${String(look)}`
+  })
+  commands.define('settings.accent', [], ({ accent }) => {
+    applyAccent(accent as Accent)
+    return `the app's colour is ${String(accent)}`
   })
   commands.define('settings.keepStorage', [], async () => {
     const keeper = inDesktopApp() ? 'WebView2' : 'The browser'

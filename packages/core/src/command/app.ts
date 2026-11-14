@@ -648,6 +648,13 @@ export const APP_COMMANDS: readonly CommandSpec[] = [
     example: { look: 'dark' },
   },
   {
+    name: 'settings.accent',
+    does: "Change the app's own colour, on its buttons and what is chosen: graphite (no colour), blue, teal, green, amber, rose or red",
+    says: ['{accent} accent', 'use the {accent} accent', 'set the accent colour to {accent}', "change the app's accent"],
+    input: inputs(['accent']),
+    example: { accent: 'blue' },
+  },
+  {
     name: 'settings.keepStorage',
     does: 'Ask the browser or WebView2 to keep the notes, not clear them when space runs low',
     says: ['keep my notes safe', 'ask to keep storage', 'make storage persistent', 'stop the browser clearing my notes'],

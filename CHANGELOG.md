@@ -38,6 +38,9 @@ All notable changes to ShellNote are listed here. The format follows
 ### Changed
 
 - ShellNote is now licensed under the Apache License 2.0 alone, in place of a choice of MIT or Apache-2.0.
+- The app's surfaces are plain greys in light and in dark, and its buttons black or white, in place of the violet it
+  had. Settings, Appearance offers a colour for the buttons and for what is chosen: graphite, which is none, or blue,
+  teal, green, amber, rose or red. The choice is kept on the device, and has its command, `settings.accent`.
 
 ### Security
 

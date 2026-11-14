@@ -9,7 +9,7 @@ import { defineAppCommands } from './commands.js'
 import { FRAMED, inAFrame } from './framed.js'
 import { keepChoices } from './library/choices.js'
 import { TerminalHost } from './TerminalHost.js'
-import { applyAppearance, savedAppearance } from './theme.js'
+import { applyAccent, applyAppearance, savedAccent, savedAppearance } from './theme.js'
 import { WindowControls } from './WindowControls.js'
 
 // The app's commands have their code before anything is on screen (app control).
@@ -20,8 +20,9 @@ keepChoices()
 // The app's own title bar's room kept in every top bar from the first paint, so the app bar measures itself with it.
 if (inWindowsApp()) document.documentElement.dataset.ownTitlebar = ''
 
-// Light or dark before the first paint, so the app does not flash the other look.
+// Light or dark, and the person's colour, before the first paint, so the app does not flash the other look.
 applyAppearance(savedAppearance(), false)
+applyAccent(savedAccent(), false)
 
 const root = document.getElementById('root')!
 // Inside another page's frame nothing of the app is drawn (framed.ts): there is nothing there to click.

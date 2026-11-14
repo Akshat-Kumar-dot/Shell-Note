@@ -5,41 +5,53 @@
  */
 
 /*
- * The app's own surfaces, as tokens, in light and dark: one accent colour, soft
- * shadows, rounded corners. Dark applies when the system asks for it, unless
- * the person chose Light, or when they chose Dark. The paper is not one of
- * these: it always stays white, as it prints.
+ * The app's own surfaces, as tokens, in light and dark: greys with no tint,
+ * one accent colour, soft shadows, rounded corners. Dark applies when the
+ * system asks for it, unless the person chose Light, or when they chose Dark.
+ * The paper is not one of these: it always stays white, as it prints.
+ *
+ * The accent is the person's choice (Settings, Appearance): graphite, which is
+ * no colour at all, or one of six colours. Each has a shade for light surfaces
+ * and one for dark, with the colour written on it; every other accent token is
+ * mixed from the shade in use, so a colour is four values and nothing else.
  */
 :root {
   --ui-font: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
-  --ui-bg: #f5f6f8;
+  --ui-bg: #f5f5f4;
   --ui-surface: #ffffff;
-  --ui-surface-2: #f1f3f6;
-  --ui-hover: #eef0f4;
-  --ui-border: #e4e7ec;
-  --ui-border-strong: #cfd4dc;
-  --ui-text: #1c1d21;
-  --ui-text-2: #555b65;
-  --ui-text-3: #7d838d;
-  --ui-accent: #5b5bd6;
-  --ui-accent-hover: #4b4bc4;
-  --ui-accent-soft: #ececfc;
-  --ui-accent-text: #4141b8;
-  --ui-on-accent: #ffffff;
-  --ui-folder: #eef0fd;
-  --ui-desk: #e9ebef;
+  --ui-surface-2: #f1f1ef;
+  --ui-hover: #ededeb;
+  --ui-border: #e5e5e2;
+  --ui-border-strong: #d0d0cc;
+  --ui-text: #1b1b1c;
+  --ui-text-2: #57575b;
+  --ui-text-3: #7d7d82;
+  --ui-hue-light: #1b1b1c;
+  --ui-on-hue-light: #ffffff;
+  --ui-hue-dark: #ececee;
+  --ui-on-hue-dark: #151516;
+  --ui-hue: var(--ui-hue-light);
+  --ui-on-hue: var(--ui-on-hue-light);
+  --ui-accent: var(--ui-hue);
+  --ui-accent-hover: color-mix(in srgb, var(--ui-hue) 86%, var(--ui-on-hue));
+  --ui-accent-soft: color-mix(in srgb, var(--ui-hue) 11%, var(--ui-surface));
+  --ui-accent-text: color-mix(in srgb, var(--ui-hue) 62%, var(--ui-text));
+  --ui-on-accent: var(--ui-on-hue);
+  --ui-folder: color-mix(in srgb, var(--ui-hue) 7%, var(--ui-surface));
+  --ui-desk: #e9e9e6;
   --ui-danger: #d23b3b;
   --ui-ok: #2e8540;
   --ui-warn: #e3a008;
   --ui-warn-bg: #fff5dc;
   --ui-warn-text: #7a4e00;
-  --ui-info-bg: #eef0fd;
-  --ui-info-text: #2f3a8f;
+  --ui-info-bg: var(--ui-accent-soft);
+  --ui-info-text: var(--ui-accent-text);
   --ui-error-bg: #fde8e8;
   --ui-error-text: #8f1d1d;
-  --ui-toast: #24262c;
-  --ui-toast-text: #f4f5f7;
-  --ui-toast-action: #b9bbff;
+  --ui-toast: #242426;
+  --ui-toast-text: #f4f4f5;
+  /* The toast is the other way round, dark on a light app, so its button takes the other shade. */
+  --ui-toast-action: var(--ui-hue-dark);
   --ui-shadow-1: 0 1px 2px rgb(16 24 40 / 0.05), 0 1px 3px rgb(16 24 40 / 0.06);
   --ui-shadow-2: 0 6px 16px rgb(16 24 40 / 0.1), 0 2px 4px rgb(16 24 40 / 0.06);
   --ui-shadow-3: 0 16px 40px rgb(16 24 40 / 0.16), 0 4px 10px rgb(16 24 40 / 0.08);
@@ -47,34 +59,28 @@
   color-scheme: light;
 }
 :root[data-theme='dark'] {
-  --ui-bg: #16171a;
-  --ui-surface: #1f2024;
-  --ui-surface-2: #26272c;
-  --ui-hover: #2d2e34;
-  --ui-border: #313238;
-  --ui-border-strong: #464851;
-  --ui-text: #ececf0;
-  --ui-text-2: #b4b7bf;
-  --ui-text-3: #8d919b;
-  --ui-accent: #8b8ef0;
-  --ui-accent-hover: #9fa2f5;
-  --ui-accent-soft: #2a2b4a;
-  --ui-accent-text: #bcbeff;
-  --ui-on-accent: #15162b;
-  --ui-folder: #26274a;
-  --ui-desk: #111214;
+  --ui-bg: #151516;
+  --ui-surface: #1d1d1f;
+  --ui-surface-2: #252527;
+  --ui-hover: #2b2b2e;
+  --ui-border: #303033;
+  --ui-border-strong: #47474b;
+  --ui-text: #ececee;
+  --ui-text-2: #b3b3b8;
+  --ui-text-3: #8c8c93;
+  --ui-hue: var(--ui-hue-dark);
+  --ui-on-hue: var(--ui-on-hue-dark);
+  --ui-desk: #0f0f10;
   --ui-danger: #f06464;
   --ui-ok: #5cc27a;
   --ui-warn: #f0b429;
   --ui-warn-bg: #3a2f12;
   --ui-warn-text: #f5d38a;
-  --ui-info-bg: #24264a;
-  --ui-info-text: #c6c8ff;
   --ui-error-bg: #3d1d1d;
   --ui-error-text: #ffb8b8;
-  --ui-toast: #ececf0;
-  --ui-toast-text: #16171a;
-  --ui-toast-action: #4141b8;
+  --ui-toast: #ececee;
+  --ui-toast-text: #151516;
+  --ui-toast-action: var(--ui-hue-light);
   --ui-shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
   --ui-shadow-2: 0 6px 16px rgb(0 0 0 / 0.45);
   --ui-shadow-3: 0 16px 40px rgb(0 0 0 / 0.55);
@@ -83,40 +89,81 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --ui-bg: #16171a;
-    --ui-surface: #1f2024;
-    --ui-surface-2: #26272c;
-    --ui-hover: #2d2e34;
-    --ui-border: #313238;
-    --ui-border-strong: #464851;
-    --ui-text: #ececf0;
-    --ui-text-2: #b4b7bf;
-    --ui-text-3: #8d919b;
-    --ui-accent: #8b8ef0;
-    --ui-accent-hover: #9fa2f5;
-    --ui-accent-soft: #2a2b4a;
-    --ui-accent-text: #bcbeff;
-    --ui-on-accent: #15162b;
-    --ui-folder: #26274a;
-    --ui-desk: #111214;
+    --ui-bg: #151516;
+    --ui-surface: #1d1d1f;
+    --ui-surface-2: #252527;
+    --ui-hover: #2b2b2e;
+    --ui-border: #303033;
+    --ui-border-strong: #47474b;
+    --ui-text: #ececee;
+    --ui-text-2: #b3b3b8;
+    --ui-text-3: #8c8c93;
+    --ui-hue: var(--ui-hue-dark);
+    --ui-on-hue: var(--ui-on-hue-dark);
+    --ui-desk: #0f0f10;
     --ui-danger: #f06464;
     --ui-ok: #5cc27a;
     --ui-warn: #f0b429;
     --ui-warn-bg: #3a2f12;
     --ui-warn-text: #f5d38a;
-    --ui-info-bg: #24264a;
-    --ui-info-text: #c6c8ff;
     --ui-error-bg: #3d1d1d;
     --ui-error-text: #ffb8b8;
-    --ui-toast: #ececf0;
-    --ui-toast-text: #16171a;
-    --ui-toast-action: #4141b8;
+    --ui-toast: #ececee;
+    --ui-toast-text: #151516;
+    --ui-toast-action: var(--ui-hue-light);
     --ui-shadow-1: 0 1px 2px rgb(0 0 0 / 0.4);
     --ui-shadow-2: 0 6px 16px rgb(0 0 0 / 0.45);
     --ui-shadow-3: 0 16px 40px rgb(0 0 0 / 0.55);
     --ui-shadow-card: 0 1px 2px rgb(0 0 0 / 0.5), 0 4px 14px rgb(0 0 0 / 0.35);
     color-scheme: dark;
   }
+}
+/*
+ * The colours a person may choose in place of graphite: the shade on a light surface with what is written on it, and
+ * the same for a dark one. On the page itself a colour changes the whole app; on anything else, such as a swatch in
+ * Settings, it only names the shades.
+ */
+[data-accent='graphite'] {
+  --ui-hue-light: #1b1b1c;
+  --ui-on-hue-light: #ffffff;
+  --ui-hue-dark: #ececee;
+  --ui-on-hue-dark: #151516;
+}
+[data-accent='blue'] {
+  --ui-hue-light: #2563eb;
+  --ui-on-hue-light: #ffffff;
+  --ui-hue-dark: #74a7ff;
+  --ui-on-hue-dark: #06142e;
+}
+[data-accent='teal'] {
+  --ui-hue-light: #0d857b;
+  --ui-on-hue-light: #ffffff;
+  --ui-hue-dark: #4fd1c5;
+  --ui-on-hue-dark: #032522;
+}
+[data-accent='green'] {
+  --ui-hue-light: #2c8039;
+  --ui-on-hue-light: #ffffff;
+  --ui-hue-dark: #6fd58c;
+  --ui-on-hue-dark: #06250f;
+}
+[data-accent='amber'] {
+  --ui-hue-light: #dc9c07;
+  --ui-on-hue-light: #231a00;
+  --ui-hue-dark: #f5c542;
+  --ui-on-hue-dark: #231a00;
+}
+[data-accent='rose'] {
+  --ui-hue-light: #d43f79;
+  --ui-on-hue-light: #ffffff;
+  --ui-hue-dark: #f58fb4;
+  --ui-on-hue-dark: #33081a;
+}
+[data-accent='red'] {
+  --ui-hue-light: #cf3a3a;
+  --ui-on-hue-light: #ffffff;
+  --ui-hue-dark: #f58585;
+  --ui-on-hue-dark: #330808;
 }
 
 .nw-desk {

@@ -270,6 +270,11 @@ test('the bars, Settings, the AI box and the recorder answer the terminal as the
   // Chosen while Settings is open, it shows there too.
   await run('settings.theme look=system', '✓ the appearance follows Windows')
   await expect(settings.getByRole('radio', { name: 'System' })).toHaveAttribute('aria-checked', 'true')
+  await run('settings.accent accent=teal', "✓ the app's colour is teal")
+  await expect(page.locator('html')).toHaveAttribute('data-accent', 'teal')
+  await expect(settings.getByRole('radio', { name: 'Teal' })).toHaveAttribute('aria-checked', 'true')
+  await run('settings.accent accent=graphite', "✓ the app's colour is graphite")
+  await expect(page.locator('html')).not.toHaveAttribute('data-accent')
   await run('settings.keepStorage', /✓ (The browser|WebView2) has agreed not to clear the notes by itself/u)
   await settings.getByRole('button', { name: 'Close' }).first().click()
   await run('ai.open mode=ask', '✓ AI box open, to ask')

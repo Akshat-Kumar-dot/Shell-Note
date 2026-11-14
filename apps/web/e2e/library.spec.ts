@@ -357,7 +357,11 @@ test('the settings show the storage used and change between light and dark, the 
   await expect(dialog.getByTestId('storage-used')).toContainText('Your notes and pictures use')
   await dialog.getByRole('radio', { name: 'Dark' }).click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(22, 23, 26)')
+  await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(21, 21, 22)')
+  // The app's own colour: graphite until another is chosen.
+  await expect(dialog.getByRole('radio', { name: 'Graphite' })).toHaveAttribute('aria-checked', 'true')
+  await dialog.getByRole('radio', { name: 'Blue' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-accent', 'blue')
   await page.keyboard.press('Escape')
   await expect(dialog).toHaveCount(0)
   await page.locator('.home-actions').getByRole('button', { name: 'New note', exact: true }).click()
@@ -365,6 +369,7 @@ test('the settings show the storage used and change between light and dark, the 
   // Remembered in this browser.
   await page.reload()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await expect(page.locator('html')).toHaveAttribute('data-accent', 'blue')
 })
 
 test('asking the browser to keep the notes always shows its answer, a silent no included (found in Edge)', async ({ page }) => {

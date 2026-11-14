@@ -231,6 +231,7 @@ export const VERBS: Readonly<Record<string, readonly string[]>> = {
 
   'settings.open': [...SHOW, 'go to', 'access', 'launch', 'enter', 'edit'],
   'settings.theme': [...PICK, 'turn', 'toggle', 'apply', 'go', 'make it', 'switch the theme', 'change the theme', 'dark', 'light'],
+  'settings.accent': ['accent', 'accent colour', 'accent color', 'tint', 'recolour', 'recolor'],
   'settings.keepStorage': ['keep', 'protect', 'persist', 'save permanently', 'preserve', 'stop clearing', 'never clear', 'guard', 'secure', 'keep safe', 'hold on to', 'stop deleting', 'make permanent'],
   'settings.pen': [...PICK, 'turn', 'adjust', 'configure', 'toggle', 'enable', 'disable', 'turn on', 'turn off', 'allow', 'stop'],
   'settings.penReset': ['reset', 'restore defaults', 'use my defaults', 'use my own settings', 'clear the note settings', 'go back to my settings', 'revert', 'undo the note settings', 'default', 'back to default'],

@@ -1,5 +1,5 @@
 // The settings, from the home page or a note: light, dark or the system's look
-// (the paper always stays white), the AI (ai/AiSettings.tsx), how much this
+// and the app's own colour (the paper always stays white), the AI (ai/AiSettings.tsx), how much this
 // browser's storage the library uses, whether the browser has agreed not to
 // clear it, and the plain truth that a saved .shellnote file is the copy
 // that lasts. In the app on Windows, also where the notes are kept: in the
@@ -9,7 +9,7 @@ import { HardDrive, Monitor, Moon, ShieldCheck, Sun, TriangleAlert } from 'lucid
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { AiSettingsPart } from '../ai/AiSettings.js'
 import { lastKeepAnswer } from '../commands.js'
-import { appearanceNow, onAppearance, type Appearance } from '../theme.js'
+import { ACCENTS, accentNow, appearanceNow, onAppearance, type Accent, type Appearance } from '../theme.js'
 import { library } from './chosen.js'
 import { Dialog } from './Dialog.js'
 import { LibraryPlace } from './LibraryPlace.js'
@@ -19,6 +19,7 @@ const LOOKS: [Appearance, string, typeof Sun][] = [
   ['light', 'Light', Sun],
   ['dark', 'Dark', Moon],
 ]
+const ACCENT_NAMES: Record<Accent, string> = { graphite: 'Graphite', blue: 'Blue', teal: 'Teal', green: 'Green', amber: 'Amber', rose: 'Rose', red: 'Red' }
 
 /** A size in bytes, in words. */
 function size(bytes: number): string {
@@ -38,6 +39,7 @@ type Asking = 'not asked' | 'asking' | 'refused'
 /** `beforeChange`: what must be kept before the library moves elsewhere, such as the note that is open. */
 export function Settings({ onClose, beforeChange }: { onClose: () => void; beforeChange?: () => Promise<void> }) {
   const look = useSyncExternalStore(onAppearance, appearanceNow)
+  const accent = useSyncExternalStore(onAppearance, accentNow)
   const [usage, setUsage] = useState<{ used: number; quota: number }>()
   const [safe, setSafe] = useState<boolean>()
   const [asking, setAsking] = useState<Asking>('not asked')
@@ -81,6 +83,14 @@ export function Settings({ onClose, beforeChange }: { onClose: () => void; befor
               {label}
             </button>
           ))}
+        </div>
+        <div className="accents" role="radiogroup" aria-label="Colour">
+          {ACCENTS.map((name) => (
+            <button key={name} type="button" role="radio" className="accent-choice" aria-checked={accent === name} aria-label={ACCENT_NAMES[name]} title={ACCENT_NAMES[name]} data-accent={name} data-command="settings.accent" onClick={() => commands.tap('settings.accent', { accent: name })}>
+              <span aria-hidden />
+            </button>
+          ))}
+          <span className="accent-name">{ACCENT_NAMES[accent]}</span>
         </div>
         <p className="settings-hint">The paper always stays white, as it prints.</p>
       </section>
