@@ -85,7 +85,7 @@ export const AREAS: Readonly<Record<string, Area>> = {
     words: ['layout', 'arrangement', 'positions', 'workspace', 'window layout'],
   },
   video: {
-    hint: 'a video beside the note, in its own panel: add, show or hide it, play, pause, go to a time, mark a hard part, dock or float its panel, its times, remove it',
+    hint: 'a video beside the note, inside the Beside panel or in its own: add, show or hide it, play, pause, go to a time, mark a hard part, dock or float its panel or put it back inside, its times, remove it',
     words: ['video', 'videos', 'clip', 'movie', 'youtube', 'film', 'lecture', 'recording', 'player', 'footage', 'playback', 'stream', 'tutorial'],
   },
   transcript: {
@@ -268,6 +268,7 @@ export const VERBS: Readonly<Record<string, readonly string[]>> = {
   'video.mark': ['mark', 'flag', 'bookmark', 'tag', 'mark a hard part', 'mark the start', 'mark the end', 'hard part', 'difficult part', 'note the time', 'pin this moment'],
   'video.place': ['dock', 'place', 'put', 'move', 'position', 'beside', 'above', 'below', 'attach', 'snap', 'arrange', 'move the panel'],
   'video.float': ['float', 'undock', 'detach', 'pop out', 'picture in picture', 'overlay', 'hover', 'make it float', 'mini player'],
+  'video.inside': ['tuck in', 'tuck back', 'inside', 'back inside', 'keep inside'],
   'video.times': ['show times', 'hide times', 'timestamps', 'times', 'show when', 'time stamps', 'toggle times', 'show the times', 'when written'],
   'video.remove': REMOVE,
 

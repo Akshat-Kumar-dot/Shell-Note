@@ -4,6 +4,7 @@
 // the box it sends as it moves, its hiding while something of ours is over it, the program closing, dragged off and
 // put back, and let go when the panel closes.
 import { expect, inApp, test, type Page } from './fixtures.js'
+import { chooseTool, noteMenu, openBeside, openPart } from './shell.js'
 
 test.use({ viewport: { width: 1280, height: 900 } })
 
@@ -122,8 +123,18 @@ const bodyArea = (page: Page) =>
     return { x: Math.round(box.left * scale), y: Math.round(box.top * scale), width: Math.round(box.width * scale), height: Math.round(box.height * scale) }
   })
 
+/** Beside, on its program part, with the windows to choose from: the person's own clicks, no command. */
+async function openProgram(page: Page): Promise<void> {
+  const rail = page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Beside the note', exact: true })
+  if ((await rail.getAttribute('aria-pressed')) !== 'true') await rail.click()
+  await page.getByRole('radio', { name: 'Program panel: a program beside the note' }).click()
+  const choose = page.getByRole('button', { name: 'Program panel: choose a program' })
+  if (await choose.isVisible()) await choose.click()
+  await expect(page.locator('.nw-program')).toBeVisible()
+}
+
 async function hold(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Program panel' }).click()
+  await openProgram(page)
   await page.getByRole('button', { name: /^Lecture 4\.pptx/u }).click()
   await expect(page.locator('.nw-program-body')).toHaveAttribute('data-state', 'held')
 }
@@ -146,80 +157,65 @@ const programs = (page: Page) => page.evaluate(() => window.__shellnote!.doc.pro
 
 async function withPen(page: Page): Promise<void> {
   await withStandIn(page)
-  await page.getByRole('radio', { name: 'Pen', exact: true }).click()
+  await chooseTool(page, 'pen')
   await page.keyboard.press('Escape')
 }
 
-/** The app bar's buttons drawn over each other, in pairs. */
+/**
+ * The frame's buttons drawn over each other, in pairs, row by row: the rail's, the tab row's and the tool bar's. Off the
+ * screen too, but for the tool bar's, which scrolls sideways when the window is narrower than its tools.
+ */
 const overlaps = (page: Page): Promise<string[]> =>
   page.evaluate(() => {
-    const boxes = [...document.querySelectorAll('.appbar button, .appbar .title')].map((button) => ({ name: button.getAttribute('aria-label') ?? '', box: button.getBoundingClientRect() })).filter(({ box }) => box.width > 0)
     const found: string[] = []
-    boxes.forEach((a, i) => {
-      if (a.box.left < -0.5 || a.box.right > innerWidth + 0.5) found.push(`${a.name} off the screen`)
-      for (const b of boxes.slice(i + 1)) if (a.box.left < b.box.right - 0.5 && a.box.right > b.box.left + 0.5 && a.box.top < b.box.bottom && a.box.bottom > b.box.top) found.push(`${a.name} over ${b.name}`)
-    })
+    for (const [selector, scrolls] of [['.rail button', false], ['.sh-tabs button, .sh-tabs input', false], ['.nw-bar[data-bar="tools"] button', true]] as const) {
+      const boxes = [...document.querySelectorAll<HTMLElement>(selector)].map((element) => ({ name: element.getAttribute('aria-label') ?? element.textContent ?? '', box: element.getBoundingClientRect() })).filter(({ box }) => box.width > 0)
+      boxes.forEach((a, i) => {
+        if (!scrolls && (a.box.left < -0.5 || a.box.right > innerWidth + 0.5)) found.push(`${a.name} off the screen`)
+        for (const b of boxes.slice(i + 1)) if (a.box.left < b.box.right - 0.5 && a.box.right > b.box.left + 0.5 && a.box.top < b.box.bottom - 0.5 && a.box.bottom > b.box.top + 0.5) found.push(`${a.name} over ${b.name}`)
+      })
+    }
     return found
   })
 
-// At 1,536 pixels wide the Video button was once drawn on the tools' Paper button.
-// Every icon stays inside one row: the bar tightens step by step as the window narrows
-// (Workspace.tsx, useOneRow), so from ONE_ROW pixels up every icon is in one row, and two rows only below.
-// Measured 26 October 2026: one row down to 1,048 px in Edge with the Program panel's button; the app's own minimise,
-// maximise and close take 138 px more.
-const ONE_ROW = inApp ? 1240 : 1100
-test('the app bar’s buttons never overlap, and every icon is in one row from 1,100 px (1,240 in the app), with the Program panel’s button or without it', async ({ page }) => {
-  const widths = [...Array.from({ length: 33 }, (_, i) => 760 + i * 36), 1536, 1920]
+// The old bar's buttons once lay over one another at some widths. Now: the rail, the tab row and the tool bar never
+// overlap, and the tool bar stays one row at every width, an iPad's upright and on its side included, scrolling sideways
+// when it must; with the program's part in Beside or without it.
+test('the frame’s buttons never overlap, and the tool bar is one row at every width, with the program’s part or without it', async ({ page }) => {
+  const widths = [...Array.from({ length: 33 }, (_, i) => 780 + i * 36), 810, 820, 834, 1024, 1180, 1194, 1366, 1536, 1920]
   const sweep = async (): Promise<string[]> => {
     const found: string[] = []
-    const seen: string[] = []
     for (const width of widths) {
       await page.setViewportSize({ width, height: 900 })
-      // The bar settles a moment after the window changes (it measures itself).
-      await page.waitForTimeout(150)
+      await page.waitForTimeout(100)
       for (const pair of await overlaps(page)) found.push(`${width}: ${pair}`)
-      const bar = await page.locator('.appbar').evaluate((element) => ({ rows: element.hasAttribute('data-rows') ? 2 : 1, step: element.getAttribute('data-tight') ?? '0', height: Math.round(element.getBoundingClientRect().height) }))
-      seen.push(`${width}:${bar.rows === 1 ? `step ${bar.step}` : 'two rows'}/${bar.height}`)
-      if (width >= ONE_ROW && (bar.rows !== 1 || bar.height > 68)) found.push(`${width}: not one row (${bar.rows} rows, ${bar.height} px)`)
+      const high = await page.locator('.nw-bar[data-bar="tools"]').evaluate((element) => Math.round(element.getBoundingClientRect().height))
+      if (high > 44) found.push(`${width}: the tool bar is ${high} high, more than one row`)
     }
-    console.log(seen.join('  '))
     return found
   }
   await page.goto('/#/new')
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
   expect(await sweep()).toEqual([])
-  await withStandIn(page)
-  await expect(page.getByRole('button', { name: 'Program panel' })).toBeVisible()
-  expect(await sweep()).toEqual([])
-})
-
-// Found 6 November 2026 at a phone's 360 pixels: Back lay under Video, the title under both, and at 320 Video was off the
-// screen. The sweep above begins at 760. The app's window is at least 480 across.
-test('on a phone or in a small window, every button of the app bar can be reached and none lies over another', async ({ page }) => {
-  await page.goto('/#/new')
-  await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
-  const found: string[] = []
-  for (const width of [320, 340, 360, 375, 384, 390, 412, 430, 460, 480, 520, 600, 680, 740].filter((one) => !inApp || one >= 480)) {
-    await page.setViewportSize({ width, height: 800 })
-    await page.waitForTimeout(150)
-    for (const pair of await overlaps(page)) found.push(`${width}: ${pair}`)
+  if (inApp) {
+    await withStandIn(page)
+    await openProgram(page)
+    expect(await sweep()).toEqual([])
   }
-  expect(found).toEqual([])
 })
 
-// On an iPad every icon stays in one row too, as at a laptop's width. Upright as much as
-// on its side: from the smallest usual iPad's width up. The app has no iPad.
-test('on an iPad, upright or on its side, every icon of the app bar is in one row', async ({ page }) => {
-  test.skip(inApp, 'the app’s bar also holds its own window buttons')
+// Found 6 November 2026 at a phone's 360 pixels: buttons lay under one another, and at 320 one was off the screen. Below
+// 780 pixels the rail lies along the bottom; the app's window is at least 480 across.
+test('on a phone or in a small window, every button can be reached and none lies over another', async ({ page }) => {
   await page.goto('/#/new')
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
   const found: string[] = []
-  for (const width of [768, 810, 820, 834, 1024, 1080, 1180, 1194, 1366]) {
-    await page.setViewportSize({ width, height: 900 })
-    await page.waitForTimeout(150)
+  for (const width of [320, 340, 360, 375, 384, 390, 412, 430, 460, 480, 520, 600, 680, 740, 779].filter((one) => !inApp || one >= 480)) {
+    await page.setViewportSize({ width, height: 800 })
+    await page.waitForTimeout(100)
     for (const pair of await overlaps(page)) found.push(`${width}: ${pair}`)
-    const bar = await page.locator('.appbar').evaluate((element: HTMLElement) => ({ rows: element.dataset.rows, height: element.offsetHeight }))
-    if (bar.rows !== undefined || bar.height > 68) found.push(`${width}: not one row (${bar.rows ?? 1} rows, ${bar.height} high)`)
+    const rail = (await page.locator('.rail').boundingBox())!
+    if (Math.round(rail.y + rail.height) !== 800) found.push(`${width}: the rail is not along the bottom`)
   }
   expect(found).toEqual([])
 })
@@ -228,13 +224,13 @@ test('the browser shows no program panel: it is the app’s, on Windows', async 
   test.skip(inApp, 'the app is where the panel is')
   await page.goto('/#/new')
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Video', exact: true })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Program panel' })).toHaveCount(0)
+  await expect((await openBeside(page)).getByRole('radio')).toHaveText(['Video', 'Web page'])
+  await expect(page.getByRole('radio', { name: /^Program panel/u })).toHaveCount(0)
 })
 
 test('each window in the list shows its program’s icon, or a plain window mark', async ({ page }) => {
   await withStandIn(page)
-  await page.getByRole('button', { name: 'Program panel' }).click()
+  await openProgram(page)
   const powerpoint = page.getByRole('button', { name: /^Lecture 4\.pptx/u })
   await expect(powerpoint.locator('img.nw-program-icon')).toBeVisible()
   // Drawn from the pixels given: red at its middle.
@@ -252,7 +248,7 @@ test('each window in the list shows its program’s icon, or a plain window mark
 
 test('the list keeps itself up to date: a program opened after the panel shows up, with no reload', async ({ page }) => {
   await withStandIn(page)
-  await page.getByRole('button', { name: 'Program panel' }).click()
+  await openProgram(page)
   await expect(page.getByRole('button', { name: /^Lecture 4\.pptx/u })).toBeVisible()
   // A program opened now, while the panel shows its list.
   await page.evaluate(() => window.__programWindows!.push({ id: 14, title: 'notes.pdf - Microsoft Edge', program: 'msedge.exe', left_out: null }))
@@ -273,15 +269,15 @@ test('started as administrator, the panel offers no window and says why (the res
     const refused = (): Promise<never> => Promise.reject(why)
     window.__shellnote!.programHost.set({ list: refused, hold: refused, place: refused, letGo: refused, cover: refused, onTold: () => () => undefined })
   }, why)
-  await page.getByRole('button', { name: 'Program panel' }).click()
+  await openProgram(page)
   await expect(page.getByRole('alert').filter({ hasText: 'started as administrator' })).toHaveText(why)
   await expect(page.getByRole('list', { name: 'Open windows' }).getByRole('button')).toHaveCount(0)
 })
 
 test('lists the windows, holds the one chosen on the panel’s box, and follows the panel', async ({ page }) => {
   await withStandIn(page)
-  await page.getByRole('button', { name: 'Program panel' }).click()
-  // Right of the notes, as the default layout has it.
+  await openProgram(page)
+  // Inside Beside, right of the notes, as the design has it.
   const notes = await page.locator('.nw-notes-panel').boundingBox()
   const panel = await page.locator('.nw-program').boundingBox()
   expect(panel!.x).toBeGreaterThanOrEqual(notes!.x + notes!.width - 1)
@@ -341,7 +337,7 @@ test('covered, the program’s last picture stands where its window was (stage 3
 
 test('elsewhere: a program’s live picture, view only, its window not moved; Bring it here puts it on the panel', async ({ page }) => {
   await withStandIn(page)
-  await page.getByRole('button', { name: 'Program panel' }).click()
+  await openProgram(page)
   await page.getByRole('button', { name: 'Show the picture of Lecture 4.pptx - PowerPoint' }).click()
   await expect.poll(() => last(page, 'picture')).toEqual({ name: 'picture', id: 11, seen: true })
   await expect(page.locator('.nw-program-picture')).toBeVisible()
@@ -361,7 +357,7 @@ test('elsewhere: a program’s live picture, view only, its window not moved; Br
 
 test('nothing pictured while ShellNote cannot be seen (the research’s rule, 3.9)', async ({ page }) => {
   await withStandIn(page)
-  await page.getByRole('button', { name: 'Program panel' }).click()
+  await openProgram(page)
   await page.getByRole('button', { name: 'Show the picture of Lecture 4.pptx - PowerPoint' }).click()
   await expect.poll(() => last(page, 'picture')).toEqual({ name: 'picture', id: 11, seen: true })
   const turn = (state: 'hidden' | 'visible') =>
@@ -393,7 +389,7 @@ test('hidden while something of ours is over it, and back when it goes', async (
   await expect(page.locator('.nw-program-standin')).toHaveCount(0)
 
   // Another panel in full view hides it too.
-  await page.getByRole('button', { name: 'Full view: the notes alone' }).click()
+  await noteMenu(page, 'Full view: the notes alone')
   await expect.poll(() => last(page, 'cover')).toEqual({ name: 'cover', id: 11, covered: true })
   await page.keyboard.press('Escape')
   await expect.poll(() => last(page, 'cover')).toEqual({ name: 'cover', id: 11, covered: false })
@@ -479,7 +475,7 @@ test('a program that does not answer never holds a line: the line is kept withou
     window.__programSilent = true
     window.__programWindows!.push({ id: 14, title: 'waves.ts - project - Visual Studio Code', program: 'Code.exe', left_out: null })
   })
-  await page.getByRole('button', { name: 'Program panel' }).click()
+  await openProgram(page)
   await page.getByRole('button', { name: /^Show the picture of waves\.ts/u }).click()
   await expect(page.locator('.nw-program-picture')).toBeVisible()
   await writeLine(page)
@@ -553,7 +549,7 @@ test('each family’s mark says its place; a web page with its program closed op
     }) as typeof window.open
     window.__programWindows!.push({ id: 15, title: 'Waves - Google Chrome', program: 'chrome.exe', left_out: null })
   })
-  await page.getByRole('button', { name: 'Program panel' }).click()
+  await openProgram(page)
   await page.getByRole('button', { name: /^Waves - Google Chrome/u }).click()
   await expect(page.locator('.nw-program-body')).toHaveAttribute('data-state', 'held')
   const lineAt = async (place: unknown, down: number): Promise<void> => {
@@ -623,8 +619,7 @@ test('the words of each place are kept once, from the program or else its pictur
   expect(await last(page, 'readPicture')).toEqual({ name: 'readPicture', size: [40, 30, 40 * 30 * 4] })
 
   // Shown under the transcript; ↩ goes back by the person's tap.
-  await page.getByRole('button', { name: 'Side panel', exact: true }).click()
-  await page.getByRole('tab', { name: 'Transcript' }).click()
+  await openPart(page, 'Transcript')
   const shown = page.getByRole('region', { name: 'What the programs showed' })
   await expect(shown).toContainText('Waves carry energy')
   await expect(shown).toContainText('What the picture shows')
@@ -716,7 +711,7 @@ test('a small picture is kept with a line when the view changed, never while a p
 
 test('the panel shows its mark while lines keep a program’s place, and only then', async ({ page }) => {
   await withPen(page)
-  await page.getByRole('button', { name: 'Program panel' }).click()
+  await openProgram(page)
   await expect(page.locator('.nw-program-keeping')).toHaveCount(0)
   await page.getByRole('button', { name: /^Lecture 4\.pptx/u }).click()
   await expect(page.locator('.nw-program-keeping')).toBeVisible()

@@ -6,7 +6,7 @@
 // step 3b;../commands.ts), which reach this screen's own code, so the agent
 // does what they do.
 import { commands, inDesktopApp, tabWord, type By, type HomePlace, type LibraryAt, type NewNote } from '@shellnote/editor'
-import { ArrowUpDown, ChevronRight, FilePlus, FolderOpen, FolderPlus, Info, LibraryBig, NotebookPen, RotateCcw, Search, Settings as SettingsIcon, SquarePen, Trash2, FolderInput, PenLine, TriangleAlert, X } from 'lucide-react'
+import { ArrowUpDown, ChevronRight, FilePlus, FolderOpen, FolderPlus, Info, NotebookPen, RotateCcw, Search, SquarePen, Trash2, FolderInput, PenLine, TriangleAlert, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { Card, nameOf, type CardItem } from './Card.js'
 import { Dialog, Menu, type MenuItem } from './Dialog.js'
@@ -17,6 +17,7 @@ import type { FolderEntry, ItemRef, Library, LibraryStore, NoteEntry } from '@sh
 import type { Tabs } from './tabs.js'
 import { contents, counts, daysLeft, deletedItems, folderPath, inside, isOpenFolder, search, sorted, type SortKey, type SortOrder } from '@shellnote/library/tree'
 import { drawThumbnail } from './thumbnail.js'
+import { findWanted } from '../shell/state.js'
 
 export type Place = { folder: string | null } | 'bin'
 
@@ -100,7 +101,6 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
   const folder = place === 'bin' ? null : place.folder
   const [library, setLibrary] = useState<Library>()
   const [query, setQuery] = useState('')
-  const [aboutRecorder, setAboutRecorder] = useState(false)
   const [sort, setSort] = useState(savedSort)
   const [active, setActive] = useState(0)
   const [renaming, setRenaming] = useState<ItemRef | null>(null)
@@ -114,6 +114,17 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
   const urls = useRef(new Map<string, string>())
   const list = useRef<HTMLDivElement>(null)
+  // The rail's Search puts the caret in the search box, here or once this screen shows.
+  const searchBox = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    const take = (): void => {
+      if (!findWanted.value || !searchBox.current) return
+      findWanted.set(false)
+      searchBox.current.focus()
+    }
+    take()
+    return findWanted.subscribe(take)
+  }, [])
   // What the commands read: set with the state, so a command's next line sees it before the screen is drawn again.
   const now = useRef({ library, query, sort, elsewhere })
   now.current = { library, query, sort, elsewhere }
@@ -472,42 +483,10 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
 
   const path = library ? folderPath(library, folder) : []
   const missing = !bin && library !== undefined && !isOpenFolder(library, folder)
-  const binCount = library ? deletedItems(library).folders.length + deletedItems(library).notes.length : 0
   const libraryEmpty = library !== undefined && !bin && folder === null && !searching && items.length === 0
 
   return (
     <div className="home">
-      <aside className="home-side" aria-label="Library">
-        <div className="brand" data-tauri-drag-region="deep">
-          <img className="brand-mark" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={32} height={32} />
-          ShellNote
-        </div>
-        <nav className="side-nav">
-          <a href="#/" data-command="library.open" aria-current={!bin ? 'page' : undefined}>
-            <LibraryBig size={18} aria-hidden />
-            Notes
-          </a>
-          <a href="#/deleted" data-command="bin.open" aria-current={bin ? 'page' : undefined}>
-            <Trash2 size={18} aria-hidden />
-            Recently deleted
-            {binCount > 0 ? <span className="side-count">{binCount}</span> : null}
-          </a>
-          <div className="side-row">
-            <a href="?record=strokes" data-command="recorder.open">
-              <PenLine size={18} aria-hidden />
-              Stroke recorder
-            </a>
-            <button type="button" className="icon-button" aria-label="What is the stroke recorder?" aria-expanded={aboutRecorder} title="What is the stroke recorder?" onClick={() => setAboutRecorder(!aboutRecorder)}>
-              <Info size={16} aria-hidden />
-            </button>
-          </div>
-        </nav>
-        <button type="button" className="side-settings" data-command="settings.open" onClick={() => commands.tap('settings.open')}>
-          <SettingsIcon size={18} aria-hidden />
-          Settings
-        </button>
-      </aside>
-
       <main className="home-main">
         <header className="home-head" data-tauri-drag-region="deep">
           {bin ? (
@@ -537,6 +516,7 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
             <label className="search">
               <Search size={16} aria-hidden />
               <input
+                ref={searchBox}
                 type="search"
                 aria-label="Search notes by title"
                 placeholder="Search notes"
@@ -560,22 +540,6 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
           ) : null}
         </header>
 
-        {aboutRecorder ? (
-          <div className="recorder-about" role="note">
-            <button type="button" className="icon-button recorder-about-close" aria-label="Close" onClick={() => setAboutRecorder(false)}>
-              <X size={16} aria-hidden />
-            </button>
-            <p>
-              <strong>Teach the pen your hand.</strong> The recorder asks you to draw one thing at a time with your own pen: lines, circles, rectangles and other shapes, the brackets ( ) [ ] {'{ }'}, the comma and @, the letters that must stay letters (c, l, 3, a, e,
-              o), a few words and some scratch-outs. It keeps exactly what the pen sends: where it went, how hard you pressed, how it leant and when.
-            </p>
-            <p>
-              Then press <strong>Teach my pen</strong>. From then on the pen goes by your own strokes, not rules made for someone else: it neatens a symbol or snaps a held shape only when it is clearly yours, and leaves your letters alone.
-              Undo a correction straight after it, and the pen learns to leave strokes like that one alone. What it learned is kept with your notes; Pen settings shows it, and can forget it.
-            </p>
-            <p>About 30 to 40 minutes, in as many sittings as you like; teach it as you go. Nothing leaves this computer unless you download the file and send it.</p>
-          </div>
-        ) : null}
         {problem ? (
           <div className="notice" data-tone="warn" role="alert">
             <TriangleAlert size={16} aria-hidden />

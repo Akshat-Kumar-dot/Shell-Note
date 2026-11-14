@@ -1,0 +1,676 @@
+/*
+ * The look every part of the app shares: plain greys in four depths with no tint of their own, one size of button,
+ * one kind of menu, and the note's row of tools. A colour the person chooses (Settings, Appearance) colours what is
+ * chosen and tints the surfaces a little. A button is 32 pixels with a mouse, 40 where a finger or a pen presses.
+ */
+
+/* ----- colours ----- */
+:root {
+  --sh-n-0: #ffffff;
+  --sh-n-1: #fafaf9;
+  --sh-n-2: #f3f3f1;
+  --sh-n-3: #e9e9e6;
+  --sh-text: #1b1b1c;
+  --sh-text-2: #5d5d61;
+  --sh-text-3: #8f8f94;
+  --sh-line: rgb(0 0 0 / 0.09);
+  --sh-line-2: rgb(0 0 0 / 0.16);
+  --sh-hover: rgb(0 0 0 / 0.05);
+  --sh-press: rgb(0 0 0 / 0.09);
+  --sh-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.1);
+  --sh-shadow-big: 0 2px 6px rgb(0 0 0 / 0.08), 0 24px 60px rgb(0 0 0 / 0.22);
+  --sh-ok: #23823f;
+  --sh-tint: 0%;
+  /* A button's size: a mouse's here, a finger's or a pen's below. */
+  --sh-size: 32px;
+}
+:root[data-theme='dark'] {
+  --sh-n-0: #1d1d1f;
+  --sh-n-1: #171718;
+  --sh-n-2: #111112;
+  --sh-n-3: #0b0b0c;
+  --sh-text: #ececee;
+  --sh-text-2: #a3a3a9;
+  --sh-text-3: #6f6f76;
+  --sh-line: rgb(255 255 255 / 0.08);
+  --sh-line-2: rgb(255 255 255 / 0.16);
+  --sh-hover: rgb(255 255 255 / 0.06);
+  --sh-press: rgb(255 255 255 / 0.11);
+  --sh-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.5);
+  --sh-shadow-big: 0 2px 6px rgb(0 0 0 / 0.5), 0 24px 60px rgb(0 0 0 / 0.65);
+  --sh-ok: #5cc27a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --sh-n-0: #1d1d1f;
+    --sh-n-1: #171718;
+    --sh-n-2: #111112;
+    --sh-n-3: #0b0b0c;
+    --sh-text: #ececee;
+    --sh-text-2: #a3a3a9;
+    --sh-text-3: #6f6f76;
+    --sh-line: rgb(255 255 255 / 0.08);
+    --sh-line-2: rgb(255 255 255 / 0.16);
+    --sh-hover: rgb(255 255 255 / 0.06);
+    --sh-press: rgb(255 255 255 / 0.11);
+    --sh-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 8px 24px rgb(0 0 0 / 0.5);
+    --sh-shadow-big: 0 2px 6px rgb(0 0 0 / 0.5), 0 24px 60px rgb(0 0 0 / 0.65);
+    --sh-ok: #5cc27a;
+  }
+}
+/* A colour chosen: the surfaces take a little of it, less in dark. */
+:root[data-accent] {
+  --sh-tint: 5%;
+}
+:root[data-accent='amber'] {
+  --sh-tint: 6%;
+}
+:root[data-theme='dark'][data-accent] {
+  --sh-tint: 3.5%;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light'])[data-accent] {
+    --sh-tint: 3.5%;
+  }
+}
+:root {
+  --sh-surface: color-mix(in srgb, var(--ui-hue) var(--sh-tint), var(--sh-n-0));
+  --sh-panel: color-mix(in srgb, var(--ui-hue) var(--sh-tint), var(--sh-n-1));
+  --sh-desk: color-mix(in srgb, var(--ui-hue) var(--sh-tint), var(--sh-n-2));
+  --sh-deep: color-mix(in srgb, var(--ui-hue) var(--sh-tint), var(--sh-n-3));
+  --sh-chosen: var(--sh-press);
+  --sh-chosen-text: var(--sh-text);
+}
+:root[data-accent] {
+  --sh-chosen: color-mix(in srgb, var(--ui-hue) 13%, transparent);
+  --sh-chosen-text: color-mix(in srgb, var(--ui-hue) 70%, var(--sh-text));
+}
+/* A finger or a pen: every button a size it can hit. */
+@media (pointer: coarse) {
+  :root {
+    --sh-size: 40px;
+  }
+}
+
+/* ----- a button: an icon, or a word with its arrow ----- */
+.sh-b,
+.sh-tools .nw-ibtn:not(:is(.nw-popover, .nw-table-grid, .nw-font-library, .nw-dropdown, .sh-menu) *) {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-sizing: border-box;
+  width: auto;
+  height: var(--sh-size);
+  min-width: var(--sh-size);
+  padding: 0 7px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--sh-text-2);
+  font: 13px/1.45 var(--ui-font);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sh-b:hover:not(:disabled),
+.sh-tools .nw-ibtn:hover:not(:disabled):not(:is(.nw-popover, .nw-table-grid, .nw-font-library, .nw-dropdown, .sh-menu) *) {
+  background: var(--sh-hover);
+  color: var(--sh-text);
+}
+.sh-b[aria-pressed='true'],
+.sh-b[aria-checked='true'],
+.sh-b[aria-expanded='true'],
+.sh-tools .nw-ibtn[aria-pressed='true']:not(:is(.nw-popover, .nw-table-grid, .nw-font-library, .nw-dropdown, .sh-menu) *),
+.sh-tools .nw-ibtn[aria-expanded='true']:not(:is(.nw-popover, .nw-table-grid, .nw-font-library, .nw-dropdown, .sh-menu) *) {
+  background: var(--sh-chosen);
+  color: var(--sh-chosen-text);
+}
+.sh-b:disabled,
+.sh-tools .nw-ibtn:disabled:not(:is(.nw-popover, .nw-table-grid, .nw-font-library, .nw-dropdown, .sh-menu) *) {
+  opacity: 0.4;
+  cursor: default;
+}
+.sh-b.sh-word {
+  padding: 0 9px 0 10px;
+  color: var(--sh-text);
+  font-weight: 500;
+}
+.sh-b.sh-word svg:last-child {
+  margin-left: -2px;
+  color: var(--sh-text-3);
+}
+.sh-b.sh-primary {
+  padding: 0 12px;
+  background: var(--ui-hue);
+  color: var(--ui-on-hue);
+  font-weight: 600;
+}
+.sh-b.sh-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ui-hue) 88%, var(--ui-on-hue));
+  color: var(--ui-on-hue);
+}
+.sh-sep {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  margin: 0 5px;
+  background: var(--sh-line-2);
+}
+.sh-grow {
+  flex: 1;
+}
+
+/* ----- the note's row of tools ----- */
+.sh-tools {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  box-sizing: border-box;
+  min-height: 44px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--sh-line);
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  /* Narrower than its tools, the row scrolls sideways; its menus are placed against the window, so none is cut off. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sh-tools::-webkit-scrollbar {
+  display: none;
+}
+/* The row never wraps or squeezes its tools: narrower than they are, it scrolls sideways. */
+.sh-tools > *,
+.sh-tools .nw-group {
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+}
+.sh-tools .nw-sep {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  margin: 0 5px;
+  background: var(--sh-line-2);
+}
+
+/* A pen's colour, as a dot; the one in use ringed. */
+.sh-dot {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--sh-size);
+  height: var(--sh-size);
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  cursor: pointer;
+}
+.sh-dot:hover {
+  background: var(--sh-hover);
+}
+.sh-dot i {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sh-text) 32%, transparent);
+}
+.sh-dot[aria-checked='true'] i {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--sh-text) 32%, transparent),
+    0 0 0 3px var(--sh-surface),
+    0 0 0 4.5px var(--sh-text);
+}
+/* The width in use, as a dot of its size. */
+.sh-weight {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+}
+.sh-weight i {
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* ----- a menu ----- */
+.sh-anchor {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.sh-menu {
+  z-index: 60;
+  box-sizing: border-box;
+  min-width: 220px;
+  padding: 6px;
+  border: 1px solid var(--sh-line-2);
+  border-radius: 10px;
+  background: var(--sh-surface);
+  box-shadow: var(--sh-shadow);
+  color: var(--sh-text);
+  font: 13px/1.45 var(--ui-font);
+}
+.sh-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: var(--sh-size);
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--sh-text);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sh-item:hover:not(:disabled) {
+  background: var(--sh-hover);
+}
+.sh-item:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.sh-item svg {
+  flex: none;
+  color: var(--sh-text-2);
+}
+.sh-item kbd,
+.sh-item em {
+  margin-left: auto;
+  padding: 0 0 0 16px;
+  border: 0;
+  background: none;
+  color: var(--sh-text-3);
+  font: 11px/1 var(--ui-font);
+  font-style: normal;
+}
+.sh-item[aria-checked='true'] {
+  background: var(--sh-chosen);
+}
+.sh-menu-head {
+  padding: 8px 8px 4px;
+  color: var(--sh-text-3);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.sh-menu hr {
+  margin: 6px -6px;
+  border: 0;
+  border-top: 1px solid var(--sh-line);
+}
+/* A few choices side by side, one of them in use. */
+.sh-seg {
+  display: flex;
+  gap: 2px;
+  margin: 2px 2px 4px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--sh-hover);
+}
+.sh-seg button {
+  flex: 1;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--sh-text-2);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sh-seg button[aria-checked='true'] {
+  background: var(--sh-surface);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
+  color: var(--sh-text);
+}
+
+/* ----- the panel beside the notes: AI, or Beside ----- */
+.sh-panel {
+  background: var(--sh-panel);
+  color: var(--sh-text);
+  font: 13px/1.45 var(--ui-font);
+}
+/* Its bar, by which it is moved: the section's name, then full view and close. */
+.sh-panel > .nw-dock-bar {
+  box-sizing: border-box;
+  height: 40px;
+  padding: 0 8px 0 14px;
+  border-bottom: 1px solid var(--sh-line);
+  background: none;
+}
+.sh-panel > .nw-dock-bar > .nw-dock-title {
+  display: none;
+}
+.sh-panel-name {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--sh-text);
+}
+.sh-panel-name b {
+  font-weight: 600;
+}
+.sh-panel-tabs {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 8px 10px 0;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.sh-panel-tabs button {
+  height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--sh-text-2);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.sh-panel-tabs button:hover {
+  background: var(--sh-hover);
+  color: var(--sh-text);
+}
+.sh-panel-tabs button[aria-selected='true'] {
+  background: var(--sh-chosen);
+  color: var(--sh-chosen-text);
+}
+
+/* ----- the note's tool bar, where its person keeps it: under the tabs, down a side, along the bottom, or floating ----- */
+.sh-rows {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.nw-bar[data-bar='tools'] {
+  gap: 0;
+}
+.nw-bar[data-bar='tools'] .sh-tools {
+  border-bottom: 0;
+  background: none;
+}
+.nw-bar[data-bar='tools'] > .nw-bar-grip {
+  width: 20px;
+  height: auto;
+  align-self: stretch;
+  border-radius: 0;
+  color: var(--sh-text-3);
+}
+.nw-bar[data-bar='tools'] > .nw-bar-grip:hover {
+  background: var(--sh-hover);
+  color: var(--sh-text);
+}
+/* Under the tabs: the whole width, one row 44 pixels high with its line (two, 88), a multiple of 4, so the pages under
+   it start on a whole screen pixel. */
+.nw-bar[data-bar='tools'][data-at='top'] {
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  border-bottom: 1px solid var(--sh-line);
+  background: var(--sh-surface);
+}
+.nw-bar[data-bar='tools'][data-at='top'] .sh-tools {
+  min-height: 43px;
+}
+.nw-bar[data-bar='tools'][data-at='top'] .sh-tools + .sh-tools {
+  min-height: 44px;
+  border-top: 1px solid var(--sh-line);
+}
+/* Floating: a pill over the note. */
+.nw-bar[data-bar='tools'][data-at='float'] {
+  padding: 0 4px 0 0;
+  border: 1px solid var(--sh-line-2);
+  border-radius: 13px;
+  background: var(--sh-surface);
+  box-shadow: var(--sh-shadow);
+}
+.nw-bar[data-bar='tools'][data-at='float'] > .nw-bar-grip {
+  border-radius: 12px 0 0 12px;
+}
+/* Down a side, or floating turned down: the rows stand as columns, side by side. */
+.nw-bar[data-bar='tools'][data-dir='column'] .sh-rows {
+  flex-direction: row;
+}
+.nw-bar[data-bar='tools'][data-dir='column'] > .nw-bar-grip {
+  width: auto;
+  height: 20px;
+  align-self: stretch;
+}
+.nw-bar[data-bar='tools'][data-at='float'][data-dir='column'] > .nw-bar-grip {
+  border-radius: 12px 12px 0 0;
+}
+.nw-bar[data-dir='column'] .sh-tools {
+  flex-direction: column;
+  min-height: 0;
+  padding: 6px 4px;
+  overflow: visible;
+}
+.nw-bar[data-dir='column'] .sh-tools .nw-group {
+  flex-direction: column;
+}
+.nw-bar[data-dir='column'] .sh-sep {
+  width: 18px;
+  height: 1px;
+  margin: 5px 0;
+}
+/* The Style button: its name along a row, its sign down a side. */
+.sh-word-sign {
+  display: none;
+}
+.nw-bar[data-dir='column'] .sh-word .sh-word-text {
+  display: none;
+}
+.nw-bar[data-dir='column'] .sh-word .sh-word-sign {
+  display: block;
+}
+.nw-bar[data-dir='column'] .sh-b.sh-word {
+  padding: 0 7px;
+}
+/* A picture's or table's description: a field along a row, a button with the field in a menu down a side. */
+.nw-describe-down {
+  display: none;
+}
+.nw-bar[data-dir='column'] .nw-describe-along {
+  display: none;
+}
+.nw-bar[data-dir='column'] .nw-describe-down {
+  display: inline-flex;
+}
+/* The strips the bar sits in, beside the pages or under them: a side strip a multiple of 4 pixels wide. */
+.nw-bar-strip {
+  background: var(--sh-surface);
+}
+.nw-bar-strip[data-side='left'],
+.nw-bar-strip[data-side='right'] {
+  width: calc(var(--sh-size) + 16px);
+  padding: 0;
+}
+.nw-bar-strip[data-side='left'] {
+  border-right: 1px solid var(--sh-line);
+}
+.nw-bar-strip[data-side='right'] {
+  border-left: 1px solid var(--sh-line);
+}
+.nw-bar-strip[data-side='bottom'] {
+  padding: 0;
+  border-top: 1px solid var(--sh-line);
+}
+.nw-bar-strip[data-side='bottom'] > .nw-bar[data-bar='tools'] {
+  width: 100%;
+}
+.nw-bar-strip[data-fit='short'] .sh-b:not(.sh-menu *) {
+  height: 28px;
+}
+
+/* ----- the notes' panel: the tool bar, the pages between the side strips, the status line ----- */
+.sh-notes-row {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+.sh-notes-row > .pages-area {
+  flex: 1 1 auto;
+  height: auto;
+  min-width: 0;
+}
+.sh-status-place {
+  flex: none;
+}
+.sh-notes-alone {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.sh-notes-alone > .pages-area {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+/* Full screen, clear of the status line. */
+.nw-notes-panel > .nw-full-screen {
+  bottom: 44px;
+}
+
+/* ----- inside the panel beside the notes ----- */
+.sh-panel-seg {
+  flex: none;
+  margin: 10px 12px 0;
+}
+/* The place kept for the video: the player 16 by 9, never under YouTube's 200 pixels, and its name under it. */
+.sh-slot[data-for='video'] {
+  box-sizing: content-box;
+  flex: none;
+  min-height: 200px;
+  margin: 12px 12px 0;
+  padding-bottom: 56px;
+  aspect-ratio: 16 / 9;
+}
+.sh-slot[data-for='program'] {
+  flex: 1 1 auto;
+  min-height: 272px;
+  margin: 12px;
+}
+.nw-side-panel:has(> .sh-slot[data-for='program']) > .nw-side-body {
+  display: none;
+}
+.sh-panel-note {
+  flex: none;
+  margin: 12px 14px 0;
+  color: var(--sh-text-2);
+}
+.sh-panel-note p {
+  margin: 0 0 8px;
+}
+.sh-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ui-accent-text);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.sh-panel > .nw-dock-bar .icon-button {
+  width: var(--sh-size);
+  height: var(--sh-size);
+  border-radius: 7px;
+  color: var(--sh-text-2);
+}
+.sh-panel > .nw-dock-bar .icon-button:hover {
+  background: var(--sh-hover);
+  color: var(--sh-text);
+}
+/* What the panel holds inside it lies over it, drawn in the place it keeps. */
+.nw-dock-panel[data-inside] {
+  z-index: 5;
+}
+.nw-dock-panel[data-inside] > .nw-video {
+  border: 0;
+  background: none;
+}
+.nw-video[data-inside] > .nw-video-body {
+  overflow: hidden;
+  border-radius: 10px;
+  background: #0a0a0b;
+}
+/* Under the player: its name, where it is, and its buttons, small. */
+.nw-video-caption {
+  box-sizing: border-box;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  height: 56px;
+  padding: 8px 0 4px 2px;
+  background: var(--sh-panel);
+  color: var(--sh-text);
+  cursor: grab;
+  user-select: none;
+}
+.nw-video-words {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.nw-video-caption .nw-video-title {
+  flex: none;
+  font-size: 13px;
+  font-weight: 600;
+}
+.nw-video-at {
+  overflow: hidden;
+  color: var(--sh-text-3);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nw-video-caption .nw-ibtn {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--sh-text-2);
+}
+/* An upright tablet or a phone: the video the whole width of the panel. */
+@media (max-width: 779px) {
+  .sh-slot[data-for='video'] {
+    margin: 0;
+  }
+}
+
+/* What the stroke recorder is for, in the pen's settings. */
+.nw-pen-about {
+  max-width: 340px;
+  margin-top: 8px;
+  color: var(--sh-text-2);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.nw-pen-about p {
+  margin: 0 0 6px;
+}

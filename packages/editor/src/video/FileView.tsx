@@ -68,6 +68,7 @@ export function FileView({ store, media, cropping, onCropped, onProblem }: { sto
         void video.play().catch(() => undefined)
       },
       pause: () => video.pause(),
+      duration: () => video.duration,
     })
     return () => {
       if (videoClock.value?.media === media.id) videoClock.set(undefined)

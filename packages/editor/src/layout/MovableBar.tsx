@@ -1,7 +1,6 @@
-// A bar that moves: the tools, or the pen and format bar, along the top, down
-// the left or right side, along the bottom, or floating as a box, like Windows Ink's. Its grip, dragged, carries it:
-// let go near a side of the workspace it goes along that side, elsewhere it floats there. Tapped, the grip offers the
-// places. Each person's own, kept in their browser.
+// A bar that moves: the note's tool bar, under the tabs, down the left or right side, along the bottom, or floating as
+// a pill, like Windows Ink's. Its grip, dragged, carries it: let go near a side of the workspace it goes along that
+// side, elsewhere it floats there. Tapped, the grip offers the places. Each person's own, kept in their browser.
 import { GripVertical } from 'lucide-react'
 import { memo, useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import { commands } from '../commands/index.js'
@@ -14,11 +13,11 @@ import { watchFloatingBar, watchStrip } from './stripFit.js'
 const SNAP = 40
 
 const PLACES: [BarPlace['at'], string][] = [
-  ['top', 'Along the top'],
+  ['top', 'Under the tabs'],
   ['left', 'Down the left side'],
   ['right', 'Down the right side'],
   ['bottom', 'Along the bottom'],
-  ['float', 'Floating box'],
+  ['float', 'Floating'],
 ]
 
 /** The workspace a bar moves over: the app's main area. */

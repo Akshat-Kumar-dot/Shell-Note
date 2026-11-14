@@ -2,6 +2,7 @@
 // space beside them; a click on bare paper puts the caret on the nearest line;
 // and a click with the Select tool chooses the block under it.
 import { expect, test, type Page } from './fixtures.js'
+import { chooseTool } from './shell.js'
 
 test.use({ viewport: { width: 1280, height: 1000 } })
 
@@ -42,8 +43,7 @@ function idOf(page: Page, text: string): Promise<string> {
 }
 
 async function useTool(page: Page, name: 'Type' | 'Select'): Promise<void> {
-  await page.getByRole('radio', { name }).click()
-  await expect(page.getByRole('radio', { name })).toHaveAttribute('aria-checked', 'true')
+  await chooseTool(page, name === 'Type' ? 'type' : 'select')
 }
 
 test('lines chosen whole by a Select box show only their words, not the blank space beside them', async ({ page }) => {

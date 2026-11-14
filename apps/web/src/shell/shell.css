@@ -1,0 +1,522 @@
+/*
+ * The shell: what is round every screen. The rail of the app's places, the library's tree, the tabs of open notes
+ * and, under a note, its status line. The colours, the buttons and the menus are the editor's shell.css. Sizes: the
+ * rail 48 pixels, the tree 256, the tabs 40, the status line 28.
+ */
+
+/* ----- the frame: the rail, the tree, then the tabs over the screen ----- */
+.shell {
+  display: flex;
+  height: 100%;
+  background: var(--sh-panel);
+  color: var(--sh-text);
+}
+.shell-main {
+  flex: 1 1 0;
+  order: 2;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--sh-surface);
+}
+.shell-screen {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+/* ----- the rail ----- */
+.rail {
+  flex: none;
+  order: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 48px;
+  padding: 8px 0;
+  border-right: 1px solid var(--sh-line);
+}
+.rail-mark {
+  display: block;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  margin: 2px 0 10px;
+  border-radius: 7px;
+}
+.rail .sh-b {
+  width: 34px;
+  height: 34px;
+  min-width: 0;
+}
+.rail .sh-b[aria-pressed='true'] {
+  color: var(--sh-text);
+}
+.rail-grow {
+  flex: 1;
+  align-self: stretch;
+}
+/* The notes kept in a folder a cloud service copies: a green dot on the cloud. */
+.rail .sh-b[data-kept='folder'] {
+  position: relative;
+}
+.rail .sh-b[data-kept='folder']::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sh-ok);
+  box-shadow: 0 0 0 2px var(--sh-panel);
+}
+
+/* ----- the tree ----- */
+.tree {
+  flex: none;
+  order: 1;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  width: 256px;
+  min-height: 0;
+  border-right: 1px solid var(--sh-line);
+  font: 13px/1.45 var(--ui-font);
+}
+.tree[data-at='right'] {
+  order: 3;
+  border-right: 0;
+  border-left: 1px solid var(--sh-line);
+}
+.tree-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 40px;
+  padding: 0 8px 0 14px;
+}
+.tree-head b {
+  font-size: 13px;
+  font-weight: 600;
+}
+.tree-head .sh-b {
+  height: 28px;
+  min-width: 28px;
+  padding: 0 5px;
+}
+.tree-find {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  margin: 2px 10px 8px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--sh-hover);
+  color: var(--sh-text-3);
+}
+.tree-find input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--sh-text);
+  font: inherit;
+}
+.tree-find input::placeholder {
+  color: var(--sh-text-3);
+}
+.tree-find input::-webkit-search-cancel-button {
+  display: none;
+}
+.tree-find:focus-within {
+  box-shadow: 0 0 0 2px var(--ui-accent);
+}
+.tree-clear {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--sh-text-3);
+  cursor: pointer;
+}
+.tree-clear:hover {
+  background: var(--sh-press);
+  color: var(--sh-text);
+}
+.tree-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 8px;
+}
+.tree-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 30px;
+  padding: 0 8px 0 calc(8px + var(--depth, 0) * 22px);
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--sh-text-2);
+  font: inherit;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.tree-row:hover {
+  background: var(--sh-hover);
+}
+a.tree-row {
+  text-decoration: none;
+}
+.tree-row svg {
+  flex: none;
+  color: var(--sh-text-3);
+}
+.tree-row.tree-folder {
+  color: var(--sh-text);
+  font-weight: 500;
+}
+/* A note's line starts under its folder's name, past the arrow. */
+.tree-indent {
+  flex: none;
+  width: 0;
+}
+.tree-items > li > .tree-row:not(.tree-folder) .tree-indent {
+  width: 0;
+}
+.tree-row[aria-current='page'] {
+  background: var(--sh-chosen);
+  color: var(--sh-chosen-text);
+  font-weight: 500;
+}
+.tree-row[aria-current='page'] svg {
+  color: inherit;
+}
+.tree-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tree-where {
+  flex: 1 10 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--sh-text-3);
+  font-size: 11px;
+  text-align: right;
+  text-overflow: ellipsis;
+}
+.tree-count {
+  margin-left: auto;
+  color: var(--sh-text-3);
+  font-size: 11px;
+}
+.tree-line {
+  position: relative;
+}
+/* A new note in the folder: shown while the pointer is on its line, and always where nothing can hover. */
+.tree-add {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: var(--sh-panel);
+  color: var(--sh-text-2);
+  cursor: pointer;
+}
+.tree-line:hover .tree-add,
+.tree-add:focus-visible {
+  display: grid;
+}
+@media (hover: none) {
+  .tree-add {
+    display: grid;
+  }
+}
+.tree-add:hover {
+  background: var(--sh-press);
+  color: var(--sh-text);
+}
+.tree-naming {
+  box-sizing: border-box;
+  width: 100%;
+  height: 30px;
+  padding: 0 8px 0 calc(8px + var(--depth, 0) * 22px + 23px);
+  border: 0;
+  border-radius: 7px;
+  outline: 2px solid var(--ui-accent);
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  font: inherit;
+}
+.tree-quiet,
+.tree-problem {
+  margin: 0;
+  padding: 8px;
+  color: var(--sh-text-3);
+}
+.tree-problem {
+  color: var(--ui-danger);
+}
+.tree-foot {
+  flex: none;
+  padding: 8px;
+  border-top: 1px solid var(--sh-line);
+}
+
+/* ----- the tabs ----- */
+.sh-tabs {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  box-sizing: border-box;
+  height: 40px;
+  padding-left: 6px;
+  border-bottom: 1px solid var(--sh-line);
+  background: var(--sh-panel);
+  font: 13px/1.45 var(--ui-font);
+}
+.sh-tabs > .sh-b {
+  align-self: center;
+}
+.sh-tablist {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+.sh-tab {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 200px;
+  margin-top: 6px;
+  padding: 0 6px 0 12px;
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  background: none;
+  color: var(--sh-text-2);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+button.sh-tab {
+  padding-right: 12px;
+}
+.sh-tab svg {
+  flex: none;
+  color: var(--sh-text-3);
+}
+.sh-tab span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sh-tab:hover {
+  color: var(--sh-text);
+}
+.sh-tab[aria-selected='true'] {
+  background: var(--sh-surface);
+  box-shadow: 0 0 0 1px var(--sh-line);
+  clip-path: inset(-1px -1px 0 -1px);
+  color: var(--sh-text);
+  font-weight: 500;
+}
+.sh-tab-open {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+/* The tab row is never text to pick up, whatever the tool; the title typed in it is. */
+.sh-tabs {
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* The title of the note on screen, renamed where it stands. */
+.sh-tab-title {
+  -webkit-user-select: text;
+  user-select: text;
+  flex: 1 1 auto;
+  min-width: 24px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-overflow: ellipsis;
+  field-sizing: content;
+}
+.sh-tab-x {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--sh-text-3);
+  cursor: pointer;
+  opacity: 0;
+}
+.sh-tab:hover .sh-tab-x,
+.sh-tab[aria-selected='true'] .sh-tab-x,
+.sh-tab-x:focus-visible {
+  opacity: 1;
+}
+.sh-tab-x:hover {
+  background: var(--sh-press);
+  color: var(--sh-text);
+}
+.sh-tabs-end {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 4px;
+}
+/* What the note puts at the tabs' end (a video, a program): buttons like the row's own. */
+.sh-tabs-end .icon-button {
+  width: var(--sh-size);
+  height: var(--sh-size);
+  border-radius: 7px;
+  color: var(--sh-text-2);
+}
+.sh-tabs-end .icon-button:hover:not(:disabled) {
+  background: var(--sh-hover);
+  color: var(--sh-text);
+}
+/* The desktop app's own minimise, maximise and close lie over the window's top right: whatever is there keeps clear of
+   them. The tab row over a whole screen; while a note is on screen, the head of the panel at the top right (the tab
+   row over the note, the panel beside it, or the library column moved to the right). */
+html[data-own-titlebar] .shell-main > .sh-tabs .sh-tabs-end,
+html[data-own-titlebar] .nw-dock-panel[data-top-right] .sh-tabs-end,
+html[data-own-titlebar] .nw-dock-panel[data-top-right] > * > .nw-dock-bar,
+html[data-own-titlebar] .nw-dock-panel[data-top-right] .nw-video-bar,
+html[data-own-titlebar] .tree[data-at='right'] .tree-head {
+  padding-right: 142px;
+}
+.sh-tabs-place,
+.sh-notice-place {
+  flex: none;
+}
+/* The tab row over the note alone: the panel beside the note runs from the window's top. */
+.nw-notes-panel > .sh-tabs-place > .sh-tabs {
+  background: var(--sh-panel);
+}
+
+/* ----- the status line, under a screen ----- */
+.sh-status {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-sizing: border-box;
+  height: 28px;
+  padding: 0 14px;
+  border-top: 1px solid var(--sh-line);
+  background: var(--sh-panel);
+  color: var(--sh-text-3);
+  font: 12px/1.45 var(--ui-font);
+  white-space: nowrap;
+}
+.sh-status > span,
+.sh-status > button,
+.sh-status > .sh-anchor > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.sh-status > button,
+.sh-status > .sh-anchor > button {
+  cursor: pointer;
+}
+.sh-status > button:hover,
+.sh-status > .sh-anchor > button:hover {
+  color: var(--sh-text);
+}
+.sh-status .sh-good {
+  color: var(--sh-ok);
+}
+.sh-status [data-late] {
+  color: var(--ui-warn);
+}
+.sh-status .file-status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* An upright tablet or a phone has no width to spare: the rail lies along the bottom, as a phone's own apps have
+   theirs, its buttons a finger's size, and the tree gives its room to the screen (the Library tab holds the notes). */
+@media (max-width: 779px) {
+  .shell {
+    flex-direction: column;
+  }
+  .rail {
+    order: 9;
+    flex-direction: row;
+    width: auto;
+    height: 48px;
+    padding: 0 6px;
+    border-top: 1px solid var(--sh-line);
+    border-right: 0;
+  }
+  .rail-mark {
+    display: none;
+  }
+  .rail .sh-b {
+    width: 40px;
+    height: 40px;
+  }
+  .tree,
+  .sh-tabs-tree {
+    display: none;
+  }
+}

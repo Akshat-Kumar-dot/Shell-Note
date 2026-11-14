@@ -1,8 +1,8 @@
-// The library beside a note, on the left (or moved to the right): its folders and notes, a note opened in one click, a
-// folder named in place, a search by name, and the side hidden, shown or moved as it was left.
+// The library's column beside every screen: its folders and notes, a note opened in one click, a folder named in
+// place, a search by name, and the column hidden, shown or moved to the window's other side, as it was left.
 import { expect, test } from './fixtures.js'
 
-test('the library beside a note opens a note in one click, makes and names a folder, finds by name, and stays as it was left', async ({ page }) => {
+test('the library column opens a note in one click, makes and names a folder, finds by name, and stays as it was left', async ({ page }) => {
   await page.goto('/#/new')
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
   const side = page.getByRole('navigation', { name: 'Library' })
@@ -12,8 +12,12 @@ test('the library beside a note opens a note in one click, makes and names a fol
     const [library, pages] = [await side.boundingBox(), await desk.boundingBox()]
     return library && pages ? library.x < pages.x : undefined
   }
-  // Narrower than 1400 pixels it starts hidden: a strip with its arrow, on the left.
-  await side.getByRole('button', { name: 'Show the library' }).click()
+  /** One of the column's own places, from its menu. */
+  const place = async (name: string): Promise<void> => {
+    await side.getByRole('button', { name: 'Sort and place' }).click()
+    await page.getByRole('menuitem', { name, exact: true }).click()
+  }
+  // A laptop's window has room for it: it shows from the start, on the left.
   await expect.poll(onTheLeft).toBe(true)
   const title = page.getByRole('textbox', { name: 'Title' })
   await title.fill('Waves')
@@ -50,18 +54,33 @@ test('the library beside a note opens a note in one click, makes and names a fol
   await expect(side.getByRole('button', { name: 'Physics: 1 note' })).toBeVisible()
 
   // Moved to the right, it stays there after a reload, and comes back.
-  await side.getByRole('button', { name: 'Move the library to the right' }).click()
+  await place('Move the library to the right')
   await expect.poll(onTheLeft).toBe(false)
   await page.reload()
   await expect.poll(onTheLeft).toBe(false)
-  await side.getByRole('button', { name: 'Move the library to the left' }).click()
+  await place('Move the library to the left')
   await expect.poll(onTheLeft).toBe(true)
 
-  // Hidden, it stays hidden after a reload; shown, it stays shown, the folder still open.
-  await side.getByRole('button', { name: 'Hide the library' }).click()
+  // Hidden, it stays hidden after a reload; shown again from the tabs' row, it stays shown, the folder still open.
+  await place('Hide the library')
+  await expect(side).toHaveCount(0)
   await page.reload()
-  await expect(side.getByRole('button', { name: 'Show the library' })).toBeVisible()
-  await side.getByRole('button', { name: 'Show the library' }).click()
+  await expect(page.getByRole('button', { name: 'Show the library' })).toBeVisible()
+  await page.getByRole('button', { name: 'Show the library' }).click()
   await page.reload()
   await expect(side.getByRole('button', { name: 'Physics: 1 note' })).toHaveAttribute('aria-expanded', 'true')
+})
+
+test("the rail's search puts the caret in the library's search, the column shown for it if it was hidden", async ({ page }) => {
+  await page.goto('/#/new')
+  await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
+  const rail = page.getByRole('navigation', { name: 'Places' })
+  const side = page.getByRole('navigation', { name: 'Library' })
+  await rail.getByRole('button', { name: 'Search', exact: true }).click()
+  await expect(side.getByRole('searchbox', { name: 'Search the library' })).toBeFocused()
+  await side.getByRole('button', { name: 'Sort and place' }).click()
+  await page.getByRole('menuitem', { name: 'Hide the library', exact: true }).click()
+  await expect(side).toHaveCount(0)
+  await rail.getByRole('button', { name: 'Search', exact: true }).click()
+  await expect(side.getByRole('searchbox', { name: 'Search the library' })).toBeFocused()
 })

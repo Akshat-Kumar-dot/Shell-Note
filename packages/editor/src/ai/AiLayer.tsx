@@ -114,11 +114,12 @@ function chosenRect(store: EditorStore, desk: Element): { rect: DOMRect; sheet: 
   return { rect: dom.getRangeAt(0).getBoundingClientRect(), sheet: (node instanceof Element ? node : node?.parentElement)?.closest<HTMLElement>('.nw-page') ?? null }
 }
 
-/** The part of the desk in view: below the format bar floating over its top, and above its foot. */
+/** The part of the desk in view: below the tool bar where it floats over the desk's top, and above its foot. */
 function deskView(desk: Element): { ceiling: number; floor: number } {
   const view = desk.getBoundingClientRect()
-  const bar = document.querySelector('.nw-formatbar')?.getBoundingClientRect()
-  return { ceiling: Math.max(view.top, bar ? bar.bottom : view.top) + GAP, floor: view.bottom - GAP }
+  const bar = document.querySelector('.nw-bar[data-bar="tools"][data-at="float"]')?.getBoundingClientRect()
+  const over = bar !== undefined && bar.top <= view.top + 64 && bar.bottom > view.top
+  return { ceiling: Math.max(view.top, over ? bar.bottom : view.top) + GAP, floor: view.bottom - GAP }
 }
 
 /** Whether something is chosen that a request can act on, in a way the ✨ button shows for. */

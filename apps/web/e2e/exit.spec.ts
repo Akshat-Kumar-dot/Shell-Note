@@ -4,6 +4,7 @@
 // - Reload and get the same document.
 // - Save to a file, open it, and get a deep-equal document.
 import { expect, inApp, test, type Page } from './fixtures.js'
+import { chooseTool } from './shell.js'
 
 type Drawn = [number, number, string]
 interface Carrier {
@@ -89,7 +90,7 @@ test('phase 2 exit: type, paste, move and resize; undo to empty and redo to full
   await page.keyboard.type('The end.')
 
   // Two images, pasted where a Free-cursor click on bare paper put the caret.
-  await page.getByRole('radio', { name: 'Free cursor' }).click()
+  await chooseTool(page, 'free')
   const spot = await onPage(page, 60, 200)
   await page.mouse.click(spot.x, spot.y)
   await page.locator('.nw-draft .ProseMirror').evaluate(async (target) => {
@@ -135,7 +136,7 @@ test('phase 2 exit: type, paste, move and resize; undo to empty and redo to full
   // Save to a file, open it, and get a deep-equal document.
   await page.keyboard.press('Control+s')
   await expect(page.getByRole('status')).toContainText('Saved to Untitled.shellnote')
-  await page.getByRole('button', { name: 'New note' }).click()
+  await page.getByRole('button', { name: 'New tab' }).click()
   // A new note beside it in the library, editable once it has checked the other tabs.
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Untitled 2')
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()

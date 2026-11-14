@@ -41,19 +41,22 @@ export const leaf = (id: PanelId): Leaf => ({ kind: 'panel', id })
 const split = (dir: Dir, kids: Node[], sizes: number[]): Split => ({ kind: 'split', dir, kids, sizes: normal(sizes) })
 
 /**
- * The person's sketch: the video above the side panel on the left, the notes on the right; a program, when one
- * is shown, right of the notes (while it is not, its room is the others', so the sketch is unchanged).
+ * How the workspace starts: the notes, and on their right the panel beside them (the AI, or Beside), about 340 pixels
+ * of a laptop's window. The video and a program are kept inside Beside until the person takes them out (state.ts):
+ * then the video goes above the panel, and a program right of them all. While one is not shown, its room is the
+ * others', so the start is unchanged.
  */
 export const DEFAULT_LAYOUT: Layout = {
-  root: split('row', [split('column', [leaf('video'), leaf('side')], [0.55, 0.45]), leaf('notes'), leaf('program')], [0.4, 0.6, 0.4]),
+  root: split('row', [leaf('notes'), split('column', [leaf('video'), leaf('side')], [0.55, 0.45]), leaf('program')], [0.69, 0.31, 0.4]),
   floating: {},
 }
 
 /**
- * The smallest a panel may be, in CSS pixels: YouTube's player at 200 by 200 under its bar; room to write; a program
- * still usable (320 by 240 under the bar: to be checked with PowerPoint's ribbon).
+ * The smallest a panel may be, in CSS pixels: YouTube's player at 200 by 200 under its bar; room to write; the panel
+ * beside the notes with a video inside it, 200 wide between its margins; a program still usable (320 by 240 under the
+ * bar: to be checked with PowerPoint's ribbon).
  */
-export const PANEL_LEAST: Record<PanelId, { w: number; h: number }> = { notes: { w: 240, h: 200 }, video: { w: 204, h: 240 }, side: { w: 200, h: 160 }, program: { w: 320, h: 272 } }
+export const PANEL_LEAST: Record<PanelId, { w: number; h: number }> = { notes: { w: 240, h: 200 }, video: { w: 204, h: 240 }, side: { w: 224, h: 160 }, program: { w: 320, h: 272 } }
 
 /** The step the edges between panels fall on, in CSS pixels. */
 const STEP = 4
@@ -130,7 +133,8 @@ export function dock(layout: Layout, id: PanelId, target: PanelId | 'area', side
   if (target === id) return layout
   const floating = { ...layout.floating }
   delete floating[id]
-  const rest = without(layout.root, id)
+  // Its room back where it took it from first (the notes, mostly), so moving a panel about never wears the notes away.
+  const rest = layout.root.kind === 'panel' && layout.root.id === id ? undefined : giveBack(layout, id).root
   if (!rest) return { root: leaf(id), floating, full: undefined }
   let root: Node
   if (target === 'area' || !contains(rest, target)) {
@@ -143,10 +147,34 @@ export function dock(layout: Layout, id: PanelId, target: PanelId | 'area', side
   return { root, floating, full: undefined }
 }
 
+/**
+ * `id` out of the tree, its room given back to the neighbour it took it from (the notes, where they are neighbours),
+ * not shared out among all as `without` does: a video docked beside the notes and put back inside the Beside panel
+ * leaves the notes as wide as before. A split left with one kid becomes that kid.
+ */
+export function giveBack(layout: Layout, id: PanelId): Layout {
+  const take = (node: Node): Node => {
+    if (node.kind === 'panel') return node
+    const at = node.kids.findIndex((kid) => kid.kind === 'panel' && kid.id === id)
+    if (at < 0) return { ...node, kids: node.kids.map(take) }
+    const near = [at - 1, at + 1].filter((i) => i >= 0 && i < node.kids.length)
+    const to = near.find((i) => contains(node.kids[i]!, 'notes')) ?? near[0]
+    if (to === undefined) return node
+    const sizes = [...node.sizes]
+    sizes[to] = sizes[to]! + sizes[at]!
+    sizes.splice(at, 1)
+    const kids = node.kids.filter((_, i) => i !== at)
+    return kids.length === 1 ? kids[0]! : split(node.dir, kids, sizes)
+  }
+  const floating = { ...layout.floating }
+  delete floating[id]
+  return { ...layout, root: layout.root.kind === 'panel' ? layout.root : take(layout.root), floating }
+}
+
 /** Float `id` at `rect`, out of the tree. The notes always stay docked. */
 export function float(layout: Layout, id: PanelId, rect: Rect): Layout {
   if (id === 'notes') return layout
-  const root = without(layout.root, id) ?? leaf('notes')
+  const root = layout.root.kind === 'panel' && layout.root.id === id ? leaf('notes') : giveBack(layout, id).root
   return { root, floating: { ...layout.floating, [id]: rect }, full: layout.full === id ? undefined : layout.full }
 }
 
@@ -185,10 +213,10 @@ export interface Places {
   splitters: Splitter[]
 }
 
-/** The smallest a part of the tree may be, as its shown panels add up. */
-export function leastOf(node: Node, shown: (id: PanelId) => boolean): { w: number; h: number } {
-  if (node.kind === 'panel') return shown(node.id) ? PANEL_LEAST[node.id] : { w: 0, h: 0 }
-  const kids = node.kids.map((kid) => leastOf(kid, shown))
+/** The smallest a part of the tree may be, as its shown panels add up; `least`, each panel's smallest now. */
+export function leastOf(node: Node, shown: (id: PanelId) => boolean, least: Record<PanelId, { w: number; h: number }> = PANEL_LEAST): { w: number; h: number } {
+  if (node.kind === 'panel') return shown(node.id) ? least[node.id] : { w: 0, h: 0 }
+  const kids = node.kids.map((kid) => leastOf(kid, shown, least))
   return node.dir === 'row'
     ? { w: kids.reduce((sum, k) => sum + k.w, 0), h: Math.max(0, ...kids.map((k) => k.h)) }
     : { w: Math.max(0, ...kids.map((k) => k.w)), h: kids.reduce((sum, k) => sum + k.h, 0) }
@@ -216,7 +244,7 @@ function heldToLeast(shares: readonly number[], least: readonly number[], length
  * 4-pixel steps from the area's corner, so a panel starts on a whole screen pixel at 100, 125, 150, 175 and 200 %,
  * where the pen's live line and the page's match.
  */
-export function placesOf(layout: Layout, area: Rect, shown: (id: PanelId) => boolean): Places {
+export function placesOf(layout: Layout, area: Rect, shown: (id: PanelId) => boolean, least: Record<PanelId, { w: number; h: number }> = PANEL_LEAST): Places {
   const rects: Partial<Record<PanelId, Rect>> = {}
   const splitters: Splitter[] = []
   const floating = PANELS.filter((id) => id !== 'notes' && layout.floating[id] && shown(id))
@@ -230,7 +258,7 @@ export function placesOf(layout: Layout, area: Rect, shown: (id: PanelId) => boo
       return
     }
     const kids = node.kids.map((kid, i) => ({ kid, i })).filter(({ kid }) => visible(kid, shown))
-    const leasts = kids.map(({ kid }) => leastOf(kid, shown))
+    const leasts = kids.map(({ kid }) => leastOf(kid, shown, least))
     const across = node.dir === 'row' && (rect.w <= 0 || leasts.reduce((sum, least) => sum + least.w, 0) <= rect.w)
     const length = across ? rect.w : rect.h
     const shares = heldToLeast(normal(kids.map(({ i }) => node.sizes[i] ?? 0)), leasts.map((least) => (across ? least.w : least.h)), length)
@@ -251,9 +279,9 @@ export function placesOf(layout: Layout, area: Rect, shown: (id: PanelId) => boo
   walk(layout.root, area, [])
   for (const id of floating) {
     const f = layout.floating[id]!
-    const least = PANEL_LEAST[id]
-    const w = Math.max(least.w, Math.min(f.w, area.w))
-    const h = Math.max(least.h, Math.min(f.h, area.h))
+    const smallest = least[id]
+    const w = Math.max(smallest.w, Math.min(f.w, area.w))
+    const h = Math.max(smallest.h, Math.min(f.h, area.h))
     rects[id] = { x: area.x + Math.max(0, Math.min(area.w - w, f.x)), y: area.y + Math.max(0, Math.min(area.h - h, f.y)), w, h }
   }
   return { rects, floating, splitters }
@@ -299,10 +327,11 @@ export function layoutFrom(value: unknown): Layout {
   const floating: Partial<Record<PanelId, Rect>> = {}
   const f = (typeof o.floating === 'object' && o.floating !== null ? o.floating : {}) as Record<string, unknown>
   for (const id of PANELS) if (id !== 'notes' && !ids.includes(id) && isRect(f[id])) floating[id] = f[id]
-  // A panel in neither place goes back to where the default has it. The program goes at the right of the whole area,
-  // its room taken from every panel alike: while it is not shown, a layout kept before it existed is as it was (beside
-  // the notes, it would take half of theirs, and the notes would narrow in the browser too, where it never shows).
+  // A panel in neither place goes back to the side the default has it on: the right of the notes. The program goes at
+  // the right of the whole area, its room taken from every panel alike: while it is not shown, a layout kept before
+  // it existed is as it was (beside the notes, it would take half of theirs, and the notes would narrow in the browser
+  // too, where it never shows).
   let layout: Layout = { root, floating }
-  for (const id of PANELS) if (!ids.includes(id) && !floating[id]) layout = id === 'program' ? dock(layout, id, 'area', 'right') : dock(layout, id, 'notes', 'left')
+  for (const id of PANELS) if (!ids.includes(id) && !floating[id]) layout = id === 'program' ? dock(layout, id, 'area', 'right') : dock(layout, id, 'notes', 'right')
   return layout
 }

@@ -1,6 +1,7 @@
-// Undo and redo, and the toolbar: every change goes through core, one undo
-// step each, and the caret and selection stay where they were.
+// Undo and redo, and the note's row of tools: every change goes through core, one undo step each, and the caret and
+// selection stay where they were.
 import { expect, inApp, test, type Page } from './fixtures.js'
+import { chooseTool, penRow, textAlign, textRow, textSize, textStyle } from './shell.js'
 
 type Block = { id: string; role?: string; md?: string; done?: true; style?: Record<string, string> }
 
@@ -53,14 +54,16 @@ test('Ctrl+Z and Ctrl+Y undo and redo, a typed line at a time', async ({ page })
   await expect(page.locator('.nw-frame .ProseMirror')).toContainText('Second line')
 })
 
-test('the block type and style buttons change the block, one undo step each', async ({ page }) => {
+test("the block's style, size and alignment change the block, one undo step each", async ({ page }) => {
   await startTyping(page)
   await page.keyboard.type('A title')
-  await page.getByRole('combobox', { name: 'Block type' }).selectOption('h1')
+  await textStyle(page, 'Heading 1')
+  // The Style button names the block's style.
+  await expect(textRow(page).getByRole('button', { name: 'Style', exact: true })).toContainText('Heading 1')
   // The whole line, chosen as in Word, takes a size as its style.
   await page.locator('.nw-frame .nw-text').first().click({ clickCount: 3 })
-  await page.getByRole('button', { name: 'Large', exact: true }).click()
-  await page.getByRole('button', { name: 'Centre' }).click()
+  await textSize(page, 'Large')
+  await textAlign(page, 'Centre')
   expect((await blocks(page))[0]).toMatchObject({ role: 'h1', md: 'A title', style: { size: 'l', align: 'center' } })
   // The text still has the focus: typing carries on there.
   await page.keyboard.press('End')
@@ -106,55 +109,72 @@ test('the word buttons format the selected words and keep them selected', async 
   expect(block.md).toMatch(/now\]\{color=blue\}$/u)
 })
 
-test('a to-do item can be ticked from the toolbar', async ({ page }) => {
+test("a to-do item can be ticked from the row's More menu", async ({ page }) => {
   await startTyping(page)
   await page.keyboard.type('[ ] buy milk')
-  await page.getByRole('button', { name: 'Ticked' }).click()
+  await textRow(page).getByRole('button', { name: 'More', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Ticked', exact: true }).click()
   expect((await blocks(page))[0]).toMatchObject({ role: 'todo', done: true })
   await expect(page.locator('.nw-frame .nw-text[data-done]')).toHaveCount(1)
 })
 
-// With room, every button is at least 40 px. In a narrow window the app bar may tighten its own buttons to 34, then
-// 30 px, to keep every icon in one row (Workspace.tsx, useOneRow): never less.
-test('every button of the bars is at least 40 px, for a finger or a pen, the colour panel included; the app bar never under 30 px in a narrow window', async ({ page }) => {
+// The design's buttons: 32 pixels with a mouse (40 where a finger or a pen presses, by the same rule), the colour
+// panel's swatches 40 for a finger. The row stays one row however narrow the window: it scrolls sideways instead.
+test("every button of the rows is the design's 32 pixels at least, the colour panel's 40; a narrow window scrolls the row, never wraps it", async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 900 })
   await page.goto('/?sample=physics')
   await page.locator('[data-id="t2"]').click()
+  const small = async (selector: string, least: number) =>
+    page.evaluate(
+      ([selector, least]) =>
+        [...document.querySelectorAll<HTMLElement>(selector as string)]
+          .filter((element) => element.offsetParent !== null)
+          .map((element) => ({ name: element.getAttribute('aria-label') ?? element.textContent, ...element.getBoundingClientRect().toJSON() }))
+          .filter(({ width, height }) => width < (least as number) || height < (least as number)),
+      [selector, least],
+    )
+  expect(await small('.sh-tools button', 32)).toEqual([])
+  await chooseTool(page, 'pen')
+  expect(await small('.sh-tools button', 32)).toEqual([])
+  await chooseTool(page, 'type')
+  await page.locator('[data-id="t2"]').click()
   await page.getByRole('button', { name: 'Colour', exact: true }).click()
-  const small = await page.evaluate(() =>
-    [...document.querySelectorAll<HTMLElement>('.nw-toolstrip button, .nw-toolstrip select, .nw-formatbar button, .nw-formatbar select, .nw-colour-panel button, .appbar button')]
-      .filter((element) => element.offsetParent !== null)
-      .map((element) => ({ name: element.getAttribute('aria-label') ?? element.textContent, ...element.getBoundingClientRect().toJSON() }))
-      .filter(({ width, height }) => width < 40 || height < 36),
-  )
-  expect(small).toEqual([])
-  // Inside the app a page of the tests' server may not resize the window (Tauri allows that command to the app's own
-  // pages only); the bar's steps are the same styles there, checked here in Edge.
-  if (inApp) return
+  expect(await small('.nw-colour-panel button', 40)).toEqual([])
   await page.keyboard.press('Escape')
-  // Narrow enough for the tightest step, not yet two rows.
-  await page.setViewportSize({ width: 1060, height: 900 })
-  await expect(page.locator('.appbar')).toHaveAttribute('data-tight', '3')
-  const tightest = await page.locator('.appbar button').evaluateAll((buttons) =>
-    buttons
-      .filter((element) => (element as HTMLElement).offsetParent !== null)
-      .map((element) => ({ name: element.getAttribute('aria-label') ?? element.textContent, ...element.getBoundingClientRect().toJSON() }))
-      .filter(({ width, height }) => width < 30 || height < 30),
-  )
-  expect(tightest).toEqual([])
+  // Inside the app a page of the tests' server may not resize the window (Tauri allows that command to the app's own
+  // pages only); the row is the same styles there, checked here in Edge.
+  if (inApp) return
+  await page.setViewportSize({ width: 900, height: 900 })
+  const row = textRow(page)
+  await expect.poll(async () => (await row.boundingBox())!.height).toBe(43)
+  expect(await row.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true)
+  await row.evaluate((element) => element.scrollTo({ left: element.scrollWidth }))
+  await expect(row.getByRole('button', { name: 'Pen', exact: true })).toBeInViewport()
 })
 
-test('the pen, highlighter and eraser of phase 3 are tools in the room kept for them, each with its own bar', async ({ page }) => {
+test("the pen, the highlighter and the eraser bring the pen's row in place of the words' row, each shown as in hand; Type brings the words' row back", async ({ page }) => {
   await page.goto('/?sample=physics')
-  for (const name of ['Pen', 'Highlighter', 'Eraser']) {
-    const tile = page.getByRole('radio', { name, exact: true })
-    await tile.click()
-    await expect(tile).toBeChecked()
+  for (const [tool, name] of [['pen', 'Pen'], ['highlighter', 'Highlighter'], ['eraser', 'Eraser']] as const) {
+    await chooseTool(page, tool)
     await expect(page.getByRole('toolbar', { name })).toBeVisible()
+    await expect(penRow(page).getByRole('button', { name, exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('toolbar', { name: 'Formatting' })).toHaveCount(0)
   }
-  // Back to Type: the format bar again.
-  await page.getByRole('radio', { name: 'Type', exact: true }).click()
+  // Back to Type: the words' row again, in the same place.
+  await chooseTool(page, 'type')
   await expect(page.getByRole('toolbar', { name: 'Formatting' })).toBeVisible()
+  await expect(penRow(page)).toHaveCount(0)
+  // Both rows at once, when chosen so (More), one under the other; and back to one.
+  await textRow(page).getByRole('button', { name: 'More', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Show both rows', exact: true }).click()
+  await expect(page.getByRole('toolbar', { name: 'Formatting' })).toBeVisible()
+  await expect(page.getByRole('toolbar', { name: 'Pen' })).toBeVisible()
+  const [words, pen] = [(await textRow(page).boundingBox())!, (await penRow(page).boundingBox())!]
+  expect(pen.y).toBeGreaterThanOrEqual(words.y + words.height - 1)
+  await page.keyboard.press('Escape')
+  await textRow(page).getByRole('button', { name: 'More', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Show both rows', exact: true }).click()
+  await expect(penRow(page)).toHaveCount(0)
 })
 
 test('the paper is chosen for every page, or for the page in view only, one undo step each', async ({ page }) => {
@@ -162,15 +182,15 @@ test('the paper is chosen for every page, or for the page in view only, one undo
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
   const papers = (): Promise<string[]> => page.evaluate(() => window.__shellnote!.doc.pages.map((id) => window.__shellnote!.doc.page[id]!.bg))
   const before = await papers()
-  await page.getByRole('button', { name: 'Paper' }).click()
-  await page.getByRole('button', { name: 'Lines' }).click()
+  await textRow(page).getByRole('button', { name: 'More', exact: true }).click()
+  await page.getByRole('radio', { name: 'Lines', exact: true }).click()
   await expect.poll(papers).toEqual(['ruled', 'ruled', 'ruled'])
   await expect(page.locator('.nw-page').first()).toHaveAttribute('data-bg', 'ruled')
   await page.getByRole('radio', { name: 'This page' }).click()
-  await page.getByRole('button', { name: 'Dots' }).click()
+  await page.getByRole('radio', { name: 'Dots', exact: true }).click()
   await expect.poll(papers).toEqual(['dots', 'ruled', 'ruled'])
   await page.keyboard.press('Escape')
-  await expect(page.getByRole('group', { name: 'Paper' })).toHaveCount(0)
+  await expect(page.getByRole('radiogroup', { name: 'Paper' })).toHaveCount(0)
   await page.getByRole('button', { name: 'Undo' }).click()
   await expect.poll(papers).toEqual(['ruled', 'ruled', 'ruled'])
   await page.getByRole('button', { name: 'Undo' }).click()

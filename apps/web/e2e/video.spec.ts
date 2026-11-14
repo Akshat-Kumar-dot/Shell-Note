@@ -4,6 +4,7 @@
 import { readFileSync } from 'node:fs'
 import { expect, inApp, test, type Page } from './fixtures.js'
 import { player, standInForYouTube } from './youtube.js'
+import { chooseTool, expectVideoAt, openPart, openVideoMenu, videoPlace } from './shell.js'
 
 test.use({ viewport: { width: 1280, height: 900 } })
 
@@ -51,9 +52,9 @@ async function openNote(page: Page): Promise<void> {
 /** A three-second WebM video, 160 by 90, a square moving across (made with OpenCV; headless Edge records no canvas). */
 const WEBM = readFileSync(new URL('./fixtures/moving-square.webm', import.meta.url))
 
-test('a YouTube link opens beside the note; above, below and to either side the note moves aside, floating it goes over; one player throughout', async ({ page }) => {
+test('a YouTube link shows inside Beside; taken out it goes left, right, above or below the note, or floats over it, and back inside; one player throughout', async ({ page }) => {
   await openNote(page)
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  await openVideoMenu(page)
   await page.getByLabel('YouTube link').fill('https://youtu.be/aircAruvnKk?t=30')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect.poll(() => media(page)).toEqual([{ id: expect.stringMatching(/^[A-Za-z0-9]{8}$/), kind: 'youtube', video: 'aircAruvnKk' }])
@@ -63,34 +64,46 @@ test('a YouTube link opens beside the note; above, below and to either side the 
   await expect(frame).toHaveAttribute('src', /^https:\/\/www\.youtube-nocookie\.com\/embed\/aircAruvnKk\?/u)
   await frame.evaluate((element) => (element.dataset.mark = 'the same player'))
 
-  // On the left by default (the design sketch): the notes start where the video ends.
+  // Inside Beside, as the design has it: in the panel right of the note, under its head, over its parts.
+  const inside = async (): Promise<void> => {
+    const side = await box(page, '.nw-dock-panel[data-panel="side"]')
+    const video = await box(page, '.nw-video')
+    expect(video.left).toBeGreaterThanOrEqual(side.left)
+    expect(video.right).toBeLessThanOrEqual(side.right)
+    expect(video.top).toBeGreaterThan(side.top)
+    expect((await box(page, '.pages-area')).right).toBeLessThanOrEqual(side.left + 1)
+    await bigEnough(page)
+  }
+  await inside()
+  await expectVideoAt(page, 'Video inside the Beside panel')
+
+  // Taken out on the left: the notes start where the video ends.
+  await videoPlace(page, 'Video on the left')
   let video = await box(page, '.nw-video')
   let note = await box(page, '.pages-area')
-  await bigEnough(page)
   expect(video.right).toBeLessThanOrEqual(note.left + 1)
-  await expect(page.getByRole('radio', { name: 'Video on the left' })).toHaveAttribute('aria-checked', 'true')
+  await bigEnough(page)
 
-  // On the right: the note ends where the video starts, and the format bar stops before it.
-  await page.getByRole('radio', { name: 'Video on the right' }).click()
+  // On the right: the note ends where the video starts.
+  await videoPlace(page, 'Video on the right')
   video = await box(page, '.nw-video')
   note = await box(page, '.pages-area')
   expect(note.right).toBeLessThanOrEqual(video.left + 1)
-  expect((await box(page, '.format-row')).right).toBeLessThanOrEqual(video.left)
   await bigEnough(page)
 
-  await page.getByRole('radio', { name: 'Video above' }).click()
+  await videoPlace(page, 'Video above')
   video = await box(page, '.nw-video')
   note = await box(page, '.pages-area')
   await bigEnough(page)
   expect(video.bottom).toBeLessThanOrEqual(note.top + 1)
 
-  await page.getByRole('radio', { name: 'Video below' }).click()
+  await videoPlace(page, 'Video below')
   video = await box(page, '.nw-video')
   note = await box(page, '.pages-area')
   expect(video.top).toBeGreaterThanOrEqual(note.bottom - 1)
   await bigEnough(page)
 
-  await page.getByRole('radio', { name: 'Video floating over the note' }).click()
+  await videoPlace(page, 'Video floating over the note')
   video = await box(page, '.nw-video')
   note = await box(page, '.pages-area')
   expect(video.left).toBeGreaterThan(note.left)
@@ -99,17 +112,23 @@ test('a YouTube link opens beside the note; above, below and to either side the 
   // Over the note, and nothing over the player.
   const top = await page.evaluate(([x, y]) => document.elementFromPoint(x!, y!)?.closest('.nw-video') !== null, [video.left + video.width / 2, video.top + video.height / 2])
   expect(top).toBe(true)
+  await expectVideoAt(page, 'Video floating over the note')
+
+  // Back inside Beside, the notes as wide as before it came out.
+  const before = (await box(page, '.pages-area')).width
+  await videoPlace(page, 'Video inside the Beside panel')
+  await inside()
+  expect((await box(page, '.pages-area')).width).toBeGreaterThanOrEqual(before - 1)
 
   // Moved about, the player was never made again: a playing video plays on.
   await expect(frame).toHaveAttribute('data-mark', 'the same player')
-  await expect(page.getByRole('radio', { name: 'Video floating over the note' })).toHaveAttribute('aria-checked', 'true')
   // Kept for the next time.
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('shellnote:workspace')!).layout.floating.video)).toBeDefined()
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('shellnote:workspace-2')!).beside.video)).toBe(true)
 })
 
 test('Play plays the video and Ctrl+Shift+Space pauses it while the pen writes; Close closes the panel, the video stays in the note', async ({ page }) => {
   await openNote(page)
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  await openVideoMenu(page)
   await page.getByLabel('YouTube link').fill('aircAruvnKk')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await page.getByRole('button', { name: 'Play the video' }).click()
@@ -125,22 +144,21 @@ test('Play plays the video and Ctrl+Shift+Space pauses it while the pen writes; 
   await expect(page.locator('.nw-video')).toHaveCount(0)
   expect(await media(page)).toHaveLength(1)
   // Shown again from the Video menu.
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  await openVideoMenu(page)
   await page.getByRole('button', { name: 'YouTube aircAruvnKk', exact: true }).click()
   await expect(page.locator('.nw-video iframe')).toBeVisible()
 })
 
 test('a menu opened over the YouTube player makes it step aside, paused and hidden, and it plays on when the menu closes (YouTube terms)', async ({ page }) => {
   await openNote(page)
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  await openVideoMenu(page)
   await page.getByLabel('YouTube link').fill('aircAruvnKk')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await page.getByRole('button', { name: 'Play the video' }).click()
   await expect(page.getByRole('button', { name: 'Pause the video' })).toBeVisible()
 
-  // The Video menu drops down over the player docked on the right.
-  await page.getByRole('radio', { name: 'Video on the right' }).click()
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  // The Video menu, at Beside's head, drops down over the player inside it.
+  await openVideoMenu(page)
   const menu = await box(page, '.nw-video-menu')
   const player = await box(page, '.nw-video-body')
   expect(menu.bottom > player.top && menu.left < player.right && menu.right > player.left).toBe(true)
@@ -159,7 +177,7 @@ test('a menu opened over the YouTube player makes it step aside, paused and hidd
 
 test('a link that is not YouTube says so and adds nothing', async ({ page }) => {
   await openNote(page)
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  await openVideoMenu(page)
   await page.getByLabel('YouTube link').fill('https://example.com/watch?v=aircAruvnKk')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('not a YouTube link')
@@ -169,7 +187,7 @@ test('a link that is not YouTube says so and adds nothing', async ({ page }) => 
 test('a video file of ones own is kept with the note and plays in the panel; its edge drags, kept; taken out, its bytes go, and undo brings both back', async ({ page }) => {
   await openNote(page)
   const bytes = WEBM
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  await openVideoMenu(page)
   const chooser = page.waitForEvent('filechooser')
   await page.getByRole('button', { name: 'Add a video file (MP4, WebM)' }).click()
   await (await chooser).setFiles({ name: 'my lecture.webm', mimeType: 'video/webm', buffer: bytes })
@@ -186,25 +204,25 @@ test('a video file of ones own is kept with the note and plays in the panel; its
   await expect(page.getByRole('button', { name: 'Play the video' })).toBeVisible()
   expect(await player.evaluate((video: HTMLVideoElement) => video.paused)).toBe(true)
 
-  // The edge between video and notes, dragged 150 pixels toward the notes: the video wider by as much, and kept.
+  // The edge between the notes and Beside, dragged 150 pixels toward the notes: the video inside it wider by as much, and kept.
   const before = await box(page, '.nw-video')
   const edge = await box(page, '.nw-dock-splitter[data-dir="row"]')
   await page.mouse.move(edge.left + edge.width / 2, edge.top + 200)
   await page.mouse.down()
-  await page.mouse.move(edge.left + edge.width / 2 + 75, edge.top + 200, { steps: 4 })
-  await page.mouse.move(edge.left + edge.width / 2 + 150, edge.top + 200, { steps: 4 })
+  await page.mouse.move(edge.left + edge.width / 2 - 75, edge.top + 200, { steps: 4 })
+  await page.mouse.move(edge.left + edge.width / 2 - 150, edge.top + 200, { steps: 4 })
   await page.mouse.up()
   const after = await box(page, '.nw-video')
   expect(after.width - before.width).toBeGreaterThan(144)
   expect(after.width - before.width).toBeLessThan(156)
-  expect((await box(page, '.pages-area')).left).toBeGreaterThanOrEqual(after.right - 1)
-  // Kept for the next time: the video's share against the notes' is no longer the sketch's 0.4 (the root also keeps the
+  expect((await box(page, '.pages-area')).right).toBeLessThanOrEqual(after.left)
+  // Kept for the next time: the notes' share against the panel's is no longer the start's 0.69 (the root also keeps the
   // program panel's share, shown in the app on Windows only).
   const kept = await page.evaluate(() => {
-    const [video, notes] = JSON.parse(localStorage.getItem('shellnote:workspace')!).layout.root.sizes as number[]
-    return video! / (video! + notes!)
+    const [notes, side] = JSON.parse(localStorage.getItem('shellnote:workspace-2')!).layout.root.sizes as number[]
+    return notes! / (notes! + side!)
   })
-  expect(kept).not.toBeCloseTo(0.4, 2)
+  expect(kept).not.toBeCloseTo(0.69, 2)
 
   // Dragged as far as it goes, the notes keep room to write in.
   await page.mouse.move(after.right, edge.top + 200)
@@ -213,7 +231,7 @@ test('a video file of ones own is kept with the note and plays in the panel; its
   await page.mouse.up()
   expect((await box(page, '.pages-area')).width).toBeGreaterThanOrEqual(236)
 
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  await openVideoMenu(page)
   await page.getByRole('button', { name: 'Take my lecture.webm out of the note' }).click()
   await expect(page.locator('.nw-video')).toHaveCount(0)
   expect(await media(page)).toBeUndefined()
@@ -226,7 +244,7 @@ test('a video file of ones own is kept with the note and plays in the panel; its
 
 test('ones own video is cropped by a box moved and sized over it: the part kept shows in its own shape, with a seek bar; Whole video takes it off, one undo step each', async ({ page }) => {
   await openNote(page)
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  await openVideoMenu(page)
   const chooser = page.waitForEvent('filechooser')
   await page.getByRole('button', { name: 'Add a video file (MP4, WebM)' }).click()
   await (await chooser).setFiles({ name: 'square.webm', mimeType: 'video/webm', buffer: WEBM })
@@ -271,9 +289,9 @@ test('ones own video is cropped by a box moved and sized over it: the part kept 
 test('a stroke written beside a playing video keeps its time; the ⏱ beside the line plays the video from there, opening the panel if it is closed', async ({ page }) => {
   await openNote(page)
   // The Pen first: its panel closed before the video is beside the note.
-  await page.getByRole('radio', { name: 'Pen', exact: true }).click()
+  await chooseTool(page, 'pen')
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  await openVideoMenu(page)
   await page.getByLabel('YouTube link').fill('aircAruvnKk')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await page.getByRole('button', { name: 'Play the video' }).click()
@@ -311,9 +329,9 @@ test('a stroke written beside a playing video keeps its time; the ⏱ beside the
 
 test('a hard part marked from the panel becomes a ▶ right of the writing: a tap plays it and pauses at its end; dragged, it moves; × takes it out; one undo step each', async ({ page }) => {
   await openNote(page)
-  await page.getByRole('radio', { name: 'Pen', exact: true }).click()
+  await chooseTool(page, 'pen')
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  await openVideoMenu(page)
   await page.getByLabel('YouTube link').fill('aircAruvnKk')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await page.getByRole('button', { name: 'Play the video' }).click()
@@ -405,12 +423,12 @@ test.describe('recording the note as it is written', () => {
 
   test('only the desk is recorded, with no sound, never a video beside it; Stop, or the browser ending the sharing, keeps the recording in the note and leaves the panel be', async ({ page }) => {
     await openNote(page)
-    await page.getByRole('button', { name: 'Video', exact: true }).click()
+    await openVideoMenu(page)
     await page.getByLabel('YouTube link').fill('aircAruvnKk')
     await page.getByRole('button', { name: 'Add', exact: true }).click()
-    await page.getByRole('radio', { name: 'Video floating over the note' }).click()
+    await videoPlace(page, 'Video floating over the note')
 
-    await page.getByRole('button', { name: 'Video', exact: true }).click()
+    await openVideoMenu(page)
     await page.getByRole('button', { name: 'Record this note as you write' }).click()
     const stop = page.getByRole('button', { name: /^Stop recording/ })
     await expect(stop).toBeVisible()
@@ -432,7 +450,7 @@ test.describe('recording the note as it is written', () => {
     await expect(stop).toHaveCount(0)
 
     // The browser's own Stop sharing ends it too.
-    await page.getByRole('button', { name: 'Video', exact: true }).click()
+    await openVideoMenu(page)
     await page.getByRole('button', { name: 'Record this note as you write' }).click()
     await expect(stop).toBeVisible()
     await page.evaluate(() => (window as unknown as { __capture: { track: MediaStreamTrack } }).__capture.track.dispatchEvent(new Event('ended')))
@@ -445,7 +463,7 @@ test.describe('recording the note as it is written', () => {
       delete (window as unknown as { RestrictionTarget?: unknown }).RestrictionTarget
     })
     await openNote(page)
-    await page.getByRole('button', { name: 'Video', exact: true }).click()
+    await openVideoMenu(page)
     await expect(page.getByRole('button', { name: 'Record this note as you write' })).toBeDisabled()
     await expect(page.getByText('Recording only the note needs Edge or Chrome 132 or later')).toBeVisible()
   })
@@ -453,10 +471,10 @@ test.describe('recording the note as it is written', () => {
 
 test('floating, the video is sized from each of its four edges and four corners', async ({ page }) => {
   await openNote(page)
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  await openVideoMenu(page)
   await page.getByLabel('YouTube link').fill('aircAruvnKk')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
-  await page.getByRole('radio', { name: 'Video floating over the note' }).click()
+  await videoPlace(page, 'Video floating over the note')
   // Grab a grip's middle and move it; the panel as it then is.
   const pull = async (grip: string, dx: number, dy: number): Promise<Box> => {
     const g = await box(page, `.nw-video-grip[data-grip="${grip}"]`)
@@ -492,9 +510,9 @@ test.describe('on an iPad', () => {
   // A test iPad, 6 November 2026: a ⏱ did not play. A page may not start a video there: only a tap on the player's own button.
   test('a ⏱ sets where the tap on YouTube’s button will start, and says so; once it has played, a ⏱ plays', async ({ page }) => {
     await openNote(page)
-    await page.getByRole('radio', { name: 'Pen', exact: true }).click()
+    await chooseTool(page, 'pen')
     await page.keyboard.press('Escape')
-    await page.getByRole('button', { name: 'Video', exact: true }).click()
+    await openVideoMenu(page)
     await page.getByLabel('YouTube link').fill('aircAruvnKk')
     await page.getByRole('button', { name: 'Add', exact: true }).click()
     const facts = () => player(page, (p) => ({ cued: p.cued, played: p.played, time: p.getCurrentTime() }))
@@ -532,11 +550,11 @@ test.describe('on a phone upright', () => {
 
   // A test phone, 6 November 2026: a ⏱ tapped "does not automatically open". Beside the notes the video's share was 156
   // pixels, too small for YouTube's player, which plays at no less than 200.
-  test('the video goes above the notes, big enough to play, and a ⏱ opens it with the panel closed', async ({ page }) => {
+  test('the video shows inside Beside under the note, the whole width, big enough to play, and a ⏱ opens it with the panel closed', async ({ page }) => {
     await openNote(page)
-    await page.getByRole('radio', { name: 'Pen', exact: true }).click()
+    await chooseTool(page, 'pen')
     await page.keyboard.press('Escape')
-    await page.getByRole('button', { name: 'Video', exact: true }).click()
+    await openVideoMenu(page)
     await page.getByLabel('YouTube link').fill('aircAruvnKk')
     await page.getByRole('button', { name: 'Add', exact: true }).click()
     await page.getByRole('button', { name: 'Play the video' }).click()
@@ -544,17 +562,18 @@ test.describe('on a phone upright', () => {
     await bigEnough(page)
     const panel = await box(page, '.nw-video')
     expect(panel.width).toBeGreaterThanOrEqual(380)
-    // At this width the buttons keep their size, those of where it sits too.
-    expect(await page.getByRole('radio', { name: /^Video floating/u }).evaluate((button) => button.getBoundingClientRect().width)).toBeGreaterThanOrEqual(30)
-    // Its bar's buttons all inside it, none out of reach (found 6 November 2026: Close lay past the panel's edge).
-    expect(await page.locator('.nw-video-bar').evaluate((bar) => {
+    // At this width the buttons keep their size, that of where it sits too.
+    expect(await page.getByRole('button', { name: 'Where the video sits' }).evaluate((button) => button.getBoundingClientRect().width)).toBeGreaterThanOrEqual(30)
+    // Its buttons all inside it, none out of reach (found 6 November 2026: Close lay past the panel's edge).
+    expect(await page.locator('.nw-video-caption').evaluate((bar) => {
       const edge = bar.getBoundingClientRect()
       return [...bar.querySelectorAll('button')].filter((button) => button.getBoundingClientRect().right > edge.right + 0.5 || button.getBoundingClientRect().left < edge.left - 0.5).map((button) => button.getAttribute('aria-label'))
     })).toEqual([])
     await player(page, (p) => p.seekTo(83))
 
-    // Low on the screen: the bars float over the top of the notes.
-    await writeWord(page, 170, 720)
+    // On the note, above Beside: the panel under the note on a phone.
+    const pages = await box(page, '.sh-notes-row .pages-area')
+    await writeWord(page, 170, pages.bottom - 50)
     await expect.poll(() => page.evaluate(() => Object.values(window.__shellnote!.doc.block).flatMap((b) => (b.type === 'ink' ? b.strokes : [])).length)).toBe(3)
     const mark = page.getByRole('button', { name: /^Play the video from 1:23/u })
     await expect(mark).toBeVisible()
@@ -570,9 +589,9 @@ test.describe('on a phone upright', () => {
 
 test('a line’s times come off with its ×, one undo step, and the ⏱ can all be hidden', async ({ page }) => {
   await openNote(page)
-  await page.getByRole('radio', { name: 'Pen', exact: true }).click()
+  await chooseTool(page, 'pen')
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  await openVideoMenu(page)
   await page.getByLabel('YouTube link').fill('aircAruvnKk')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
   await page.getByRole('button', { name: 'Play the video' }).click()
@@ -585,7 +604,7 @@ test('a line’s times come off with its ×, one undo step, and the ⏱ can all 
   await expect(mark).toBeVisible()
 
   // Hidden by the switch, shown again.
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  await openVideoMenu(page)
   await page.getByLabel('Show when each line was written (⏱)').uncheck()
   await expect(mark).toHaveCount(0)
   expect(await page.evaluate(() => localStorage.getItem('shellnote:video-times'))).toBe('off')
@@ -612,11 +631,10 @@ test('the side panel’s description: a key of one’s own typed in, the creator
     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ items: [{ snippet: { title: 'But what is a neural network?', channelTitle: '3Blue1Brown', description: 'A first look.\n0:00 Introduction\n1:05 The structure' } }] }) })
   })
   await openNote(page)
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  await openVideoMenu(page)
   await page.getByLabel('YouTube link').fill('aircAruvnKk')
   await page.getByRole('button', { name: 'Add', exact: true }).click()
-  await page.getByRole('button', { name: 'Side panel', exact: true }).click()
-  await page.getByRole('tab', { name: 'Description' }).click()
+  await openPart(page, 'Description')
   await page.getByLabel('YouTube Data API key').fill('test-key-not-real')
   await page.getByRole('button', { name: 'Keep the key' }).click()
 

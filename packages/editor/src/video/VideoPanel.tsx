@@ -1,10 +1,11 @@
-// The video panel beside a note: a YouTube video in YouTube's own player, or a
-// video file of the person's own. One of the workspace's panels: docked beside, above or below the notes
-// (the five buttons, or dragged by its bar), or floating over them and sized from any edge or corner; Ctrl+Shift+Space
-// pauses it while the pen writes.
+// The video beside a note: a YouTube video in YouTube's own player, or a video file of the person's own. Shown
+// inside the Beside panel, or taken out into a panel of its own: docked beside, above or below the notes, or floating
+// over them and sized from any edge or corner (its places menu, or dragged by its bar). Ctrl+Shift+Space pauses it
+// while the pen writes.
 import type { Id, Media } from '@shellnote/core'
-import { Crop, Flag, Maximize2, Minimize2, PanelBottom, PanelLeft, PanelRight, PanelTop, Pause, Play, PictureInPicture2, X } from 'lucide-react'
+import { ChevronDown, Crop, Flag, Maximize2, Minimize2, PanelBottom, PanelLeft, PanelRight, PanelRightDashed, PanelTop, Pause, Play, PictureInPicture2, X } from 'lucide-react'
 import { useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react'
+import { BarMenu, MenuItem } from '../BarMenu.js'
 import { commands } from '../commands/index.js'
 import { useFullView, usePanel, type Where } from '../layout/DockArea.js'
 import { PANEL_LEAST } from '../layout/tree.js'
@@ -16,6 +17,7 @@ import { useStepAside } from './stepAside.js'
 import { BUFFERING, mustTapToStart, PLAYING, youTubePlayer, type YouTubePlayer } from './youtube.js'
 
 const PLACES: [Where, string, typeof PanelLeft][] = [
+  ['beside', 'Video inside the Beside panel', PanelRightDashed],
   ['left', 'Video on the left', PanelLeft],
   ['right', 'Video on the right', PanelRight],
   ['top', 'Video above', PanelTop],
@@ -65,8 +67,9 @@ export function VideoPanel({ store, media }: { store: EditorStore; media: Media 
   /** A hard part (a ▶ mark): the first press marks its start, the second its end; put beside the writing (video.mark). */
   const mark = (): void => commands.tap('video.mark')
 
-  /** One of the five places: beside the notes, above or below them, or floating where it last floated (video.place, video.float). */
-  const place = (where: Where): void => (where === 'float' ? commands.tap('video.float') : commands.tap('video.place', { place: where }))
+  /** One of the places: inside Beside, beside the notes, above or below them, or floating where it last floated (video.inside, video.place, video.float). */
+  const place = (where: Where): void => (where === 'beside' ? commands.tap('video.inside') : where === 'float' ? commands.tap('video.float') : commands.tap('video.place', { place: where }))
+  const Here = PLACES.find(([where]) => where === panel?.where)?.[2] ?? PanelRightDashed
 
   /** Floating: one of its edges or corners dragged, each side it holds following the pointer, inside the workspace. */
   const size = (event: ReactPointerEvent, grip: Grip): void => {
@@ -102,13 +105,14 @@ export function VideoPanel({ store, media }: { store: EditorStore; media: Media 
 
   const title = media.kind === 'youtube' ? (media.title ?? 'YouTube video') : (media.name ?? 'Video')
   const playing = clock?.media === media.id && clock.playing()
-  return (
-    <section className="nw-video" data-floating={floating ? '' : undefined} aria-label="Video">
-      <header className="nw-video-bar" onPointerDown={panel?.grab} title="Drag to move the video">
-        <span className="nw-video-title" title={title}>
-          {title}
-        </span>
-        <button type="button" className="nw-ibtn" aria-label={playing ? 'Pause the video' : 'Play the video'} title={`${playing ? 'Pause' : 'Play'} (Ctrl+Shift+Space)`} disabled={clock?.media !== media.id || covered} data-command={playing ? 'video.pause' : 'video.play'} onClick={() => commands.tap(playing ? 'video.pause' : 'video.play')}>
+  // Inside the Beside panel, as the design draws it: the player first, its name and where it is under it.
+  const inside = panel?.where === 'beside'
+  const now = clock?.media === media.id ? clock.time() : undefined
+  const length = clock?.media === media.id ? clock.duration?.() : undefined
+  const at = [now !== undefined && Number.isFinite(now) ? timeText(Math.round(now * 10)) : '', length !== undefined && Number.isFinite(length) && length > 0 ? `of ${timeText(Math.round(length * 10))}` : ''].filter(Boolean).join(' ')
+  const controls = (
+    <>
+      <button type="button" className="nw-ibtn" aria-label={playing ? 'Pause the video' : 'Play the video'} title={`${playing ? 'Pause' : 'Play'} (Ctrl+Shift+Space)`} disabled={clock?.media !== media.id || covered} data-command={playing ? 'video.pause' : 'video.play'} onClick={() => commands.tap(playing ? 'video.pause' : 'video.play')}>
           {playing ? <Pause size={16} aria-hidden /> : <Play size={16} aria-hidden />}
         </button>
         <button
@@ -128,13 +132,35 @@ export function VideoPanel({ store, media }: { store: EditorStore; media: Media 
             <Crop size={16} aria-hidden />
           </button>
         ) : null}
-        <span className="nw-video-places" role="radiogroup" aria-label="Where the video sits">
-          {PLACES.map(([where, label, Icon]) => (
-            <button key={where} type="button" role="radio" className="nw-ibtn" aria-checked={panel?.where === where} aria-label={label} title={label} data-command={where === 'float' ? 'video.float' : 'video.place'} onClick={() => place(where)}>
-              <Icon size={16} aria-hidden />
-            </button>
-          ))}
-        </span>
+        <BarMenu
+          label="Where the video sits"
+          title="Where the video sits: inside the Beside panel, beside the notes, above or below them, or floating"
+          className="nw-ibtn nw-video-where"
+          button={
+            <>
+              <Here size={16} aria-hidden />
+              <ChevronDown size={12} aria-hidden />
+            </>
+          }
+        >
+          {(close) =>
+            PLACES.map(([where, label, Icon]) => (
+              <MenuItem
+                key={where}
+                label={label}
+                checked={panel?.where === where}
+                command={where === 'beside' ? 'video.inside' : where === 'float' ? 'video.float' : 'video.place'}
+                onChoose={() => {
+                  close()
+                  place(where)
+                }}
+              >
+                <Icon size={16} aria-hidden />
+                {label}
+              </MenuItem>
+            ))
+          }
+        </BarMenu>
         {full ? (
           <button type="button" className="nw-ibtn" aria-label={full.full ? 'Leave full view' : 'Full view: the video alone'} aria-pressed={full.full} title={full.full ? 'Leave full view (Esc)' : 'Full view'} data-command="panel.full" onClick={full.toggle}>
             {full.full ? <Minimize2 size={16} aria-hidden /> : <Maximize2 size={16} aria-hidden />}
@@ -143,7 +169,18 @@ export function VideoPanel({ store, media }: { store: EditorStore; media: Media 
         <button type="button" className="nw-ibtn" aria-label="Close the video" title="Close the video" data-command="video.hide" onClick={() => commands.tap('video.hide')}>
           <X size={16} aria-hidden />
         </button>
-      </header>
+    </>
+  )
+  return (
+    <section className="nw-video" data-floating={floating ? '' : undefined} data-inside={inside ? '' : undefined} aria-label="Video">
+      {inside ? null : (
+        <header className="nw-video-bar" onPointerDown={panel?.grab} title="Drag to move the video">
+          <span className="nw-video-title" title={title}>
+            {title}
+          </span>
+          {controls}
+        </header>
+      )}
       {tapFrom !== undefined && !problem ? (
         <p className="nw-video-tap" role="status">
           Tap ▶ on the video to start it{tapFrom > 0 ? ` from ${timeText(tapFrom * 10)}` : ''}. On this device YouTube starts only from its own button, the first time.
@@ -161,6 +198,17 @@ export function VideoPanel({ store, media }: { store: EditorStore; media: Media 
           <FileView store={store} media={media} cropping={cropping} onCropped={() => setCropping(false)} onProblem={setProblem} />
         )}
       </div>
+      {inside ? (
+        <footer className="nw-video-caption" onPointerDown={panel?.grab} title="Drag to take the video out of Beside">
+          <span className="nw-video-words">
+            <b className="nw-video-title" title={title}>
+              {title}
+            </b>
+            <span className="nw-video-at">{at ? `${at} · a line you write keeps its time` : 'A line you write keeps its time'}</span>
+          </span>
+          {controls}
+        </footer>
+      ) : null}
       {floating ? GRIPS.map((grip) => <div key={grip} className="nw-video-grip" data-grip={grip} onPointerDown={(event) => size(event, grip)} aria-hidden />) : null}
     </section>
   )
@@ -201,6 +249,7 @@ function YouTubeView({ media, video, onProblem, onTapFrom }: { media: Id; video:
             const state = ready.getPlayerState()
             return state === PLAYING || state === BUFFERING
           },
+          duration: () => ready.getDuration?.() ?? Number.NaN,
           play: () => {
             if (started) ready.playVideo()
             else onTapFrom(from)

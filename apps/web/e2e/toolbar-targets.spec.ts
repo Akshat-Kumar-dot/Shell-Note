@@ -4,6 +4,7 @@
 // with only a caret, a change goes to its whole word, or to the words typed
 // next; with nothing chosen, to where the caret last was, shown in grey.
 import { expect, test, type Page } from './fixtures.js'
+import { chooseTool, textFont, textRow, textSize } from './shell.js'
 
 test.use({ viewport: { width: 1280, height: 1000 } })
 
@@ -98,7 +99,7 @@ const SELECT: Record<string, { whole: boolean; run: (page: Page) => Promise<void
   'a Select box': {
     whole: false,
     run: async (page) => {
-      await page.getByRole('radio', { name: 'Select' }).click()
+      await chooseTool(page, 'select')
       const beta = await wordBox(page, 'beta')
       await page.mouse.move(beta.left - 3, beta.top - 3)
       await page.mouse.down()
@@ -135,12 +136,12 @@ const CHANGE: Record<string, { run: (page: Page) => Promise<void>; expect: (line
     expect: styled('color', 'red'),
   },
   size: {
-    run: (page) => page.getByRole('button', { name: 'Large', exact: true }).click(),
+    run: (page) => textSize(page, 'Large'),
     expect: styled('size', 'l'),
   },
   font: {
     run: async (page) => {
-      await page.getByRole('combobox', { name: 'Font' }).selectOption('serif')
+      await textFont(page, 'Serif')
     },
     expect: styled('font', 'serif'),
   },
@@ -180,13 +181,13 @@ test('with nothing chosen, the bar stays on and acts where the caret last was, s
   const sheet = (await page.locator('.nw-page').first().boundingBox())!
   await page.mouse.click(sheet.x - 30, sheet.y + 300)
   await expect(page.locator('.nw-frame .nw-last-caret')).toHaveCount(1)
-  const off = await page.locator('.nw-formatbar button:disabled, .nw-formatbar select:disabled').evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))
-  // Only what does not apply here: no indent to take away, and no to-do to tick.
-  expect(off.sort()).toEqual(['Indent less', 'Ticked'])
+  const off = await textRow(page).locator('button:disabled').evaluateAll((els) => els.map((el) => el.getAttribute('aria-label')))
+  // Only what does not apply here: nothing to redo.
+  expect(off.sort()).toEqual(['Redo'])
   await page.getByRole('button', { name: 'Bold', exact: true }).click()
   await expect.poll(async () => (await lines(page))[0]!.md).toBe('Alpha **beta** gamma')
   // The caret was inside "beta", so the size goes to that word too.
-  await page.getByRole('button', { name: 'Large', exact: true }).click()
+  await textSize(page, 'Large')
   await expect.poll(async () => (await lines(page))[0]!.md).toBe('Alpha [**beta**]{size=l} gamma')
 })
 

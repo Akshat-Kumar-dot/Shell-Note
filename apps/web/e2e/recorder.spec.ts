@@ -3,6 +3,7 @@
 // its progress in the library (IndexedDB, one ask at a time), and teaches the
 // pen the person's hand.
 import { expect, test, type Page } from './fixtures.js'
+import { chooseTool, openPenSettings } from './shell.js'
 
 type Item = { kind: string; strokes: { type: string; samples: number[][] }[] }
 
@@ -47,19 +48,22 @@ test('the recorder keeps each stroke sample by sample, and goes on by itself aft
   await expect(page.getByRole('button', { name: 'Download (1 kept)' })).toBeEnabled()
 })
 
-test('the library links to the recorder, says what it is for, and the recorder leads back', async ({ page }) => {
-  await page.goto('/')
-  const about = page.getByRole('button', { name: 'What is the stroke recorder?' })
+test("the pen's settings link to the recorder, say what it is for, and the recorder leads back to the library", async ({ page }) => {
+  await page.goto('/#/new')
+  await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
+  await openPenSettings(page)
+  const hand = page.getByRole('group', { name: 'Your hand' })
+  const about = hand.getByRole('button', { name: 'What is the stroke recorder?' })
   await expect(about).toHaveAttribute('aria-expanded', 'false')
   await about.click()
-  await expect(page.getByRole('note')).toContainText('Teach the pen your hand.')
+  await expect(hand.getByRole('note')).toContainText('Teach the pen your hand.')
   await about.click()
-  await expect(page.getByRole('note')).toHaveCount(0)
-  await page.getByRole('link', { name: 'Stroke recorder' }).click()
+  await expect(hand.getByRole('note')).toHaveCount(0)
+  await hand.getByRole('link', { name: 'Teach the pen your hand' }).click()
   await expect(page.getByRole('heading', { name: 'Stroke recorder' })).toBeVisible()
   await page.getByRole('link', { name: '← Back to notes' }).click()
   // Back in the library.
-  await expect(page.getByRole('link', { name: 'Stroke recorder' })).toBeVisible()
+  await expect(page.locator('.home')).toBeVisible()
 })
 
 test('the alphabet: a letter of two strokes is kept as one, and the recorder goes on after a short pause', async ({ page }) => {
@@ -116,8 +120,8 @@ test('Teach my pen makes the pen profile from what is recorded, and the library 
   await expect(page.getByRole('status')).toContainText('That file is not a stroke recording.')
   // In a note, Pen settings shows what was learned, read back from the library.
   await page.goto('/?sample=mixed')
-  await page.getByRole('radio', { name: 'Pen', exact: true }).click()
-  await page.getByRole('button', { name: 'Pen settings' }).click()
+  await chooseTool(page, 'pen')
+  await openPenSettings(page)
   await expect(page.getByRole('group', { name: 'Your hand' })).toContainText('learned from 28 recorded strokes')
 })
 

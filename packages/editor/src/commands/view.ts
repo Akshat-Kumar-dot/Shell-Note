@@ -41,9 +41,10 @@ export function defineView(commands: Commands): void {
     return 'full screen on'
   })
   commands.define('panel.show', ['workspace'], ({ panel }) => {
-    if (panel === 'side') setSideOpen(true)
-    else showSideTab(panel as SideTab)
-    return `side panel open on ${panel === 'side' ? sideTab.value : String(panel)}`
+    // A program's part is the person's own: the panel opened by a command never shows it.
+    if (panel === 'side' && sideTab.value !== 'program') setSideOpen(true)
+    else showSideTab(panel === 'side' ? 'description' : (panel as SideTab))
+    return `side panel open on ${sideTab.value}`
   })
   commands.define('panel.hide', ['workspace'], () => {
     setSideOpen(false)
@@ -138,5 +139,5 @@ export function viewLine(zoom: number | undefined): string | undefined {
   if (zoom === undefined) return undefined
   const saved = layout.value
   const bars = Object.entries(saved.bars).map(([bar, place]) => `${bar} ${place.at}`).join(', ')
-  return `zoom ${pct(zoom)} · side panel ${saved.side ? `open on ${sideTab.value}` : 'closed'} · bars ${bars} · full view ${saved.layout.full ?? 'off'} · full screen ${typeof document !== 'undefined' && document.fullscreenElement ? 'on' : 'off'}`
+  return `zoom ${pct(zoom)} · side panel ${saved.side ? `open on ${sideTab.value === 'program' ? 'a program' : sideTab.value}` : 'closed'} · video ${saved.beside.video ? 'inside the Beside panel' : 'in its own panel'} · bars ${bars} · full view ${saved.layout.full ?? 'off'} · full screen ${typeof document !== 'undefined' && document.fullscreenElement ? 'on' : 'off'}`
 }

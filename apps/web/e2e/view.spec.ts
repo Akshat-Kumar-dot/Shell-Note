@@ -1,6 +1,7 @@
 // The read-only page view in a real browser: drawing, zoom, and drawing only
 // the pages near the screen.
 import { expect, test } from './fixtures.js'
+import { zoom, zoomShown } from './shell.js'
 
 test('draws a sample note: roles, lists, style tokens and placeholders', async ({ page }) => {
   await page.goto('/?sample=mixed')
@@ -27,16 +28,16 @@ test('zooms with the buttons, and with Ctrl and the wheel', async ({ page }) => 
   // An A4 page is 210 mm wide: 793.7 CSS pixels at 100%.
   const start = await width()
   expect(start).toBeCloseTo(793.7, 0)
-  await page.getByRole('button', { name: 'Zoom in' }).click()
+  await zoom(page, 'in')
   expect(await width()).toBeCloseTo(start * 1.1, 0)
-  await page.getByRole('button', { name: 'Actual size' }).click()
+  await zoom(page, 'actual')
   expect(await width()).toBeCloseTo(start, 0)
   await page.mouse.move(400, 400)
   await page.keyboard.down('Control')
   await page.mouse.wheel(0, -300)
   await page.keyboard.up('Control')
   await expect.poll(width).toBeGreaterThan(start * 1.2)
-  await expect(page.getByRole('button', { name: 'Actual size' })).not.toHaveText('100%')
+  await expect(zoomShown(page)).not.toHaveText('100%')
 })
 
 test('draws only the pages near the screen', async ({ page }) => {

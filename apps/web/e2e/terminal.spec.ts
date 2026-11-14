@@ -3,6 +3,7 @@
 // request writes blocks of lines that run one by one, its output going back.
 import { expect, test, type Page, type Route } from './fixtures.js'
 import { standInForYouTube } from './youtube.js'
+import { expectPenKind, expectVideoAt, openPenSettings } from './shell.js'
 
 /** A stand-in LM Studio, as the AI settings name it; each chat call answered from a script. */
 const FAKE = 'http://127.0.0.1:1298'
@@ -55,7 +56,7 @@ test('Ctrl+Shift+P opens the terminal; plain words and commands typed there run 
   await line.fill('use a blue pencil')
   await line.press('Enter')
   await expect(terminal(page).getByRole('log')).toContainText('✓ pen.set: pen: pencil, fine, blue')
-  await expect(page.getByRole('radio', { name: 'Pencil' })).toHaveAttribute('aria-checked', 'true')
+  await expectPenKind(page, 'Pencil')
   await line.fill('tool.choose tool=crayon')
   await line.press('Enter')
   await expect(terminal(page).getByRole('log')).toContainText('Write it as: tool.choose tool=select')
@@ -87,10 +88,11 @@ test('the view, the side panel, the bars and choosing blocks answer the terminal
   await openSample(page)
   await page.keyboard.press('Control+Shift+P')
   const run = lineRunner(page)
+  const zoomButton = page.locator('.sh-status').getByRole('button', { name: 'Zoom', exact: true })
   await run('screen.zoom percent=150', '✓ zoom 150 %')
-  await expect(page.getByRole('button', { name: 'Actual size' })).toHaveText('150%')
+  await expect(zoomButton).toHaveText('150%')
   await run('zoom to the actual size', '✓ screen.zoom: zoom 100 %')
-  await expect(page.getByRole('button', { name: 'Actual size' })).toHaveText('100%')
+  await expect(zoomButton).toHaveText('100%')
   await run('panel.show timer', '✓ side panel open on timer')
   await expect(page.getByRole('region', { name: 'Side panel' }).getByRole('tab', { name: 'Timer' })).toHaveAttribute('aria-selected', 'true')
   await run('panel.hide', '✓ side panel closed')
@@ -102,10 +104,15 @@ test('the view, the side panel, the bars and choosing blocks answer the terminal
   // A list written as JSON reads as the same ids.
   await run('select.blocks blocks=["nothere1"]', 'No such block in this note: nothere1 (no block has that id, or those words).')
   await run('look', 'bars tools top, format top')
-  // Each of these buttons now goes through its command.
-  for (const [name, command] of [['Zoom in', 'screen.zoom'], ['Zoom out', 'screen.zoom'], ['Side panel', 'panel.show'], ['Full screen', 'screen.fullscreen'], ['Save', 'file.save']] as const) {
-    await expect(page.getByRole('button', { name, exact: true })).toHaveAttribute('data-command', command)
-  }
+  // Each of these goes through its command: the zoom's menu, the rail's AI, full screen, and Save in the note's menu.
+  await zoomButton.click()
+  for (const name of ['Zoom in', 'Zoom out', 'Actual size']) await expect(page.getByRole('menuitem', { name, exact: true })).toHaveAttribute('data-command', 'screen.zoom')
+  await zoomButton.click()
+  await expect(page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'AI panel', exact: true })).toHaveAttribute('data-command', 'panel.show')
+  await expect(page.getByRole('button', { name: 'Full screen', exact: true })).toHaveAttribute('data-command', 'screen.fullscreen')
+  await page.getByRole('button', { name: 'This note', exact: true }).click()
+  await expect(page.getByRole('menuitem', { name: 'Save', exact: true })).toHaveAttribute('data-command', 'file.save')
+  await page.getByRole('button', { name: 'This note', exact: true }).click()
 })
 
 test('the library answers the terminal as its buttons do: folders and notes by name, the way there taken first, the bin emptied only once allowed (step 3b)', async ({ page }) => {
@@ -154,7 +161,7 @@ test('the library answers the terminal as its buttons do: folders and notes by n
   await expect(page.getByRole('heading', { name: 'Recently deleted is empty' })).toBeVisible()
   // The library's controls are marked with their commands.
   await page.keyboard.press('Escape')
-  await page.getByRole('link', { name: 'Notes', exact: true }).first().click()
+  await page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Library', exact: true }).click()
   await expect(page.getByRole('button', { name: 'New folder' })).toHaveAttribute('data-command', 'folder.new')
   await expect(page.getByRole('searchbox', { name: 'Search notes by title' })).toHaveAttribute('data-command', 'library.search')
   await expect(page.getByRole('combobox', { name: 'Sort' })).toHaveAttribute('data-command', 'library.sort')
@@ -177,9 +184,11 @@ test('the video, full view and the timer answer the terminal as their buttons do
   await run('video.pause', /✓ video paused at 1:30/u)
   await expect(page.getByRole('button', { name: 'Play the video' })).toBeVisible()
   await run('video.place place=left', '✓ video panel docked at the left')
-  await expect(page.getByRole('radio', { name: 'Video on the left' })).toHaveAttribute('aria-checked', 'true')
+  await expectVideoAt(page, 'Video on the left')
   await run('video.float', '✓ video panel floating over the note')
-  await expect(page.getByRole('radio', { name: 'Video floating over the note' })).toHaveAttribute('aria-checked', 'true')
+  await expectVideoAt(page, 'Video floating over the note')
+  await run('video.inside', '✓ video inside the Beside panel')
+  await expectVideoAt(page, 'Video inside the Beside panel')
   await run('panel.full pane=video', '✓ full view: the video alone')
   await expect(page.getByRole('button', { name: 'Leave full view' })).toBeVisible()
   await run('panel.full on=false', '✓ full view left')
@@ -245,9 +254,9 @@ test('the side panel’s tabs answer the terminal: a transcript kept, found in a
   await expect(side.getByRole('textbox', { name: 'Web address' })).toHaveValue('https://example.test/notes')
   await expect(side.frameLocator('iframe[title="Web page"]').getByRole('heading', { name: 'A page beside the note' })).toBeVisible()
   await run('output.made', '✓ Output: what the AI made, on the scratch pad')
-  await expect(side.getByRole('radio', { name: 'Made' })).toHaveAttribute('aria-checked', 'true')
+  await expect(side.getByRole('tab', { name: 'Scratch pad', exact: true })).toHaveAttribute('aria-selected', 'true')
   await run('output.answers', "✓ Output: the AI's answers and its log")
-  await expect(side.getByRole('radio', { name: 'Answers and log' })).toHaveAttribute('aria-checked', 'true')
+  await expect(side.getByRole('tab', { name: 'Changes', exact: true })).toHaveAttribute('aria-selected', 'true')
 })
 
 test('the bars, Settings, the AI box and the recorder answer the terminal as their buttons do (step 3c)', async ({ page }) => {
@@ -307,7 +316,7 @@ test("the app's own AI answers the terminal under high review; the scratch pad, 
   // The side panel's chat: a table onto the scratch pad, then into the note; an answer.
   await run('chat.send request="the kinds of waves" make=table put=pad', '✓ On the scratch pad. (pad.put puts it into the note.) [high review]')
   const side = page.getByRole('region', { name: 'Side panel' })
-  await expect(side.getByRole('tab', { name: 'AI' })).toHaveAttribute('aria-selected', 'true')
+  await expect(side.getByRole('tab', { name: 'Chat', exact: true })).toHaveAttribute('aria-selected', 'true')
   await run('look', /scratch pad: table "the kinds of waves" \(\w+\)/u)
   await run('chat.send request="what is sound?" make=ask', '✓ answered: Sound is a longitudinal wave. [high review]')
   await run('chat.choose make=flowchart put=note', '✓ next, the chat makes a flowchart, into the note')
@@ -385,7 +394,7 @@ test("the note's blocks listed by id, an id a letter off answered with the close
   expect(await page.evaluate(() => JSON.stringify(window.__shellnote!.doc.pen))).toBe('{"smoothing":3}')
   await run('settings.pen option=gap value=roomy', 'gap takes usual, first, tighter, wider, written.')
   await run('do use the pen', '✓')
-  await page.getByRole('button', { name: 'Pen settings' }).click()
+  await openPenSettings(page)
   const panel = page.getByRole('group', { name: 'Pen settings' })
   await expect(panel.getByRole('combobox', { name: 'Scratch out to delete' })).toHaveValue('false')
   await expect(panel.getByRole('combobox', { name: 'Smoothing' })).toHaveAttribute('data-command', 'settings.pen')
@@ -402,7 +411,9 @@ test("the note's blocks listed by id, an id a letter off answered with the close
   await run('pen.forget', '✓ the pen has learned nothing of your hand yet')
   // A sample note is this window's alone.
   await run('note.editHere', '✓ a sample note is edited here already')
-  await expect(page.getByRole('button', { name: 'AI log' })).toHaveAttribute('data-command', 'output.answers')
+  await page.getByRole('button', { name: 'This note', exact: true }).click()
+  await expect(page.getByRole('menuitem', { name: 'AI log', exact: true })).toHaveAttribute('data-command', 'output.answers')
+  await page.getByRole('button', { name: 'This note', exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveAttribute('data-command', 'note.rename')
 })
 
@@ -452,7 +463,7 @@ test('an area and the operation in plain words run the command the app picks in 
   await page.keyboard.press('Control+Shift+P')
   const run = lineRunner(page)
   await run('pen: use a red pencil', '✓ pen.set: pen: pencil, fine, red')
-  await expect(page.getByRole('radio', { name: 'Pencil' })).toHaveAttribute('aria-checked', 'true')
+  await expectPenKind(page, 'Pencil')
   await run('screen: zoom to percent=150', '✓ screen.zoom: zoom 150 %')
   // The area in its own words, and inputs that fit another area's command.
   await run('sidebar | open | panel=timer', /✓ panel\.show/u)
@@ -488,7 +499,7 @@ test('a model given a request writes lines that run one block at a time, sees th
   await line.fill('a broad red marker')
   await line.press('Control+Enter')
   await expect(terminal(page).getByRole('log')).toContainText('The model is done.')
-  await expect(page.getByRole('radio', { name: 'Marker' })).toHaveAttribute('aria-checked', 'true')
+  await expectPenKind(page, 'Marker')
   expect(calls).toHaveLength(3)
   // The first block's failure went back with how to write it, and where marker fits.
   expect(calls[1]!.messages.at(-1)!.content).toContain("\"marker\" fits pen.set's kind: write pen.set kind=marker")

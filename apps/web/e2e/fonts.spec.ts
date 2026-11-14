@@ -1,6 +1,7 @@
 // The font library: fonts bundled with the app, added to the font menu beside
 // the four font styles, used on a block, and kept in the menu after a reload.
 import { expect, test, type Page } from './fixtures.js'
+import { textFont, textRow } from './shell.js'
 
 function firstStyle(page: Page): Promise<{ font?: string } | undefined> {
   return page.evaluate(() => {
@@ -16,10 +17,15 @@ test('a font added from the library joins the font menu, sets a block in it, and
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
   await page.locator('.nw-frame .ProseMirror').first().click()
   await page.keyboard.type('Lecture notes')
-  const menu = page.getByRole('combobox', { name: 'Font' })
-  await expect(menu.locator('option')).toHaveText(['Sans', 'Serif', 'Mono', 'Handwriting', 'More fonts…'])
+  /** The font and size menu, opened from the row for words. */
+  const fonts = async () => {
+    await textRow(page).getByRole('button', { name: 'Font and size', exact: true }).click()
+    return page.getByRole('menu', { name: 'Font and size' })
+  }
+  const menu = await fonts()
+  await expect(menu.getByRole('menuitemradio')).toHaveText(['Sans', 'Serif', 'Mono', 'Handwriting'])
 
-  await menu.selectOption('+more')
+  await menu.getByRole('menuitem', { name: 'More fonts…' }).click()
   const library = page.getByRole('dialog', { name: 'Font library' })
   await expect(library.getByRole('listitem')).toHaveCount(15)
   await library.getByRole('button', { name: 'Lora in the font menu' }).click()
@@ -30,7 +36,7 @@ test('a font added from the library joins the font menu, sets a block in it, and
   // The whole line, chosen as in Word, takes the font as its style.
   const line = page.locator('.nw-frame .nw-text').first()
   await line.click({ clickCount: 3 })
-  await menu.selectOption('lora')
+  await textFont(page, 'Lora')
   await expect.poll(async () => (await firstStyle(page))?.font).toBe('lora')
   await expect(line).toHaveAttribute('data-font', 'lora')
   await expect(line).toHaveCSS('font-family', /Lora/)
@@ -40,5 +46,5 @@ test('a font added from the library joins the font menu, sets a block in it, and
   await page.reload()
   await page.locator('.nw-frame .ProseMirror').first().click()
   await page.keyboard.type('x')
-  await expect(page.getByRole('combobox', { name: 'Font' }).locator('option', { hasText: 'Lora' })).toHaveCount(1)
+  await expect((await fonts()).getByRole('menuitemradio', { name: 'Lora', exact: true })).toHaveCount(1)
 })

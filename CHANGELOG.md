@@ -41,6 +41,25 @@ All notable changes to ShellNote are listed here. The format follows
 - The app's surfaces are plain greys in light and in dark, and its buttons black or white, in place of the violet it
   had. Settings, Appearance offers a colour for the buttons and for what is chosen: graphite, which is none, or blue,
   teal, green, amber, rose or red. The choice is kept on the device, and has its command, `settings.accent`.
+- A new frame round every screen. A rail of the app's places down the left edge: the library, a search of its names,
+  the AI, what is beside the note, the terminal, where your notes are kept, and Settings. The library's column beside
+  every screen, to search, sort, hide or move to the other side, with Recently deleted at its foot. Tabs of the open
+  notes, the Library first, each note renamed in its tab. On a phone or an upright tablet the rail lies along the
+  bottom.
+- One slim row of tools on a note in place of the two bars: undo, redo, the block's style, font and size, bold, italic,
+  underline, colour, alignment and indent, link, picture, table, and More for the rest (the other marks, the paper, the
+  Select box and the free cursor). With the pen, highlighter or eraser in hand, the pen's row takes its place: select,
+  the pen and its kinds, highlighter, eraser, four colours and more, one width, undo, redo, tidy, type and picture.
+  More can show both rows at once. The row sits under the tabs, down either side, along the bottom, or floats as a
+  pill; narrower than its tools, it scrolls sideways.
+- A status line under the note: how safe it is, where it is kept, its pages and words, and the zoom. Save, open a file,
+  the note's full view and what the AI changed are in the note's own menu, at the end of the tabs.
+- One panel beside the note, from the window's top: the AI (its chat, what it changed, the scratch pad) or Beside (a
+  video, a web page, or in the Windows app another program). A video shows inside Beside with its name and time under
+  it, its description, transcript and a timer below; it can be taken out into a panel of its own, beside, above or
+  below the note or floating, and put back with its menu or the new command `video.inside`. A program has the same,
+  by its own buttons alone. A panel moved about gives its room back to the note.
+- What the stroke recorder is for, and the way to it, are in the pen's settings, under Your hand.
 
 ### Security
 

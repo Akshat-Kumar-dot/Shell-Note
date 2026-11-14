@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./host": "./src/host.ts",
     "./theme.css": "./src/theme.css",
+    "./shell.css": "./src/shell.css",
     "./fonts.css": "./src/fonts.css"
   },
   "dependencies": {

@@ -23,6 +23,9 @@ export interface Entry {
 const history = new Shared<Entry[]>([])
 const opened = new Shared(false)
 
+/** Whether the terminal is open: a button elsewhere shows it, and follows Ctrl+Shift+P. */
+export const terminalOpen: Pick<Shared<boolean>, 'subscribe' | 'snapshot'> = opened
+
 /** Open or close the terminal, as Ctrl+Shift+P does. */
 export function openTerminal(open = true): void {
   opened.set(open)

@@ -7,11 +7,12 @@
 // floating bar) would be hidden behind it: while something is, the window is hidden and the panel shows a stand-in
 // with its title, then it comes back (the research, section 3.2). Dragged off by its own title bar, the program is let
 // go and the panel offers to put it back.
-import { AppWindow, ArrowDownToLine, Eye, List, RefreshCw, Undo2 } from 'lucide-react'
+import { AppWindow, ArrowDownToLine, Eye, List, PanelRightDashed, RefreshCw, SquareArrowOutUpRight, Undo2 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { usePanel } from '../layout/DockArea.js'
 import { PanelBar } from '../layout/PanelBar.js'
-import { workspace } from '../layout/state.js'
+import { showSideTab } from '../layout/sideTab.js'
+import { putInside, setInside, workspace } from '../layout/state.js'
 import { watchCovered } from '../video/stepAside.js'
 import { leftOutWords, offered, PROGRAM_ICON, type ProgramArea, type ProgramHost, type ProgramWindow } from './host.js'
 import { keepFrames } from './moment.js'
@@ -313,6 +314,25 @@ export function ProgramPanel({ host }: { host: ProgramHost }) {
         ) : (
           <button type="button" className="nw-ibtn" aria-label="List the windows again" title="List the windows again" onClick={refresh}>
             <RefreshCw size={15} aria-hidden />
+          </button>
+        )}
+        {/* Inside the Beside panel, or taken out into a panel of its own: the person's own choice, no command's. */}
+        {panel?.where === 'beside' ? (
+          <button type="button" className="nw-ibtn" aria-label="Program panel: take it out of Beside" title="Take it out of Beside, into a panel of its own beside the notes" onClick={() => setInside('program', false)}>
+            <SquareArrowOutUpRight size={15} aria-hidden />
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="nw-ibtn"
+            aria-label="Program panel: put it back in Beside"
+            title="Put it back inside the Beside panel"
+            onClick={() => {
+              putInside('program')
+              showSideTab('program')
+            }}
+          >
+            <PanelRightDashed size={15} aria-hidden />
           </button>
         )}
       </PanelBar>

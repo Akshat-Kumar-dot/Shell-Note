@@ -3,6 +3,7 @@
 // border and the table's corner resize it; the bar gives it a look; Delete
 // removes it; and all of it is kept after a reload.
 import { expect, test, type Page } from './fixtures.js'
+import { zoom } from './shell.js'
 
 type Table = { id: string; type: 'table'; parent: string; rows: string[][]; cols?: number[]; width?: number; look?: string }
 type Frame = { id: string; type: 'frame'; page: string; kids: string[] }
@@ -90,7 +91,7 @@ test('⊕ drags the table above a line, and onto the next page, each in one undo
       { op: 'add', block: { id: 'g2', r: 0, type: 'text', parent: 'f2', role: 'p', indent: 0, md: 'On page two' } },
     ] as never)
   })
-  for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'Zoom out' }).click()
+  for (let i = 0; i < 4; i++) await zoom(page, 'out')
   await expect(page.getByText('On page two')).toBeVisible()
   await page.locator('.nw-table td').first().click()
   const two = (await page.getByText('On page two').boundingBox())!

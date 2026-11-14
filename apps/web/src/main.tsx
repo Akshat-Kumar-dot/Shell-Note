@@ -1,6 +1,8 @@
 import '@shellnote/editor/theme.css'
 import '@shellnote/editor/fonts.css'
+import '@shellnote/editor/shell.css'
 import './app.css'
+import './shell/shell.css'
 import { inWindowsApp } from '@shellnote/editor'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'

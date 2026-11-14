@@ -10,6 +10,7 @@
 // - The benchmark's recorded replies, replayed through the app, end as the benchmark did.
 import { readFile } from 'node:fs/promises'
 import { expect, test, type Page, type Route } from './fixtures.js'
+import { chooseTool, noteMenu, openPart, openVideoMenu } from './shell.js'
 
 test.use({ viewport: { width: 1280, height: 1200 } })
 
@@ -109,8 +110,7 @@ async function start(page: Page, address: string): Promise<void> {
 }
 
 async function useTool(page: Page, name: 'Type' | 'Select'): Promise<void> {
-  await page.getByRole('radio', { name }).click()
-  await expect(page.getByRole('radio', { name })).toHaveAttribute('aria-checked', 'true')
+  await chooseTool(page, name === 'Type' ? 'type' : 'select')
 }
 
 async function onPage(page: Page, x: number, y: number): Promise<{ x: number; y: number }> {
@@ -238,11 +238,11 @@ test('a reply LM Studio streams is shown as it comes, and ends as the same edit 
   await expect(page.getByRole('complementary').getByText('It says a body keeps still until a force acts.')).toBeVisible()
   expect(calls.filter((body) => body.stream === true)).toHaveLength(2)
   // The answer is in the side panel's Output, over the AI log; Made is the other view.
-  await expect(page.getByRole('tab', { name: 'Output' })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('tab', { name: 'Changes', exact: true })).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByRole('complementary', { name: 'AI log' })).toBeVisible()
-  await page.getByRole('radio', { name: 'Made' }).click()
+  await openPart(page, 'Scratch pad')
   await expect(page.getByText('Nothing made yet.')).toBeVisible()
-  await page.getByRole('radio', { name: 'Answers and log' }).click()
+  await openPart(page, 'Changes')
   await expect(page.getByRole('complementary', { name: 'Answer' })).toBeVisible()
 })
 
@@ -407,12 +407,12 @@ test('a table and a diagram asked for on empty paper land inside the box, the di
   await expect(page.locator(`[data-id="${diagram}"][data-drawn] svg`)).toBeVisible()
 })
 
-test('for a choice taller than the window, the prompt box stays on the desk, below the format bar', async ({ page }) => {
+test('for a choice taller than the window, the prompt box stays on the desk, below the tool bar', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 700 })
   await fakeModel(page, () => '{"ops":[{"op":"none","why":"No."}]}')
   await start(page, '/?sample=physics')
   await useTool(page, 'Select')
-  const bar = (await page.locator('.nw-formatbar').boundingBox())!
+  const bar = (await page.locator('.nw-bar[data-bar="tools"]').boundingBox())!
   await drag(page, await onPage(page, 15, 15), { x: (await onPage(page, 195, 0)).x, y: 690 })
   await page.getByRole('button', { name: 'AI', exact: true }).click()
   const box = (await page.getByRole('dialog', { name: 'AI' }).boundingBox())!
@@ -594,7 +594,7 @@ test('the AI log keeps every request with its model, tier and tokens, and undoes
   await expect(page.locator('.nw-ai-toast')).toBeVisible()
   expect((await note(page)).block.h1!.style).toEqual({ color: 'red' })
 
-  await page.getByRole('button', { name: 'AI log' }).click()
+  await noteMenu(page, 'AI log')
   const log = page.getByRole('complementary', { name: 'AI log' })
   const entry = log.locator('.nw-log-entry').first()
   await expect(entry).toContainText('make this one warmer')
@@ -606,7 +606,7 @@ test('the AI log keeps every request with its model, tier and tokens, and undoes
   await expect.poll(() => page.evaluate(() => window.__shellnote!.keptRev === window.__shellnote!.doc.rev)).toBe(true)
   await page.reload()
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
-  await page.getByRole('button', { name: 'AI log' }).click()
+  await noteMenu(page, 'AI log')
   await expect(log.locator('.nw-log-entry').first()).toContainText('make this one warmer')
 
   await log.getByRole('button', { name: 'Undo' }).click()
@@ -622,7 +622,7 @@ test('undo from the log is refused once the edit is no longer the latest change 
   await request(page, 'make this one leafy')
   await expect(page.locator('.nw-ai-toast')).toBeVisible()
   await page.evaluate(() => window.__shellnote!.store.apply([{ op: 'update', id: 't1', set: { md: 'Laws of motion' } }]))
-  await page.getByRole('button', { name: 'AI log' }).click()
+  await noteMenu(page, 'AI log')
   const log = page.getByRole('complementary', { name: 'AI log' })
   await log.getByRole('button', { name: 'Undo' }).click()
   await expect(log.getByRole('status')).toContainText('Those blocks have changed since')
@@ -753,10 +753,9 @@ test("the benchmark's recorded replies, replayed through the app, end exactly as
   console.log(`${replays.cases.length} replayed; diagrams Mermaid could not read, rewritten by the app: ${refused.length}: ${refused.join('; ')}`)
 })
 
-/** The side panel opened on its AI tab. */
+/** The panel beside the note opened on the AI's chat. */
 async function aiTab(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Side panel', exact: true }).click()
-  await page.getByRole('tab', { name: 'AI', exact: true }).click()
+  await openPart(page, 'Chat')
 }
 
 test('the side panel’s AI makes a table from a picture into the empty part of the page in view, one undo step, in the log; the chat stays while another tab is open', async ({ page }) => {
@@ -788,10 +787,10 @@ test('the side panel’s AI makes a table from a picture into the empty part of 
   expect(seen.some((picture) => picture?.startsWith('data:image/png;base64,'))).toBe(true)
 
   // In the AI log, and undone from the tab.
-  await page.getByRole('tab', { name: 'Output' }).click()
+  await openPart(page, 'Changes')
   await expect(page.getByRole('complementary', { name: 'AI log' }).locator('.nw-log-entry').first()).toContainText('Make a table of the rain chart.')
   // The chat as it was, its mode too; undone from it.
-  await page.getByRole('tab', { name: 'AI', exact: true }).click()
+  await openPart(page, 'Chat')
   await expect(page.locator('.nw-turn-q')).toHaveText('A table of the rain chart')
   await expect(page.getByRole('radio', { name: 'Table', exact: true })).toHaveAttribute('aria-checked', 'true')
   await page.locator('.nw-chat').getByRole('button', { name: 'Undo' }).click()
@@ -809,7 +808,7 @@ test('the side panel’s AI asks about a picture, and the answer comes in the ch
   await page.getByRole('button', { name: 'Ask', exact: true }).click()
   await expect(page.locator('.nw-turn-q')).toHaveText('what is this?')
   await expect(page.locator('.nw-turn-a')).toHaveText('It shows a rain chart.')
-  await expect(page.getByRole('tab', { name: 'AI', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.getByRole('tab', { name: 'Chat', exact: true })).toHaveAttribute('aria-selected', 'true')
   await expect(page.getByLabel('Ask the AI, or say what to make')).toHaveValue('')
   expect(seen[0]).toMatch(/^data:image\/png;base64,/u)
   expect(content(await note(page))).toEqual(content(before))
@@ -824,8 +823,8 @@ test('in the side panel’s AI, a question being typed and its picture wait whil
   await aiTab(page)
   await page.getByLabel('Picture file for the AI').setInputFiles({ name: 'rain.png', mimeType: 'image/png', buffer: PIXEL })
   await page.getByLabel('Ask the AI, or say what to make').fill('what is this chart about')
-  await page.getByRole('tab', { name: 'Output' }).click()
-  await page.getByRole('tab', { name: 'AI', exact: true }).click()
+  await openPart(page, 'Changes')
+  await openPart(page, 'Chat')
   await expect(page.getByLabel('Ask the AI, or say what to make')).toHaveValue('what is this chart about')
   await expect(page.getByRole('img', { name: 'The picture sent with the question' })).toBeVisible()
 })
@@ -838,15 +837,14 @@ test('the side panel’s AI summarises the transcript around where the video is 
   })
   await start(page, '/#/new')
   const webm = await readFile(new URL('./fixtures/moving-square.webm', import.meta.url))
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  await openVideoMenu(page)
   const chooser = page.waitForEvent('filechooser')
   await page.getByRole('button', { name: 'Add a video file (MP4, WebM)' }).click()
   await (await chooser).setFiles({ name: 'lesson.webm', mimeType: 'video/webm', buffer: webm })
-  await page.getByRole('button', { name: 'Side panel', exact: true }).click()
-  await page.getByRole('tab', { name: 'Transcript' }).click()
+  await openPart(page, 'Transcript')
   await page.getByLabel('Transcript to paste').fill('0:00\nA neuron holds a number between 0 and 1.\n0:02\nThe layers pass the numbers on.')
   await page.getByRole('button', { name: 'Keep it with the note' }).click()
-  await page.getByRole('tab', { name: 'AI', exact: true }).click()
+  await openPart(page, 'Chat')
   await page.getByRole('radio', { name: 'Summarise', exact: true }).click()
   const before = await note(page)
   await page.getByRole('button', { name: 'Summarise the transcript' }).click()
@@ -909,7 +907,7 @@ test('on the scratch pad, what the AI makes waits under Output’s Made until pu
   await page.getByRole('button', { name: 'Open the scratch pad' }).click()
 
   // Shown under Made, the note as it was.
-  await expect(page.getByRole('radio', { name: 'Made' })).toHaveAttribute('aria-checked', 'true')
+  await expect(page.getByRole('tab', { name: 'Scratch pad', exact: true })).toHaveAttribute('aria-selected', 'true')
   const item = page.locator('.nw-made-item').first()
   await expect(item.locator('table')).toContainText('Rain')
   expect(content(await note(page))).toEqual(content(before))
@@ -921,7 +919,7 @@ test('on the scratch pad, what the AI makes waits under Output’s Made until pu
   expect((await note(page)).block[table!]).toMatchObject({ rows: [['Day', 'Rain'], ['Mon', '3']] })
 
   // A flowchart, dragged onto the page.
-  await page.getByRole('tab', { name: 'AI', exact: true }).click()
+  await openPart(page, 'Chat')
   await page.getByRole('radio', { name: 'Flowchart', exact: true }).click()
   await page.getByLabel('Ask the AI, or say what to make').fill('a push')
   await page.getByRole('button', { name: 'Make a flowchart', exact: true }).click()

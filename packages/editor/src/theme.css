@@ -1080,17 +1080,14 @@ body[data-dragging] * {
 
 /* Buttons and bars are never text to pick up, whatever the tool; what is typed in them still is. */
 button,
-.appbar,
 .nw-bar,
 .nw-bar-strip,
 .nw-dock-title,
-.nw-video-bar,
-.nw-side-tabs {
+.nw-video-bar {
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
 }
-.appbar input,
 .nw-bar input {
   -webkit-user-select: text;
   user-select: text;
@@ -1098,24 +1095,6 @@ button,
 
 /* ----- the bars: the tool strip in the app bar, and the floating format bar ----- */
 
-.nw-toolstrip,
-.nw-formatbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  color: var(--ui-text);
-  font: 14px/1.2 var(--ui-font);
-}
-.nw-formatbar {
-  min-width: 0;
-  padding: 5px 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: 16px;
-  background: var(--ui-surface);
-  box-shadow: var(--ui-shadow-2);
-}
 .nw-group {
   display: inline-flex;
   /* A group too wide for its bar wraps too, as beside a wide video: the bar never reaches past the note. */
@@ -1123,12 +1102,6 @@ button,
   justify-content: center;
   align-items: center;
   gap: 2px;
-}
-.nw-sep {
-  width: 1px;
-  height: 24px;
-  margin: 0 6px;
-  background: var(--ui-border);
 }
 
 /* ----- the bars that move: along the top, down a side, along the bottom, or floating as a box ----- */
@@ -1167,73 +1140,9 @@ button,
   color: var(--ui-text);
 }
 /* Down a side: the bar's groups one under another. */
-.nw-bar[data-dir='column'] .nw-toolstrip,
-.nw-bar[data-dir='column'] .nw-formatbar,
-.nw-bar[data-dir='column'] .nw-group,
-.nw-bar[data-dir='column'] .nw-tools {
+.nw-bar[data-dir='column'] .nw-group {
   flex-direction: column;
   flex-wrap: nowrap;
-}
-.nw-bar[data-dir='column'] .nw-sep {
-  width: 24px;
-  height: 1px;
-  margin: 6px 0;
-}
-.nw-bar[data-dir='column'] .nw-formatbar {
-  padding: 8px 5px;
-}
-/* Down a side, the eraser's two choices one over the other, their words on two lines: they hung off both edges of the strip. */
-.nw-bar[data-dir='column'] .nw-formatbar > .nw-segmented {
-  flex-direction: column;
-  box-sizing: border-box;
-  width: 46px;
-  padding: 2px;
-}
-.nw-bar[data-dir='column'] .nw-formatbar > .nw-segmented button {
-  flex: none;
-  height: auto;
-  min-height: 36px;
-  padding: 4px 0;
-  font-size: 11px;
-  line-height: 1.2;
-  white-space: normal;
-}
-/* Down a side, a menu shows as its sign, 44 pixels wide, its menu still opening with every name: the select itself
-   lies over the sign, unseen. */
-.nw-select-wrap {
-  position: relative;
-  display: inline-flex;
-}
-.nw-select-short {
-  display: none;
-}
-.nw-bar[data-dir='column'] .nw-select-wrap {
-  width: 44px;
-  height: 36px;
-}
-.nw-bar[data-dir='column'] .nw-select-short {
-  box-sizing: border-box;
-  display: grid;
-  width: 100%;
-  height: 100%;
-  place-items: center;
-  border: 1px solid var(--ui-border);
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-}
-.nw-bar[data-dir='column'] .nw-select-wrap > select {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  min-width: 0;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-}
-.nw-bar[data-dir='column'] .nw-select-wrap:focus-within .nw-select-short {
-  outline: 2px solid var(--ui-accent, #4f6bd8);
-  outline-offset: 1px;
 }
 /* A table's two menu buttons, an icon and an arrow, within the strip's width. */
 .nw-bar[data-dir='column'] .nw-menu-anchor .nw-ibtn {
@@ -1250,10 +1159,6 @@ button,
   border-radius: 14px;
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow-3);
-}
-.nw-bar[data-at='float'] .nw-formatbar {
-  border: 0;
-  box-shadow: none;
 }
 /* A bar with a menu open comes over the others: a menu was drawn under another floating bar (found 6 November 2026). */
 .nw-bar:has(.nw-popover, .nw-font-library, .nw-table-grid, .nw-dropdown) {
@@ -1302,21 +1207,8 @@ button,
   padding: 8px 0;
   overflow: hidden auto;
 }
-/* Too short for its bars (layout/stripFit.ts): first shorter buttons, then bars in more columns, side by side. */
-.nw-bar-strip[data-fit='short'] :is(.nw-ibtn, .nw-tool, .nw-select-wrap):not(:is(.nw-popover, .nw-font-library, .nw-table-grid, .nw-dropdown) *) {
-  height: 32px;
-}
 .nw-bar-strip[data-fit='short'] > .nw-bar > .nw-bar-grip {
   height: 28px;
-}
-.nw-bar-strip[data-fit='short'] > .nw-bar > * > .nw-sep {
-  margin: 3px 0;
-}
-.nw-bar-strip[data-fit='short'] > .nw-bar > :is(.nw-toolstrip, .nw-formatbar) {
-  gap: 1px;
-}
-.nw-bar-strip[data-fit='short'] > .nw-bar > .nw-formatbar {
-  padding-block: 4px;
 }
 .nw-bar-strip[data-fit='columns'] {
   flex-direction: row;
@@ -1353,7 +1245,6 @@ button,
 
 /* Buttons: 40 px, for a finger or a pen as well as a mouse. */
 .nw-ibtn,
-.nw-tool,
 .nw-chip {
   display: inline-flex;
   align-items: center;
@@ -1374,7 +1265,6 @@ button,
     color 0.12s;
 }
 .nw-ibtn:hover:not(:disabled),
-.nw-tool:hover:not(:disabled),
 .nw-chip:hover:not(:disabled) {
   background: var(--ui-hover);
   color: var(--ui-text);
@@ -1391,50 +1281,9 @@ button,
   opacity: 0.38;
   cursor: default;
 }
-.nw-text-btn {
-  min-width: 40px;
-  font-size: 13px;
-  font-weight: 650;
-}
 .nw-chip {
   padding: 0 12px;
   border: 1px solid var(--ui-border);
-}
-
-/* The tools: tiles in a tray, the one in use filled with the accent. The greyed ones wait for phase 3. */
-.nw-tools {
-  gap: 3px;
-  padding: 3px;
-  border-radius: 14px;
-  background: var(--ui-surface-2);
-}
-.nw-tool {
-  width: 44px;
-  padding: 0;
-}
-.nw-tool[aria-checked='true'] {
-  background: var(--ui-accent);
-  color: var(--ui-on-accent);
-  box-shadow: var(--ui-shadow-1);
-}
-.nw-tool[aria-checked='true']:hover {
-  background: var(--ui-accent-hover);
-  color: var(--ui-on-accent);
-}
-
-.nw-select {
-  height: 40px;
-  padding: 0 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
-  background: var(--ui-surface);
-  color: var(--ui-text);
-  font: inherit;
-  cursor: pointer;
-}
-.nw-select:disabled {
-  opacity: 0.45;
-  cursor: default;
 }
 
 /* Colours: round swatches, each a 40 px target in the colour panel. */
@@ -1551,7 +1400,8 @@ button,
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  z-index: 30;
+  /* Over the edges between panels (30) and a floating panel (40), the menu of a panel or a bar inside the workspace. */
+  z-index: 55;
   box-sizing: border-box;
   padding: 10px;
   border: 1px solid var(--ui-border);
@@ -1771,56 +1621,6 @@ button,
   filter: brightness(1.08);
 }
 
-.nw-paper-menu {
-  width: 300px;
-}
-.nw-paper-choices {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  margin-bottom: 10px;
-}
-.nw-paper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 4px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  background: transparent;
-  color: var(--ui-text-2);
-  font: inherit;
-  cursor: pointer;
-}
-.nw-paper:hover {
-  background: var(--ui-hover);
-}
-.nw-paper[aria-pressed='true'] {
-  border-color: var(--ui-accent);
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent-text);
-}
-.nw-paper-sample {
-  width: 46px;
-  height: 62px;
-  border-radius: 6px;
-  background-color: #fff;
-  box-shadow: var(--ui-shadow-1);
-}
-.nw-paper-sample[data-bg='ruled'] {
-  background-image: repeating-linear-gradient(to bottom, transparent 0 7px, var(--nw-rule) 7px 8px);
-}
-.nw-paper-sample[data-bg='grid'] {
-  background-image:
-    linear-gradient(var(--nw-rule) 1px, transparent 1px),
-    linear-gradient(90deg, var(--nw-rule) 1px, transparent 1px);
-  background-size: 6px 6px;
-}
-.nw-paper-sample[data-bg='dots'] {
-  background-image: radial-gradient(circle, #9fb4cf 1px, transparent 1.4px);
-  background-size: 6px 6px;
-}
 .nw-segmented {
   display: flex;
   padding: 3px;
@@ -2440,16 +2240,6 @@ button.nw-ai-instant:hover {
   z-index: 5;
   pointer-events: none;
 }
-.nw-width-dot,
-.nw-eraser-dot {
-  display: block;
-  border-radius: 50%;
-  background: currentColor;
-}
-.nw-eraser-dot {
-  background: transparent;
-  box-shadow: 0 0 0 1.5px currentColor;
-}
 .nw-penbar .nw-segmented button {
   padding: 0 12px;
   white-space: nowrap;
@@ -2602,11 +2392,6 @@ button.nw-ai-instant:hover {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  min-height: 0;
-}
-.nw-notes-panel > .pages-area {
-  flex: 1 1 auto;
-  height: auto;
   min-height: 0;
 }
 /* The program panel (other programs inside ShellNote, stage 2): its bar, and the body the program's own window is
@@ -2768,14 +2553,6 @@ button.nw-ai-instant:hover {
   min-height: 0;
   background: var(--ui-surface);
   color: var(--ui-text);
-}
-.nw-side-tabs {
-  display: flex;
-  flex: none;
-  flex-wrap: wrap;
-  gap: 2px;
-  padding: 6px 8px;
-  border-bottom: 1px solid var(--ui-border);
 }
 .nw-side-tab {
   height: 28px;

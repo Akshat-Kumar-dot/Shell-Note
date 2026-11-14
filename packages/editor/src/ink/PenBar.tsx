@@ -1,22 +1,24 @@
-// The floating bar while an ink tool is chosen: the pen in hand (its kind,
-// width and colour), the highlighter's width and colour, or the eraser's way
-// and size; and the Pen switches, for this person or for this note,
-// with what the pen has learned of this person's hand. Like every button in
-// the bars, none takes the focus.
-import { StrokeWidth, type AnyColor, type PenSettings, type SymbolKind, type TidyRules } from '@shellnote/core'
-import { Brush, Pen, Pencil, PenTool, SlidersHorizontal, WandSparkles, type LucideIcon } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react'
+// The pen's row of tools, while an ink tool is in hand: Select; the pen (its four kinds in a menu, with the pen's
+// settings), the highlighter, and the eraser (its way and its size in a menu); four colours in reach and every other
+// under Colour; one Width button; undo and redo; the wand that tidies handwriting; Type, back to the row for words;
+// and a picture. The Pen switches are for this person or for this note, with what the pen has learned of this
+// person's hand. Like every button in the rows, none takes the focus.
+import { StrokeWidth, type AnyColor, type Color, type PenSettings, type SymbolKind, type TidyRules } from '@shellnote/core'
+import { Brush, ChevronDown, Eraser, Highlighter, Lasso, Pen, Pencil, PenLine, PenTool, SlidersHorizontal, Type, WandSparkles, type LucideIcon } from 'lucide-react'
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
+import { BarMenu, keepFocus, MenuItem } from '../BarMenu.js'
+import { PictureButton, UndoRedo } from '../BarParts.js'
 import { ColourMenu } from '../ColourMenu.js'
 import { commands } from '../commands/index.js'
 import { optionOf, valueWord } from '../commands/pen.js'
 import { eraserWord, widthWord } from '../commands/tools.js'
 import { useDismiss } from '../dismiss.js'
 import { placeMenu } from '../popover.js'
-import type { EditorStore } from '../store.js'
+import type { EditorStore, Tool } from '../store.js'
 import { ERASER_RADIUS, lastInput, myPenSettings, penChoice, penProfile, penSettings, penSettingsFor, tidyBox, tidyRules, developerMode, typicalPressure, type EraserSize, type LastInput, type PenChoice } from './settings.js'
 
-const keepFocus = (event: MouseEvent): void => event.preventDefault()
 const ICON = 18
+const ARROW = 14
 
 const KINDS: [PenChoice['kind'], string, LucideIcon][] = [
   ['pen', 'Plain pen', Pen],
@@ -30,71 +32,174 @@ const ERASER_SIZES: [EraserSize, string][] = [
   ['m', 'Medium eraser'],
   ['l', 'Large eraser'],
 ]
-
-/** Widths as dots that grow, so the choice reads at a glance. */
-function Widths({ value, command, onChange }: { value: StrokeWidth; command: string; onChange: (width: StrokeWidth) => void }) {
-  return (
-    <span className="nw-group nw-segment" role="radiogroup" aria-label="Width">
-      {StrokeWidth.options.map((width, i) => (
-        <button key={width} type="button" role="radio" className="nw-ibtn" aria-label={WIDTH_NAMES[width]} title={WIDTH_NAMES[width]} aria-checked={value === width} data-command={command} onMouseDown={keepFocus} onClick={() => onChange(width)}>
-          <span className="nw-width-dot" style={{ width: 3 + i * 2.5, height: 3 + i * 2.5 }} aria-hidden />
-        </button>
-      ))}
-    </span>
-  )
+/** The four colours kept in reach; every other is under Colour. */
+const INKS: [Color, string][] = [
+  ['ink', 'Black'],
+  ['blue', 'Blue'],
+  ['red', 'Red'],
+  ['green', 'Green'],
+]
+/** A width as a dot that grows with it, so the choice reads at a glance. */
+const dot = (width: StrokeWidth): CSSProperties => {
+  const size = 3 + StrokeWidth.options.indexOf(width) * 2.5
+  return { width: size, height: size }
 }
 
 export function PenBar({ store }: { store: EditorStore }) {
   const tool = useSyncExternalStore(store.subscribeTool, store.toolSnapshot)
   const choice = useSyncExternalStore(penChoice.subscribe, penChoice.snapshot)
-  if (tool === 'eraser') {
-    return (
-      <div className="nw-formatbar nw-penbar" role="toolbar" aria-label="Eraser">
-        <span className="nw-segmented" role="radiogroup" aria-label="Eraser takes">
-          <button type="button" role="radio" aria-checked={choice.eraser === 'stroke'} title="Whole strokes: a touch takes the whole stroke" data-command="eraser.set" onMouseDown={keepFocus} onClick={() => commands.do('eraser.set', { erase: 'whole' })}>
-            Whole strokes
-          </button>
-          <button type="button" role="radio" aria-checked={choice.eraser === 'part'} title="Part of a stroke: only what the eraser passes over" data-command="eraser.set" onMouseDown={keepFocus} onClick={() => commands.do('eraser.set', { erase: 'part' })}>
-            Part of a stroke
-          </button>
-        </span>
-        <span className="nw-sep" />
-        <span className="nw-group nw-segment" role="radiogroup" aria-label="Eraser size">
-          {ERASER_SIZES.map(([size, label]) => (
-            <button key={size} type="button" role="radio" className="nw-ibtn" aria-label={label} title={label} aria-checked={choice.eraserSize === size} data-command="eraser.set" onMouseDown={keepFocus} onClick={() => commands.do('eraser.set', { size: eraserWord(size) })}>
-              <span className="nw-eraser-dot" style={{ width: 4 + ERASER_RADIUS[size] / 40, height: 4 + ERASER_RADIUS[size] / 40 }} aria-hidden />
-            </button>
-          ))}
-        </span>
-        <span className="nw-sep" />
-        <PenPanel store={store} />
-      </div>
-    )
-  }
+  const [settings, setSettings] = useState(false)
   const highlighter = tool === 'highlighter'
+  const eraser = tool === 'eraser'
   const colour = highlighter ? choice.highlighterColor : choice.color
+  const width = highlighter ? choice.highlighterWidth : choice.width
   const command = highlighter ? 'highlighter.set' : 'pen.set'
-  const paint = (colour: AnyColor): void => void commands.do(command, { colour })
+  const paint = (next: AnyColor): void => void commands.do(command, { colour: next })
+  const choose = (next: Tool): void => void commands.do('tool.choose', { tool: next })
+  const KindNow = KINDS.find(([kind]) => kind === choice.kind)?.[2] ?? PenLine
   return (
-    <div className="nw-formatbar nw-penbar" role="toolbar" aria-label={highlighter ? 'Highlighter' : 'Pen'}>
-      {highlighter ? null : (
-        <>
-          <span className="nw-group nw-segment" role="radiogroup" aria-label="Pen">
+    <div className="sh-tools nw-penbar" role="toolbar" aria-label={eraser ? 'Eraser' : highlighter ? 'Highlighter' : 'Pen'}>
+      <button type="button" className="sh-b" aria-label="Select" aria-pressed={tool === 'select'} title="Select: draw a box to take only what is inside it" data-command="tool.choose" onMouseDown={keepFocus} onClick={() => choose('select')}>
+        <Lasso size={ICON} aria-hidden />
+      </button>
+      <span className="sh-sep" />
+      <BarMenu
+        label="Pen"
+        title="Pen: write and draw; hold still at the end for a straight line or a shape. Pressed again: its kinds and settings"
+        pressed={tool === 'pen'}
+        onPress={() => {
+          // In hand already, the press opens its kinds; else it takes the pen up.
+          if (tool === 'pen') return true
+          choose('pen')
+          return false
+        }}
+        button={
+          <>
+            <KindNow size={ICON} aria-hidden />
+            <ChevronDown size={ARROW} aria-hidden />
+          </>
+        }
+      >
+        {(close) => (
+          <>
             {KINDS.map(([kind, label, Icon]) => (
-              <button key={kind} type="button" role="radio" className="nw-ibtn" aria-label={label} title={label} aria-checked={choice.kind === kind} data-command="pen.set" onMouseDown={keepFocus} onClick={() => commands.do('pen.set', { kind })}>
+              <MenuItem key={kind} checked={choice.kind === kind} command="pen.set" onChoose={() => void commands.do('pen.set', { kind })}>
                 <Icon size={ICON} aria-hidden />
+                {label}
+              </MenuItem>
+            ))}
+            <hr />
+            <MenuItem
+              label="Pen settings"
+              title="Pen settings: fingers, lines, shapes, smoothing"
+              onChoose={() => {
+                close()
+                setSettings(true)
+              }}
+            >
+              <SlidersHorizontal size={ICON} aria-hidden />
+              Pen settings…
+            </MenuItem>
+          </>
+        )}
+      </BarMenu>
+      {settings ? <PenPanel store={store} onClose={() => setSettings(false)} /> : null}
+      <button type="button" className="sh-b" aria-label="Highlighter" aria-pressed={highlighter} title="Highlighter: mark over words and ink" data-command="tool.choose" onMouseDown={keepFocus} onClick={() => choose('highlighter')}>
+        <Highlighter size={ICON} aria-hidden />
+      </button>
+      <BarMenu
+        label="Eraser"
+        title="Eraser: whole strokes, or the part of a stroke it passes over. Pressed again: its way and size"
+        pressed={eraser}
+        onPress={() => {
+          if (eraser) return true
+          choose('eraser')
+          return false
+        }}
+        button={
+          <>
+            <Eraser size={ICON} aria-hidden />
+            <ChevronDown size={ARROW} aria-hidden />
+          </>
+        }
+      >
+        {() => (
+          <>
+            <div className="sh-menu-head">Eraser takes</div>
+            <MenuItem checked={choice.eraser === 'stroke'} title="Whole strokes: a touch takes the whole stroke" command="eraser.set" onChoose={() => void commands.do('eraser.set', { erase: 'whole' })}>
+              Whole strokes
+            </MenuItem>
+            <MenuItem checked={choice.eraser === 'part'} title="Part of a stroke: only what the eraser passes over" command="eraser.set" onChoose={() => void commands.do('eraser.set', { erase: 'part' })}>
+              Part of a stroke
+            </MenuItem>
+            <div className="sh-menu-head">Size</div>
+            {ERASER_SIZES.map(([size, label]) => (
+              <MenuItem key={size} checked={choice.eraserSize === size} command="eraser.set" onChoose={() => void commands.do('eraser.set', { size: eraserWord(size) })}>
+                <span className="sh-weight" aria-hidden>
+                  <i style={{ width: 4 + ERASER_RADIUS[size] / 40, height: 4 + ERASER_RADIUS[size] / 40 }} />
+                </span>
+                {label}
+              </MenuItem>
+            ))}
+          </>
+        )}
+      </BarMenu>
+      <span className="sh-sep" />
+      {eraser ? null : (
+        <>
+          <span role="radiogroup" aria-label="Colours in reach" style={{ display: 'contents' }}>
+            {INKS.map(([name, label]) => (
+              <button
+                key={name}
+                type="button"
+                role="radio"
+                className="sh-dot"
+                aria-label={label}
+                title={label}
+                aria-checked={colour === name}
+                style={{ '--c': `var(--nw-${highlighter ? 'hl-' : ''}${name})` } as CSSProperties}
+                data-command={command}
+                onMouseDown={keepFocus}
+                onClick={() => paint(name)}
+              >
+                <i />
               </button>
             ))}
           </span>
-          <span className="nw-sep" />
+          <ColourMenu current={colour} onNamed={paint} onCode={(code) => paint(code as AnyColor)} highlighter={highlighter} look="more" />
+          <BarMenu
+            label="Width"
+            title="Width: fine to broad"
+            button={
+              <>
+                <span className="sh-weight" aria-hidden>
+                  <i style={dot(width)} />
+                </span>
+                <ChevronDown size={ARROW} aria-hidden />
+              </>
+            }
+          >
+            {() =>
+              StrokeWidth.options.map((value) => (
+                <MenuItem key={value} checked={width === value} command={command} onChoose={() => void commands.do(command, { width: widthWord(value) })}>
+                  <span className="sh-weight" aria-hidden>
+                    <i style={dot(value)} />
+                  </span>
+                  {WIDTH_NAMES[value]}
+                </MenuItem>
+              ))
+            }
+          </BarMenu>
+          <span className="sh-sep" />
         </>
       )}
-      <Widths value={highlighter ? choice.highlighterWidth : choice.width} command={command} onChange={(width) => void commands.do(command, { width: widthWord(width) })} />
-      <span className="nw-sep" />
-      <ColourMenu current={colour} onNamed={paint} onCode={(code) => paint(code as AnyColor)} highlighter={highlighter} />
-      <span className="nw-sep" />
-      {highlighter ? null : <TidyButton store={store} />}
-      <PenPanel store={store} />
+      <UndoRedo store={store} />
+      <span className="sh-sep" />
+      {highlighter || eraser ? null : <TidyButton store={store} />}
+      <button type="button" className="sh-b" aria-label="Type" title="Type: back to writing words, and their row" data-command="tool.choose" onMouseDown={keepFocus} onClick={() => choose('type')}>
+        <Type size={ICON} aria-hidden />
+      </button>
+      <PictureButton store={store} />
     </div>
   )
 }
@@ -223,15 +328,13 @@ const SWITCHES: { key: keyof PenSettings; label: string; choices: [string | numb
   { key: 'wordGap', label: 'Gap between words', choices: [['usual', 'Usual'], ['first', 'First gap'], ['tighter', 'Tighter'], ['wider', 'Wider'], ['written', 'As written']] },
 ]
 
-/** The Pen switches: this person's own, or this note's, which travel with it and win. */
-function PenPanel({ store }: { store: EditorStore }) {
+/** The Pen switches, opened from the pen's menu: this person's own, or this note's, which travel with it and win. */
+function PenPanel({ store, onClose }: { store: EditorStore; onClose: () => void }) {
   const doc = useSyncExternalStore(store.subscribe, store.snapshot)
   useSyncExternalStore(penSettings.subscribe, penSettings.snapshot)
-  const [open, setOpen] = useState(false)
   const [forNote, setForNote] = useState(false)
   const root = useRef<HTMLSpanElement>(null)
-  const close = useCallback(() => setOpen(false), [])
-  useDismiss(open, root, close)
+  useDismiss(true, root, onClose)
   const shown = forNote ? penSettingsFor(doc) : myPenSettings()
   /** A setting changed (settings.pen), the person's own or this note's. */
   const set = (key: keyof PenSettings, value: PenSettings[keyof PenSettings]): void => {
@@ -242,11 +345,7 @@ function PenPanel({ store }: { store: EditorStore }) {
   }
   return (
     <span className="nw-popover-anchor" ref={root}>
-      <button type="button" className="nw-ibtn" aria-label="Pen settings" aria-expanded={open} title="Pen settings: fingers, lines, shapes, smoothing" onMouseDown={keepFocus} onClick={() => setOpen(!open)}>
-        <SlidersHorizontal size={ICON} aria-hidden />
-      </button>
-      {open ? (
-        <div ref={placeMenu} className="nw-popover nw-pen-panel" role="group" aria-label="Pen settings">
+      <div ref={placeMenu} className="nw-popover nw-pen-panel" role="group" aria-label="Pen settings">
           <div className="nw-segmented" role="radiogroup" aria-label="Settings for">
             <button type="button" role="radio" aria-checked={!forNote} onMouseDown={keepFocus} onClick={() => setForNote(false)}>
               My defaults
@@ -287,8 +386,7 @@ function PenPanel({ store }: { store: EditorStore }) {
               Use my defaults in this note
             </button>
           ) : null}
-        </div>
-      ) : null}
+      </div>
     </span>
   )
 }
@@ -301,6 +399,7 @@ function PenPanel({ store }: { store: EditorStore }) {
 function YourHand() {
   const profile = useSyncExternalStore(penProfile.subscribe, penProfile.snapshot)
   const [forgetting, setForgetting] = useState(false)
+  const [about, setAbout] = useState(false)
   const recorded = profile?.examples.filter((e) => e.from === 'recorder').length ?? 0
   const undone = (profile?.examples.length ?? 0) - recorded
   const many = (count: number, one: string, more: string): string => `${count} ${count === 1 ? one : more}`
@@ -337,8 +436,24 @@ function YourHand() {
               Forget…
             </button>
           ) : null}
+          <button type="button" aria-expanded={about} onMouseDown={keepFocus} onClick={() => setAbout(!about)}>
+            What is the stroke recorder?
+          </button>
         </span>
       )}
+      {about ? (
+        <div className="nw-pen-about" role="note">
+          <p>
+            <strong>Teach the pen your hand.</strong> The recorder asks you to draw one thing at a time with your own pen: lines, circles, rectangles and other shapes, the brackets ( ) [ ] {'{ }'}, the comma and @, the letters that must stay letters (c, l, 3, a, e, o), a
+            few words and some scratch-outs. It keeps exactly what the pen sends: where it went, how hard you pressed, how it leant and when.
+          </p>
+          <p>
+            Then press <strong>Teach my pen</strong>. From then on the pen goes by your own strokes, not rules made for someone else: it neatens a symbol or snaps a held shape only when it is clearly yours, and leaves your letters alone. Undo a
+            correction straight after it, and the pen learns to leave strokes like that one alone. What it learned is kept with your notes; Pen settings shows it, and can forget it.
+          </p>
+          <p>About 30 to 40 minutes, in as many sittings as you like; teach it as you go. Nothing leaves this computer unless you download the file and send it.</p>
+        </div>
+      ) : null}
     </div>
   )
 }

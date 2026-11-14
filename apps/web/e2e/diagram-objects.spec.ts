@@ -5,6 +5,7 @@
 // dragged onto bare paper it goes on its own, at the size it was drawn, to be
 // moved and resized there. Each is one undo step.
 import { expect, test, type Page } from './fixtures.js'
+import { chooseTool } from './shell.js'
 
 type Diagram = { id: string; type: 'diagram'; src: string; parent?: string; page?: string; x?: number; y?: number; w?: number; h?: number }
 
@@ -60,7 +61,7 @@ test('a diagram on the page resizes from a corner, keeping its shape, its drawin
   await expect.poll(async () => (await svg.boundingBox())!.width / drawn.width).toBeCloseTo(resized.w! / before.w!, 1)
 
   // With Select, a click chooses it, and a press on it then moves it rather than starting a box.
-  await page.getByRole('radio', { name: 'Select' }).click()
+  await chooseTool(page, 'select')
   await box.click()
   await expect.poll(() => chosen(page)).toEqual({ kind: 'objects', blocks: ['df'] })
   const at = await middle(page, '.nw-free[data-free="diagram"]')

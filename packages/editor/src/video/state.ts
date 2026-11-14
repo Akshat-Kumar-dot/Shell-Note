@@ -32,6 +32,8 @@ export interface VideoClock {
   playing(): boolean
   play(): void
   pause(): void
+  /** How long the video is, in seconds, once the player knows. */
+  duration?(): number
 }
 export const videoClock = new Shared<VideoClock | undefined>(undefined)
 
@@ -133,6 +135,9 @@ export function moveVideo(media: Id, seconds: number): void {
   clock.seek(seconds)
 }
 
+/** What is done before a video plays: the panel it is kept in opened, so it is never played unseen (layout/beside.ts). */
+export const playHook: { before: () => void } = { before: () => undefined }
+
 /** Play or pause the shown video (video.play, video.pause); stepped aside, it waits. False when no player is ready. */
 export function playVideo(play: boolean): boolean {
   const clock = videoClock.value
@@ -140,6 +145,7 @@ export function playVideo(play: boolean): boolean {
   if (videoCovered.value) return true
   // Played on by hand, a part's end no longer stops it.
   until = undefined
+  if (play) playHook.before()
   if (play) clock.play()
   else clock.pause()
   return true

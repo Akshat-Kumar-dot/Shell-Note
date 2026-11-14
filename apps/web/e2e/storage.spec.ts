@@ -5,6 +5,7 @@
 // another uses the download and file input that other browsers get.
 import { readFile } from 'node:fs/promises'
 import { expect, test, type Page } from './fixtures.js'
+import { noteMenu, toLibrary } from './shell.js'
 
 type Drawn = [number, number, string]
 interface Carrier {
@@ -117,7 +118,7 @@ test('Save, then Open, gives the same note, through the browser file picker', as
   expect(await page.evaluate(() => (window as unknown as { savePicks: number }).savePicks)).toBe(1)
   const before = await note(page)
 
-  await page.getByRole('button', { name: 'New note' }).click()
+  await page.getByRole('button', { name: 'New tab' }).click()
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Untitled')
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
   await page.keyboard.press('Control+o')
@@ -135,17 +136,17 @@ test('without the file picker, Save downloads the file and Open reads it back', 
   await start(page)
   await write(page)
   const download = page.waitForEvent('download')
-  await page.getByRole('button', { name: 'Save' }).click()
+  await noteMenu(page, 'Save')
   const saved = await download
   expect(saved.suggestedFilename()).toBe('Lecture 4.shellnote')
   const bytes = await readFile((await saved.path())!)
   const before = await note(page)
 
-  await page.getByRole('button', { name: 'New note' }).click()
+  await page.getByRole('button', { name: 'New tab' }).click()
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Untitled')
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
   const chooser = page.waitForEvent('filechooser')
-  await page.getByRole('button', { name: 'Open file' }).click()
+  await noteMenu(page, 'Open file')
   await (await chooser).setFiles({ name: 'Lecture 4.shellnote', mimeType: 'application/zip', buffer: bytes })
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Lecture 4')
   expect(await note(page)).toEqual(before)
@@ -157,10 +158,10 @@ test('leaving a note keeps it in the library, its card marked until it is saved 
   await page.keyboard.type('Unsaved thoughts')
   await expect(page.getByRole('status')).toHaveText('Not saved to a file yet')
   // Nothing is lost by leaving, so nothing is asked.
-  await page.getByRole('button', { name: 'New note' }).click()
+  await page.getByRole('button', { name: 'New tab' }).click()
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Untitled 2')
   await expect(page.locator('.nw-frame .ProseMirror').first()).not.toContainText('Unsaved thoughts')
-  await page.getByRole('button', { name: 'Back to notes' }).click()
+  await toLibrary(page)
   const card = (name: string) => page.locator('.card').filter({ has: page.locator('.card-name', { hasText: new RegExp(`^${name}$`, 'u') }) })
   await expect(card('Untitled').locator('.card-dot')).toHaveCount(1)
   await expect(card('Untitled 2').locator('.card-dot')).toHaveCount(0)

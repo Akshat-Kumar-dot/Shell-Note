@@ -1,7 +1,9 @@
-// The workspace: the notes, the video and the side panel docked like
-// Obsidian's panes, dragged by their bars to any side; a full view; the side panel's tabs.
+// The workspace: the notes, the panel beside them (the AI, or Beside, with the video inside it) and a video taken out,
+// docked like Obsidian's panes and dragged by their bars to any side; a full view; the panel's parts; the tool bar that
+// moves to any side or floats.
 import { readFileSync } from 'node:fs'
 import { expect, inApp, test, type Page } from './fixtures.js'
+import { chooseTool, eraserWay, noteMenu, openPart, openVideoMenu, penRow, textStyle } from './shell.js'
 
 test.use({ viewport: { width: 1280, height: 900 } })
 
@@ -15,21 +17,20 @@ function box(page: Page, selector: string): Promise<Box> {
   })
 }
 
-/** A new note with a video file of its own beside it, and the side panel open. */
+/** A new note with a video file of its own, shown inside Beside, which opens for it. */
 async function withPanels(page: Page): Promise<void> {
   await page.goto('/#/new')
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
-  await page.getByRole('button', { name: 'Video', exact: true }).click()
+  await openVideoMenu(page)
   const chooser = page.waitForEvent('filechooser')
   await page.getByRole('button', { name: 'Add a video file (MP4, WebM)' }).click()
   await (await chooser).setFiles({ name: 'lecture.webm', mimeType: 'video/webm', buffer: WEBM })
   await expect.poll(() => page.locator('.nw-video-file video').evaluate((video: HTMLVideoElement) => video.readyState)).toBeGreaterThanOrEqual(1)
-  await page.getByRole('button', { name: 'Side panel', exact: true }).click()
 }
 
-/** Drag a panel by its bar to a point, in small steps, as a hand would. */
-async function dragBar(page: Page, bar: string, x: number, y: number): Promise<void> {
-  const from = await box(page, bar)
+/** Drag something by a point of it to another, in small steps, as a hand would. */
+async function dragFrom(page: Page, selector: string, x: number, y: number): Promise<void> {
+  const from = await box(page, selector)
   await page.mouse.move(from.left + 40, from.top + from.height / 2)
   await page.mouse.down()
   await page.mouse.move(from.left + 30, from.top + 40, { steps: 4 })
@@ -39,28 +40,32 @@ async function dragBar(page: Page, bar: string, x: number, y: number): Promise<v
 
 test('starts as designed, and a panel dragged by its bar docks where it is let go, kept for the next time', async ({ page }) => {
   await withPanels(page)
-  const video = await box(page, '.nw-video')
   const side = await box(page, '.nw-side-panel')
   const notes = await box(page, '.nw-notes-panel')
-  // The video above the side panel on the left, the notes on the right.
-  expect(Math.abs(video.left - side.left)).toBeLessThan(2)
-  expect(video.bottom).toBeLessThanOrEqual(side.top + 1)
-  expect(notes.left).toBeGreaterThanOrEqual(video.right - 1)
+  const video = await box(page, '.nw-video')
+  // The notes on the left; the panel beside them on their right, from the window's top, its head level with the tabs.
+  expect(side.left).toBeGreaterThanOrEqual(notes.right - 1)
+  expect(side.top).toBe((await box(page, '.sh-tabs')).top)
+  expect((await box(page, '.sh-tabs')).right).toBeLessThanOrEqual(side.left + 1)
+  // The video inside it, under its head.
+  expect(video.left).toBeGreaterThanOrEqual(side.left)
+  expect(video.right).toBeLessThanOrEqual(side.right)
+  expect(video.top).toBeGreaterThan(side.top + 40)
 
-  // The notes, dragged to the workspace's left edge, go there; the others take the right.
-  const dock = await box(page, '.nw-dock')
-  await dragBar(page, '.nw-notes-panel .nw-dock-bar', dock.left + 8, dock.top + 300)
-  const moved = await box(page, '.nw-notes-panel')
-  expect(moved.left).toBe(dock.left)
-  expect((await box(page, '.nw-video')).left).toBeGreaterThanOrEqual(moved.right - 1)
-  expect(await page.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem('shellnote:workspace')!).layout.root))).toContain('"notes"')
-
-  // The side panel, dragged onto the bottom of the notes, goes under them.
-  const now = await box(page, '.nw-notes-panel')
-  await dragBar(page, '.nw-side-panel .nw-dock-bar', now.left + now.width / 2, now.bottom - 20)
+  // The panel, dragged onto the bottom of the notes, goes under them.
+  await dragFrom(page, '.nw-side-panel .nw-dock-bar', notes.left + notes.width / 2, notes.bottom - 20)
   const under = await box(page, '.nw-side-panel')
   expect(under.top).toBeGreaterThanOrEqual((await box(page, '.nw-notes-panel')).bottom - 1)
-  expect(Math.abs(under.left - now.left)).toBeLessThan(2)
+  expect(Math.abs(under.left - notes.left)).toBeLessThan(2)
+  expect(await page.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem('shellnote:workspace-2')!).layout.root))).toContain('"side"')
+
+  // The video, dragged out by its name to the workspace's left edge, docks there as a panel of its own.
+  const dock = await box(page, '.nw-dock')
+  await dragFrom(page, '.nw-video-caption', dock.left + 8, dock.top + 300)
+  const out = await box(page, '.nw-video')
+  expect(out.left).toBe(dock.left)
+  expect((await box(page, '.nw-notes-panel')).left).toBeGreaterThanOrEqual(out.right - 1)
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('shellnote:workspace-2')!).beside.video)).toBe(false)
 })
 
 test('the full view fills the workspace with one panel; a video out of sight pauses; Esc brings the layout back', async ({ page }) => {
@@ -69,7 +74,7 @@ test('the full view fills the workspace with one panel; a video out of sight pau
   await expect(page.getByRole('button', { name: 'Pause the video' })).toBeVisible()
   const dock = await box(page, '.nw-dock')
 
-  await page.getByRole('button', { name: 'Full view: the notes alone' }).click()
+  await noteMenu(page, 'Full view: the notes alone')
   const notes = await box(page, '.nw-notes-panel')
   expect([notes.left, notes.top, notes.width, notes.height]).toEqual([dock.left, dock.top, dock.width, dock.height])
   await expect(page.locator('.nw-dock-panel[data-panel="video"]')).toHaveCSS('visibility', 'hidden')
@@ -89,77 +94,84 @@ test('the full view fills the workspace with one panel; a video out of sight pau
   expect((await box(page, '.nw-video')).width).toBeLessThan(dock.width)
 })
 
-test('the side panel opens beside the notes with its tabs, remembers the tab, and closes, giving its room back', async ({ page }) => {
+test('Beside opens with its parts, remembers the part, and closes, the video inside it out of sight and paused', async ({ page }) => {
   await withPanels(page)
-  const tabs = page.getByRole('tab')
-  await expect(tabs).toHaveText(['Description', 'Transcript', 'Web page', 'Timer', 'Output', 'AI'])
-  await page.getByRole('tab', { name: 'Timer' }).click()
-  await expect(page.getByRole('tab', { name: 'Timer' })).toHaveAttribute('aria-selected', 'true')
+  const side = page.getByRole('region', { name: 'Side panel' })
+  await expect(side.getByRole('radio')).toHaveText(['Video', 'Web page'])
+  await expect(side.getByRole('tab')).toHaveText(['Description', 'Transcript', ''])
+  await openPart(page, 'Timer')
+  await expect(side.getByRole('tab', { name: 'Timer' })).toHaveAttribute('aria-selected', 'true')
   expect(await page.evaluate(() => localStorage.getItem('shellnote:side-tab'))).toBe('timer')
-  const video = await box(page, '.nw-video')
   await page.getByRole('button', { name: 'Close the side panel' }).click()
   await expect(page.locator('.nw-side-panel')).toHaveCount(0)
-  // The video takes the side panel's room.
-  expect((await box(page, '.nw-video')).height).toBeGreaterThan(video.height)
-  await expect(page.getByRole('button', { name: 'Side panel', exact: true })).toHaveAttribute('aria-pressed', 'false')
+  await expect(page.locator('.nw-dock-panel[data-panel="video"]')).toHaveCSS('visibility', 'hidden')
+  await expect(page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Beside the note' })).toHaveAttribute('aria-pressed', 'false')
+  // The rail's Beside brings it back on the part it was on; the AI is the panel's other section.
+  await page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Beside the note' }).click()
+  await expect(side.getByRole('tab', { name: 'Timer' })).toHaveAttribute('aria-selected', 'true')
+  await openPart(page, 'Chat')
+  await expect(side.getByRole('tab')).toHaveText(['Chat', 'Changes', 'Scratch pad'])
+  await expect(page.locator('.nw-dock-panel[data-panel="video"]')).toHaveCSS('visibility', 'hidden')
 })
 
-test('the bars move: down a side from the grip’s menu, floating as a box where dragged, along a side when let go near it; kept', async ({ page }) => {
+test('the tool bar moves: down a side from the grip’s menu, floating as a pill where dragged, along a side when let go near it; kept', async ({ page }) => {
   await page.goto('/#/new')
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
 
-  // The tools bar down the left side: its tools one under another, still working; the app bar keeps one row.
-  await page.getByRole('button', { name: 'Move the tools bar' }).click()
+  // Down the left side: its tools one under another, still working.
+  await page.getByRole('button', { name: 'Move the tool bar' }).click()
   await page.getByRole('menuitemradio', { name: 'Down the left side' }).click()
   const strip = await box(page, '.nw-bar-strip[data-side="left"]')
   const tools = await box(page, '.nw-bar[data-bar="tools"]')
   expect(tools.left).toBeGreaterThanOrEqual(strip.left)
   expect(tools.height).toBeGreaterThan(tools.width)
-  // The panels start on a whole screen pixel beside it: a multiple of 4.
+  // The pages start on a whole screen pixel beside it: a multiple of 4.
   expect(strip.width % 4).toBe(0)
-  expect((await box(page, '.nw-dock')).left).toBe(strip.right)
-  await expect(page.locator('.appbar')).toHaveAttribute('data-tools-away', '')
-  await page.getByRole('radio', { name: 'Pen', exact: true }).click()
+  expect((await box(page, '.sh-notes-row .pages-area')).left).toBe(strip.right)
+  await chooseTool(page, 'pen')
   await expect(page.locator('.nw-desk[data-tool="pen"]')).toBeVisible()
 
-  // The format bar dragged out by its grip floats where it is let go.
-  const grip = await box(page, '.nw-bar[data-bar="format"] .nw-bar-grip')
+  // Dragged out by its grip, it floats where it is let go.
+  const grip = await box(page, '.nw-bar[data-bar="tools"] .nw-bar-grip')
   const main = await box(page, '.main')
   await page.mouse.move(grip.left + grip.width / 2, grip.top + grip.height / 2)
   await page.mouse.down()
   await page.mouse.move(main.left + 400, main.top + 300, { steps: 8 })
   await page.mouse.up()
-  const floating = page.locator('.nw-bar[data-bar="format"][data-at="float"]')
+  const floating = page.locator('.nw-bar[data-bar="tools"][data-at="float"]')
   await expect(floating).toBeVisible()
-  const f = await box(page, '.nw-bar[data-bar="format"]')
+  const f = await box(page, '.nw-bar[data-bar="tools"]')
   expect(Math.abs(f.top - (main.top + 300))).toBeLessThan(40)
   // Turned down from its menu.
-  await page.getByRole('button', { name: 'Move the format bar' }).click()
+  await page.getByRole('button', { name: 'Move the tool bar' }).click()
   await page.getByRole('menuitem', { name: 'Turn it down' }).click()
   await expect(floating).toHaveAttribute('data-dir', 'column')
 
   // Dragged to the right edge, it goes down the right side.
-  const again = await box(page, '.nw-bar[data-bar="format"] .nw-bar-grip')
+  const again = await box(page, '.nw-bar[data-bar="tools"] .nw-bar-grip')
   await page.mouse.move(again.left + again.width / 2, again.top + again.height / 2)
   await page.mouse.down()
   await page.mouse.move(main.right - 100, main.top + 300, { steps: 6 })
   await page.mouse.move(main.right - 10, main.top + 300, { steps: 4 })
   await page.mouse.up()
-  await expect(page.locator('.nw-bar-strip[data-side="right"] .nw-bar[data-bar="format"]')).toBeVisible()
+  await expect(page.locator('.nw-bar-strip[data-side="right"] .nw-bar[data-bar="tools"]')).toBeVisible()
 
   // Kept for the next time.
-  const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('shellnote:workspace')!).bars)
-  expect(kept).toEqual({ tools: { at: 'left' }, format: { at: 'right' } })
+  const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('shellnote:workspace-2')!).bars.tools)
+  expect(kept).toEqual({ at: 'right' })
   await page.reload()
-  await expect(page.locator('.nw-bar-strip[data-side="left"] .nw-bar[data-bar="tools"]')).toBeVisible()
+  await expect(page.locator('.nw-bar-strip[data-side="right"] .nw-bar[data-bar="tools"]')).toBeVisible()
+  // Back under the tabs.
+  await page.getByRole('button', { name: 'Move the tool bar' }).click()
+  await page.getByRole('menuitemradio', { name: 'Under the tabs' }).click()
+  await expect(page.locator('.nw-bar[data-bar="tools"]')).toHaveAttribute('data-at', 'top')
 })
 
-test('the side panel’s timer: a stopwatch, and a countdown that ends with “Time is up”, running on while the panel is closed', async ({ page }) => {
+test('the timer beside the note: a stopwatch, and a countdown that ends with “Time is up”, running on while the panel is closed', async ({ page }) => {
   await page.clock.install()
   await page.goto('/#/new')
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
-  await page.getByRole('button', { name: 'Side panel', exact: true }).click()
-  await page.getByRole('tab', { name: 'Timer' }).click()
+  await openPart(page, 'Timer')
 
   await page.getByRole('radio', { name: 'Stopwatch' }).click()
   await page.getByRole('button', { name: 'Start' }).click()
@@ -174,16 +186,15 @@ test('the side panel’s timer: a stopwatch, and a countdown that ends with “T
   // Closed, it runs on.
   await page.getByRole('button', { name: 'Close the side panel' }).click()
   await page.clock.fastForward('05:01')
-  await page.getByRole('button', { name: 'Side panel', exact: true }).click()
+  await openPart(page, 'Timer')
   await expect(page.getByLabel('Time is up')).toBeVisible()
 })
 
-test('the side panel shows a web page beside the note, sandboxed, with a way out for sites that refuse', async ({ page }) => {
+test('Beside shows a web page beside the note, sandboxed, with a way out for sites that refuse', async ({ page }) => {
   await page.route('https://example.com/**', (route) => route.fulfill({ contentType: 'text/html', body: '<h1>An example page</h1>' }))
   await page.goto('/#/new')
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
-  await page.getByRole('button', { name: 'Side panel', exact: true }).click()
-  await page.getByRole('tab', { name: 'Web page' }).click()
+  await openPart(page, 'Web page')
   await page.getByLabel('Web address').fill('javascript:alert(1)')
   await page.getByRole('button', { name: 'Show', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('not a web address')
@@ -197,16 +208,16 @@ test('the side panel shows a web page beside the note, sandboxed, with a way out
   await expect(page.getByRole('link', { name: 'Open it in a new tab' })).toHaveAttribute('href', 'https://example.com/')
 })
 
-test('a transcript pasted into the side panel is kept with the video; a tap on a line plays from there, the line playing marked; found, taken out', async ({ page }) => {
+test('a transcript pasted beside the video is kept with it; a tap on a line plays from there, the line playing marked; found, taken out', async ({ page }) => {
   await withPanels(page)
-  await page.getByRole('tab', { name: 'Transcript' }).click()
+  await openPart(page, 'Transcript')
   await page.getByLabel('Transcript to paste').fill('nothing timed here')
   await page.getByRole('button', { name: 'Keep it with the note' }).click()
   await expect(page.getByRole('alert')).toContainText('No times found')
   await page.getByLabel('Transcript to paste').fill('0:00\nHello and welcome\n0:02\nTwo seconds in')
-  // Pasted and not yet kept, it waits while another tab is looked at.
-  await page.getByRole('tab', { name: 'Timer' }).click()
-  await page.getByRole('tab', { name: 'Transcript' }).click()
+  // Pasted and not yet kept, it waits while another part is looked at.
+  await openPart(page, 'Timer')
+  await openPart(page, 'Transcript')
   await expect(page.getByLabel('Transcript to paste')).toHaveValue('0:00\nHello and welcome\n0:02\nTwo seconds in')
   await page.getByRole('button', { name: 'Keep it with the note' }).click()
   await expect.poll(() => page.evaluate(() => (window.__shellnote!.doc.media![0] as { transcript?: unknown }).transcript)).toEqual([
@@ -226,31 +237,30 @@ test('a transcript pasted into the side panel is kept with the video; a tap on a
   await expect(page.getByLabel('Transcript to paste')).toBeVisible()
 })
 
-test('down a side, the format bar’s menus show as their signs, the strip as slim as the tools’ one; pressed, they still choose', async ({ page }) => {
+test('down a side, the Style button shows its sign, the strip slim; pressed, it still chooses', async ({ page }) => {
   await page.goto('/#/new')
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
   await page.locator('.nw-frame .ProseMirror').first().click()
   await page.keyboard.type('A title')
-  await page.getByRole('button', { name: 'Move the format bar' }).click()
+  await page.getByRole('button', { name: 'Move the tool bar' }).click()
   await page.getByRole('menuitemradio', { name: 'Down the right side' }).click()
   const strip = await box(page, '.nw-bar-strip[data-side="right"]')
   expect(strip.width).toBeLessThanOrEqual(68)
-  expect((await box(page, '.nw-bar[data-bar="format"]')).width).toBeLessThanOrEqual(strip.width)
-  const sign = page.locator('.nw-bar[data-bar="format"] .nw-select-short').first()
-  await expect(sign).toHaveText('¶')
-  await expect(page.locator('.nw-bar[data-bar="format"] .nw-font-menu .nw-select-short')).toHaveText('Aa')
+  expect((await box(page, '.nw-bar[data-bar="tools"]')).width).toBeLessThanOrEqual(strip.width)
+  const style = page.locator('.nw-bar[data-bar="tools"]').getByRole('button', { name: 'Style', exact: true })
+  await expect(style.locator('.sh-word-text')).toBeHidden()
+  await expect(style.locator('.sh-word-sign')).toBeVisible()
   await page.locator('.nw-frame .ProseMirror').first().click()
-  await page.getByRole('combobox', { name: 'Block type' }).selectOption('h1')
-  await expect(sign).toHaveText('H1')
+  await textStyle(page, 'Heading 1')
   await expect.poll(() => page.evaluate(() => Object.values(window.__shellnote!.doc.block).some((block) => (block as { role?: string }).role === 'h1'))).toBe(true)
 })
 
-test('full screen keeps the workspace as laid out, the video and the side panel with the notes; the same button leaves it', async ({ page }) => {
+test('full screen keeps the workspace as laid out, the panel beside the notes and the video in it; the same button leaves it', async ({ page }) => {
   await withPanels(page)
   await page.getByRole('button', { name: 'Full screen', exact: true }).click()
   await expect.poll(() => page.evaluate(() => document.fullscreenElement === document.documentElement)).toBe(true)
   await expect(page.locator('.nw-video-file video')).toBeVisible()
-  await expect(page.getByRole('tab', { name: 'AI', exact: true })).toBeVisible()
+  await expect(page.getByRole('region', { name: 'Side panel' })).toBeVisible()
   await expect(page.locator('.nw-page').first()).toBeVisible()
   const leave = page.getByRole('button', { name: 'Leave full screen' })
   await expect(leave).toHaveAttribute('aria-pressed', 'true')
@@ -262,7 +272,7 @@ test('full screen keeps the workspace as laid out, the video and the side panel 
 // A screenshot, 6 November 2026: with a bar down a side, the colour panel was cut off by the strip the bar sits in, the strip
 // scrolled sideways, and a grey scrollbar stood beside the bar. A sweep of every bar's menus then found the same in Pen
 // settings, Paper and the bars' own menus, on every side. A menu must be whole, on the screen and on top.
-const MENUS = '.nw-popover, .nw-font-library, .nw-table-grid, .nw-dropdown'
+const MENUS = '.sh-menu, .nw-popover, .nw-font-library, .nw-table-grid, .nw-dropdown'
 
 /** What is wrong with the open menu: nine points inside it, each of which must be the menu's own. */
 const notWhole = (page: Page, where: string): Promise<string[]> =>
@@ -280,14 +290,14 @@ const notWhole = (page: Page, where: string): Promise<string[]> =>
     return found
   }, where)
 
-/** Opens each menu of a bar in turn, as a press does, and asks whether it is whole. */
-async function eachMenu(page: Page, bar: string, where: string, found: string[]): Promise<number> {
-  const buttons = page.locator(`.nw-bar[data-bar="${bar}"] button[aria-expanded], .nw-bar[data-bar="${bar}"] button[aria-haspopup]`)
+/** Opens each menu of the tool bar in turn, as a press does, and asks whether it is whole. A tool not in hand is left be. */
+async function eachMenu(page: Page, where: string, found: string[]): Promise<number> {
+  const buttons = page.locator('.nw-bar[data-bar="tools"] button[aria-expanded], .nw-bar[data-bar="tools"] button[aria-haspopup]')
   let opened = 0
   for (let i = 0; i < (await buttons.count()); i++) {
     const button = buttons.nth(i)
     const name = await button.getAttribute('aria-label')
-    if (await button.isDisabled()) continue
+    if (!(await button.isVisible()) || (await button.isDisabled()) || (await button.getAttribute('aria-pressed')) === 'false') continue
     await button.evaluate((element: HTMLElement) => element.click())
     if ((await page.locator(MENUS).count()) === 0) continue
     opened++
@@ -299,73 +309,70 @@ async function eachMenu(page: Page, bar: string, where: string, found: string[])
   return opened
 }
 
-/** Sends a bar along a side, or floating; "corner" floats it near the workspace's bottom right. */
-async function sendBar(page: Page, bar: string, place: string): Promise<void> {
-  const grip = page.locator(`.nw-bar[data-bar="${bar}"] .nw-bar-grip`)
+/** Sends the tool bar along a side, or floating; "corner" floats it near the workspace's bottom right. */
+async function sendBar(page: Page, place: string): Promise<void> {
+  const grip = page.locator('.nw-bar[data-bar="tools"] .nw-bar-grip')
   await grip.evaluate((element: HTMLElement) => element.click())
-  const name = { top: 'Along the top', left: 'Down the left side', right: 'Down the right side', bottom: 'Along the bottom', float: 'Floating box', corner: 'Floating box' }[place]!
+  const name = { top: 'Under the tabs', left: 'Down the left side', right: 'Down the right side', bottom: 'Along the bottom', float: 'Floating', corner: 'Floating' }[place]!
   await page.getByRole('menuitemradio', { name, exact: true }).evaluate((element: HTMLElement) => element.click())
   if (place !== 'corner') return
   const at = (await grip.boundingBox())!
   // Inside the desktop app the window is the app's own, and Playwright keeps no size for it: the page says.
   const size = page.viewportSize() ?? (await page.evaluate(() => ({ width: innerWidth, height: innerHeight })))
-  await page.mouse.move(at.x + 10, at.y + 10)
+  await page.mouse.move(at.x + 5, at.y + 10)
   await page.mouse.down()
   await page.mouse.move(size.width - 140, size.height - 110, { steps: 4 })
   await page.mouse.up()
 }
 
 for (const [width, height] of inApp ? [[1280, 800], [800, 600]] as const : [[1280, 800], [800, 600], [360, 740]] as const) {
-  test(`at ${width} by ${height}, every menu of the bars is whole and on top, wherever the bar is`, async ({ page }) => {
+  test(`at ${width} by ${height}, every menu of the tool bar is whole and on top, wherever the bar is`, async ({ page }) => {
     test.setTimeout(120_000)
     await page.setViewportSize({ width, height })
     await page.goto('/?sample=mixed')
     await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
     const found: string[] = []
-    const seen = { tools: 0, format: 0, pen: 0, table: 0 }
-    // A caret in the text: the tools' Table and the format bar's own come alive.
+    const seen = { words: 0, pen: 0, table: 0 }
+    // A caret in the text: the Table and the words' own menus come alive.
     const caret = (): Promise<void> => page.locator('.nw-frame .ProseMirror').first().evaluate((element: HTMLElement) => element.focus())
     for (const place of ['top', 'left', 'right', 'bottom', 'float', 'corner']) {
       await caret()
-      // Both float together, one over the other: a menu must come over the other bar too.
-      await sendBar(page, 'tools', place === 'corner' ? 'float' : place)
-      await sendBar(page, 'format', place)
-      seen.tools += await eachMenu(page, 'tools', `tools ${place}`, found)
-      seen.format += await eachMenu(page, 'format', `format ${place}`, found)
+      await sendBar(page, place)
+      seen.words += await eachMenu(page, `words ${place}`, found)
       // A side's scrollbar is slim and only up and down, shown or not.
       for (const strip of await page.locator('.nw-bar-strip[data-side="left"], .nw-bar-strip[data-side="right"]').all()) {
         expect(await strip.evaluate((element: HTMLElement) => [getComputedStyle(element).overflowX, element.offsetWidth - element.clientWidth <= 7])).toEqual(['hidden', true])
       }
     }
-    // The pen's own bar, in the same places.
-    await page.getByRole('radio', { name: 'Pen', exact: true }).evaluate((element: HTMLElement) => element.click())
+    // The pen's own row, in the same places.
+    await chooseTool(page, 'pen')
     for (const place of ['top', 'left', 'right', 'bottom', 'corner']) {
-      await sendBar(page, 'format', place)
-      seen.pen += await eachMenu(page, 'format', `pen ${place}`, found)
+      await sendBar(page, place)
+      seen.pen += await eachMenu(page, `pen ${place}`, found)
     }
     // A table's own: the delete and style menus.
-    await page.getByRole('radio', { name: 'Type', exact: true }).evaluate((element: HTMLElement) => element.click())
+    await chooseTool(page, 'type')
     await caret()
     await page.getByRole('button', { name: 'Table', exact: true }).evaluate((element: HTMLElement) => element.click())
     await page.locator('.nw-pick-cells button').nth(12).evaluate((element: HTMLElement) => element.click())
     await expect(page.getByRole('button', { name: 'Table style' })).toBeVisible()
     for (const place of ['left', 'right', 'bottom', 'corner']) {
-      await sendBar(page, 'format', place)
-      seen.table += await eachMenu(page, 'format', `table ${place}`, found)
+      await sendBar(page, place)
+      seen.table += await eachMenu(page, `table ${place}`, found)
     }
     expect(found).toEqual([])
-    // Each kind was really opened: the tools' Paper and Table, the format's Colour, the pen's settings, the table's two.
-    expect(seen.tools).toBeGreaterThanOrEqual(12)
-    expect(seen.format).toBeGreaterThanOrEqual(6)
-    expect(seen.pen).toBeGreaterThanOrEqual(5)
+    // Each kind was really opened: the words' Style, Font and size, Colour, Align, Table and More; the pen's Pen, Colour
+    // and Width; a table's two.
+    expect(seen.words).toBeGreaterThanOrEqual(24)
+    expect(seen.pen).toBeGreaterThanOrEqual(10)
     expect(seen.table).toBeGreaterThanOrEqual(8)
   })
 }
 
-// Options down a side "are not visible". With both bars on one side, a window 730 high showed all of the first and of the
-// second only its first button; the eraser's two choices hung off both edges of the strip.
+// Options down a side "are not visible": a window 730 high showed only part of a bar; the eraser's two choices hung off
+// both edges of the strip.
 for (const [width, height] of inApp ? [[1536, 730], [1280, 800]] as const : [[1536, 730], [1280, 800], [1180, 820], [820, 1180]] as const) {
-  test(`at ${width} by ${height}, with both bars down a side, every option is in sight, whichever tool is chosen`, async ({ page }) => {
+  test(`at ${width} by ${height}, with the tool bar down a side, every option is in sight, whichever tool is chosen`, async ({ page }) => {
     test.setTimeout(120_000)
     await page.setViewportSize({ width, height })
     await page.goto('/?sample=mixed')
@@ -385,23 +392,22 @@ for (const [width, height] of inApp ? [[1536, 730], [1280, 800]] as const : [[15
         return out
       }, where)
     for (const side of ['left', 'right']) {
-      await sendBar(page, 'tools', side)
-      await sendBar(page, 'format', side)
-      for (const tool of ['Type', 'Select', 'Pen', 'Highlighter', 'Eraser']) {
-        await page.getByRole('radio', { name: tool, exact: true }).evaluate((element: HTMLElement) => element.click())
+      await sendBar(page, side)
+      for (const tool of ['type', 'select', 'pen', 'highlighter', 'eraser'] as const) {
+        await chooseTool(page, tool)
         await page.waitForTimeout(60)
         found.push(...(await check(`${side}, ${tool}`, side)))
       }
     }
     expect(found).toEqual([])
-    // The eraser's choices still choose, and read as words.
-    await expect(page.getByRole('radio', { name: 'Part of a stroke' })).toBeVisible()
-    await page.getByRole('radio', { name: 'Part of a stroke' }).click()
-    await expect(page.getByRole('radio', { name: 'Part of a stroke' })).toHaveAttribute('aria-checked', 'true')
+    // The eraser's choices still choose (its menu stays open after a choice).
+    await eraserWay(page, 'Part of a stroke')
+    await expect(page.getByRole('menuitemradio', { name: 'Part of a stroke' })).toHaveAttribute('aria-checked', 'true')
+    await penRow(page).getByRole('button', { name: 'Eraser', exact: true }).click()
     // A shorter bar for another tool does not move the notes.
-    await page.getByRole('radio', { name: 'Type', exact: true }).evaluate((element: HTMLElement) => element.click())
+    await chooseTool(page, 'type')
     const typed = (await box(page, '.nw-bar-strip[data-side="right"]')).width
-    await page.getByRole('radio', { name: 'Pen', exact: true }).evaluate((element: HTMLElement) => element.click())
+    await chooseTool(page, 'pen')
     expect((await box(page, '.nw-bar-strip[data-side="right"]')).width).toBe(typed)
   })
 }

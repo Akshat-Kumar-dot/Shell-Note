@@ -8,11 +8,11 @@ const MENUS = '.nw-popover, .nw-font-library, .nw-table-grid, .nw-dropdown'
 
 const STYLES = ['box-sizing', 'flex-wrap', 'height', 'width', 'align-content', 'justify-content']
 
-const contentOf = (bar: HTMLElement): HTMLElement | null => bar.querySelector<HTMLElement>(':scope > .nw-toolstrip, :scope > .nw-formatbar')
+/** A bar's rows of tools: the one in hand, or both. */
+const contentsOf = (bar: HTMLElement): HTMLElement[] => [...bar.querySelectorAll<HTMLElement>(':scope > .sh-rows > .sh-tools')]
 
 function asOneColumn(bar: HTMLElement): void {
-  const content = contentOf(bar)
-  if (content) for (const name of STYLES) content.style.removeProperty(name)
+  for (const content of contentsOf(bar)) for (const name of STYLES) content.style.removeProperty(name)
 }
 
 /**
@@ -20,16 +20,16 @@ function asOneColumn(bar: HTMLElement): void {
  * by itself as they wrap, in any browser, so it is told how wide they came to.
  */
 function intoColumns(bar: HTMLElement, room: number): void {
-  const content = contentOf(bar)
-  if (!content) return
   const grip = bar.querySelector<HTMLElement>(':scope > .nw-bar-grip')?.offsetHeight ?? 0
   const height = Math.max(0, room - grip - 2)
-  if (content.offsetHeight <= height) return
-  Object.assign(content.style, { boxSizing: 'border-box', flexWrap: 'wrap', height: `${height}px`, alignContent: 'flex-start', justifyContent: 'flex-start' })
-  const style = getComputedStyle(content)
-  const left = content.getBoundingClientRect().left
-  const right = Math.max(...[...content.children].map((kid) => kid.getBoundingClientRect().right))
-  content.style.width = `${Math.ceil(right - left + parseFloat(style.paddingRight) + parseFloat(style.borderRightWidth))}px`
+  for (const content of contentsOf(bar)) {
+    if (content.offsetHeight <= height) continue
+    Object.assign(content.style, { boxSizing: 'border-box', flexWrap: 'wrap', height: `${height}px`, alignContent: 'flex-start', justifyContent: 'flex-start' })
+    const style = getComputedStyle(content)
+    const left = content.getBoundingClientRect().left
+    const right = Math.max(...[...content.children].map((kid) => kid.getBoundingClientRect().right))
+    content.style.width = `${Math.ceil(right - left + parseFloat(style.paddingRight) + parseFloat(style.borderRightWidth))}px`
+  }
 }
 
 /** Calls `fit` now, and whenever the element's height or the buttons inside it change. Returns the function that stops. */

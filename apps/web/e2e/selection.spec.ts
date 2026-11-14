@@ -6,6 +6,7 @@
 // with the Free cursor, a caret where it clicks, for a new frame. A click and
 // Shift+click choose blocks placed on the page.
 import { expect, test, type Page } from './fixtures.js'
+import { chooseTool, zoom, zoomShown } from './shell.js'
 
 // Tall enough to show a whole A4 page at 100%, so every point a test clicks is on screen.
 test.use({ viewport: { width: 1280, height: 1200 } })
@@ -41,8 +42,7 @@ async function start(page: Page, address = '/#/new'): Promise<void> {
 }
 
 async function useTool(page: Page, name: 'Type' | 'Select' | 'Free cursor'): Promise<void> {
-  await page.getByRole('radio', { name }).click()
-  await expect(page.getByRole('radio', { name })).toHaveAttribute('aria-checked', 'true')
+  await chooseTool(page, name === 'Type' ? 'type' : name === 'Select' ? 'select' : 'free')
 }
 
 async function drag(page: Page, from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
@@ -147,7 +147,7 @@ async function typeParagraph(page: Page): Promise<string> {
 
 test('Type is the tool at first; Select takes the caret out of the text', async ({ page }) => {
   await start(page)
-  await expect(page.getByRole('radio', { name: 'Type' })).toHaveAttribute('aria-checked', 'true')
+  await expect(page.locator('.nw-desk')).toHaveAttribute('data-tool', 'type')
   await page.locator('.nw-frame .ProseMirror').first().click()
   await expect(page.locator('.nw-frame .ProseMirror').first()).toBeFocused()
   await useTool(page, 'Select')
@@ -459,15 +459,15 @@ test('the box stays on the page through scrolling and zoom, until Escape or a cl
 
   await page.locator('.nw-desk').evaluate((desk) => desk.scrollBy(0, 200))
   await expect.poll(async () => near(await where())).toBe(true)
-  await page.getByRole('button', { name: 'Zoom in' }).click()
-  await expect(page.getByRole('button', { name: 'Actual size' })).toHaveText('110%')
+  await zoom(page, 'in')
+  await expect(zoomShown(page)).toHaveText('110%')
   await expect.poll(async () => near(await where())).toBe(true)
   expect((await chosen(page)).selection).toEqual(picked)
 
   await page.keyboard.press('Escape')
   await expect(region).toHaveCount(0)
   // A click on the paper outside the box, or beside the page, lets it go too.
-  await page.getByRole('button', { name: 'Actual size' }).click()
+  await zoom(page, 'actual')
   await drag(page, await onPage(page, 30, 230), await onPage(page, 90, 270))
   await expect(region).toHaveCount(1)
   await page.mouse.click(...(Object.values(await onPage(page, 150, 250)) as [number, number]))
@@ -522,9 +522,7 @@ test('a colour, a link and every mark key act only on the words a box holds, eac
 // Check 7: switching tools.
 test('the tools switch cleanly: Type at first with the Free cursor off, and each tool does only its own thing', async ({ page }) => {
   await start(page, '/?sample=physics')
-  await expect(page.getByRole('radio', { name: 'Type' })).toHaveAttribute('aria-checked', 'true')
-  await expect(page.getByRole('radio', { name: 'Select' })).toHaveAttribute('aria-checked', 'false')
-  await expect(page.getByRole('radio', { name: 'Free cursor' })).toHaveAttribute('aria-checked', 'false')
+  await expect(page.locator('.nw-desk')).toHaveAttribute('data-tool', 'type')
   const [t2] = await drawnLetters(page, ['t2'])
   const row = lines(t2!)[0]!
   const from = { x: row[2]!.left + 2, y: (row[2]!.top + row[2]!.bottom) / 2 }
@@ -604,8 +602,8 @@ test('a box takes the same letters at 50% and at 200% zoom', async ({ page }) =>
     ['Zoom out', '50%', 4],
     ['Zoom in', '200%', 9],
   ] as const) {
-    for (let i = 0; i < clicks; i++) await page.getByRole('button', { name: button }).click()
-    await expect(page.getByRole('button', { name: 'Actual size' })).toHaveText(label)
+    for (let i = 0; i < clicks; i++) await zoom(page, button === 'Zoom in' ? 'in' : 'out')
+    await expect(zoomShown(page)).toHaveText(label)
     await page.locator('[data-id="t2"]').scrollIntoViewIfNeeded()
     const [t2] = await drawnLetters(page, ['t2'])
     const row = lines(t2!)[0]!

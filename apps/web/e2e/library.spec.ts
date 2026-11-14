@@ -5,6 +5,7 @@
 // and two tabs on one note never overwriting each other.
 import { readFile } from 'node:fs/promises'
 import { expect, inApp, test, type Locator, type Page } from './fixtures.js'
+import { toLibrary } from './shell.js'
 
 /** Open the home page and wait for it. */
 async function home(page: Page, address = '/'): Promise<void> {
@@ -48,7 +49,7 @@ async function newNoteHere(page: Page, title: string): Promise<void> {
   await field.press('Enter')
   await page.locator('.nw-frame .ProseMirror').first().click()
   await page.keyboard.type(`Notes about ${title}`)
-  await page.getByRole('button', { name: 'Back to notes' }).click()
+  await toLibrary(page)
   await expect(page.locator('.home')).toBeVisible()
   await expect(card(page, title)).toBeVisible()
 }
@@ -97,9 +98,9 @@ test('folders hold folders and notes; a path leads back up; rename by F2 or the 
   // New items get "Untitled", then "Untitled 2", even beside each other.
   await page.locator('.home-actions').getByRole('button', { name: 'New note', exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Untitled')
-  await page.getByRole('button', { name: 'New note' }).click()
+  await page.getByRole('button', { name: 'New tab' }).click()
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Untitled 2')
-  await page.getByRole('button', { name: 'Back to notes' }).click()
+  await toLibrary(page)
   await expect.poll(() => names(page)).toEqual(expect.arrayContaining(['Lab work', 'Untitled', 'Untitled 2']))
 
   await page.reload()
@@ -121,7 +122,7 @@ test('a folder cannot move into itself or one of its own folders; notes and fold
   await page.getByRole('button', { name: 'New folder' }).click()
   await page.getByRole('textbox', { name: 'New name for Untitled folder' }).fill('Waves')
   await page.keyboard.press('Enter')
-  await page.getByRole('link', { name: 'Notes', exact: true }).first().click()
+  await page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Library', exact: true }).click()
 
   await menu(page, 'Physics', 'Move to…')
   const dialog = page.getByRole('dialog', { name: 'Move “Physics”' })
@@ -160,7 +161,7 @@ test('Delete goes to Recently deleted with Undo; restore brings it back; delete 
   await expect(card(page, 'Draft').locator('.card-meta')).toContainText('30 days left')
   await menu(page, 'Draft', 'Restore')
   await expect(page.getByRole('status')).toContainText('Restored “Draft” to the top level')
-  await page.getByRole('link', { name: 'Notes', exact: true }).first().click()
+  await page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Library', exact: true }).click()
   await expect(card(page, 'Draft')).toBeVisible()
 
   // Delete for good asks first; Cancel keeps it.
@@ -175,13 +176,13 @@ test('Delete goes to Recently deleted with Undo; restore brings it back; delete 
   await expect(page.getByRole('heading', { name: 'Recently deleted is empty' })).toBeVisible()
 
   // Emptying asks first too.
-  await page.getByRole('link', { name: 'Notes', exact: true }).first().click()
+  await page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Library', exact: true }).click()
   await menu(page, 'Keep', 'Delete')
   await page.getByRole('link', { name: /Recently deleted/u }).click()
   await page.getByRole('button', { name: 'Empty Recently deleted' }).click()
   await page.getByRole('dialog', { name: 'Empty Recently deleted?' }).getByRole('button', { name: 'Empty it' }).click()
   await expect(page.getByRole('heading', { name: 'Recently deleted is empty' })).toBeVisible()
-  await page.getByRole('link', { name: 'Notes', exact: true }).first().click()
+  await page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Library', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Your library is empty' })).toBeVisible()
 })
 
@@ -193,7 +194,7 @@ test('search finds titles anywhere in the library, and sorting puts the oldest o
   await page.keyboard.press('Enter')
   await card(page, 'Physics').locator('.card-open').click()
   await newNoteHere(page, 'Newton')
-  await page.getByRole('link', { name: 'Notes', exact: true }).first().click()
+  await page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Library', exact: true }).click()
   // The top level is a view of its own, made afresh once the address has changed: typed into before, the old one's search box is gone.
   await expect(card(page, 'Physics')).toBeVisible()
 
@@ -297,7 +298,7 @@ test('the note this browser kept before the library moves in exactly, and the ol
       }),
   )
   expect(old).toBe(raw.id)
-  await page.getByRole('button', { name: 'Back to notes' }).click()
+  await toLibrary(page)
   await expect(page.locator('.home')).toBeVisible()
   await page.reload()
   await expect(page.locator('.card')).toHaveCount(1)

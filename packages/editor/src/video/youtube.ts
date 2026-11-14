@@ -29,6 +29,8 @@ export function youTubeId(text: string): string | undefined {
 /** The few parts of YouTube's player ShellNote uses. */
 export interface YouTubePlayer {
   getCurrentTime(): number
+  /** How long the video is, in seconds; 0 until it knows. */
+  getDuration?(): number
   seekTo(seconds: number, allowSeekAhead: boolean): void
   /** Sets where the video will start, when it is started. */
   cueVideoById(options: { videoId: string; startSeconds: number }): void

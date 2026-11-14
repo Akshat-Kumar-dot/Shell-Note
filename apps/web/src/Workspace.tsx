@@ -1,26 +1,24 @@
-// One note on screen: the app bar (back to the library, the title and how safe
-// the note is; the tools; zoom and the file buttons), the floating format bar,
-// and the pages. The note is kept in the library a moment after every change,
-// through the storage interface, and a thumbnail of its first page is drawn
-// once edits settle and when leaving. If another tab edits the same note, this
-// tab shows it read-only and says so, with a button to edit it here instead. A
-// sample note (?sample=…) is never kept. The AI works on what is chosen,
-// through the ✨ button or Ctrl+K; its answers and its log show in a panel
-// beside the pages, and the log is kept beside the note in the library, never
-// in its file.
-import { ValidationError, type Doc, type LogEntry, type Selection } from '@shellnote/core'
-import { aiEdit, AiLayer, AskPanel, AssetStore, CHANGED_SINCE, checkDiagram, commands, EditorStore, undoEdit, type By, type NewNote, FormatBar, LogPanel, PageView, ToolStrip, useUndoKeys, BarStrip, EditorArea, MovableBar, ProgramButton, programHost, showSideTab, SidePanelButton, sideTab, tabWord, VideoButton, workspace, inDesktopApp, type AiHost, type AskAnswer, type LogItem } from '@shellnote/editor'
+// One note on screen, inside the shell: its row of tools, the pages, and its status line (how safe the note is,
+// where it is kept, its pages and words, the zoom); at the tabs' end, its own menu. The note is kept in the library a
+// moment after every change, through the storage interface, and a thumbnail of its first page is drawn once edits
+// settle and when leaving. If another tab edits the same note, this tab shows it read-only and says so, with a
+// button to edit it here instead. A sample note (?sample=…) is never kept. The AI works on what is chosen, through
+// the ✨ button or Ctrl+K; its answers and its log show in a panel beside the pages, and the log is kept beside the
+// note in the library, never in its file.
+import { textOf, ValidationError, type Doc, type LogEntry, type Selection } from '@shellnote/core'
+import { aiEdit, AiLayer, AskPanel, AssetStore, BarMenu, BarStrip, CHANGED_SINCE, checkDiagram, commands, EditorStore, MenuItem, MovableBar, NoteBar, undoEdit, type By, type NewNote, LogPanel, PageView, useUndoKeys, EditorArea, programHost, showSideTab, tabWord, inDesktopApp, workspace, type AiHost, type AskAnswer, type LogItem } from '@shellnote/editor'
 import { openAICompatible } from '@shellnote/providers'
-import { ChevronLeft, FilePlus, FolderOpen, Minus, Plus, Save, ScrollText, TriangleAlert } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { Check, CircleAlert, CloudCheck, Ellipsis, FileDown, FilePlus2, FolderOpen, HardDrive, Maximize2, ScrollText, TriangleAlert } from 'lucide-react'
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import { assistantLog, withAssistants } from './ai/assistants.js'
 import { loadLog, saveLog } from './ai/log.js'
 import { loadSettings, missing, modelFrom, savedKey } from './ai/settings.js'
 import { keepWhenClosing } from './desktop.js'
 import { importNote } from './library/importing.js'
-import { LibrarySide, useLibrarySideAt } from './library/LibrarySide.js'
 import { libraryPictures } from './library/pictures.js'
 import { Settings } from './library/Settings.js'
+import { noteScreen, tabsAt, tabsEnd } from './shell/state.js'
 import type { LibraryStore } from '@shellnote/library'
 import type { Tabs } from './library/tabs.js'
 import { drawThumbnail } from './library/thumbnail.js'
@@ -104,9 +102,6 @@ function nextFrame(): Promise<void> {
   })
 }
 
-/** Room above the first page for the floating format bar, in screen pixels. */
-const FORMAT_BAR_SPACE = 64
-
 /** How long after the last change the thumbnail is drawn again. */
 const THUMB_AFTER = 2000
 
@@ -140,6 +135,11 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
   const [openedAt] = useState(Date.now)
   const editing = mode === 'edit'
   useUndoKeys(store, editing)
+  // The shell's rail: its buttons for the panel beside the note work while the note is edited here.
+  useEffect(() => {
+    noteScreen.set({ mode: editing ? 'edit' : 'read', id: note, folder, title: doc.title })
+  }, [editing, note, folder, doc.title])
+  useEffect(() => () => noteScreen.set(undefined), [])
   // The AI's answers and its log, shown in the side panel's Output, and Settings opened from the prompt box.
   const [answer, setAnswer] = useState<{ n: number; answer: AskAnswer }>()
   const [log, setLog] = useState<LogItem[]>([])
@@ -149,9 +149,6 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
   noteRef.current = note
   const takeAssistants = useRef<() => void>(() => undefined)
   const [settings, setSettings] = useState(false)
-  // The library beside the note, on the side the person keeps it.
-  const [sideAt, moveSide] = useLibrarySideAt()
-
 
   useEffect(() => {
     document.title = `${doc.title} – ShellNote`
@@ -593,50 +590,44 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
     }),
     [answer, log, store, keepLog, host],
   )
-  const saved = useSyncExternalStore(workspace.subscribe, workspace.snapshot)
-  const tabOpen = useSyncExternalStore(sideTab.subscribe, sideTab.snapshot)
-  const logShown = saved.side && tabOpen === 'output'
-  // The Program panel's button, in the app on Windows: the bar's end is a button wider, so the tools take a row of their
-  // own sooner (app.css).
-  const programs = useSyncExternalStore(programHost.subscribe, programHost.snapshot) !== undefined
-  const appbar = useOneRow()
-
-  // The bars, each where its person left it: along the top, a side, the bottom, or floating.
-  const bars = useSyncExternalStore(workspace.subscribe, workspace.snapshot).bars
-  // Made once a note: a key typed redraws the tools and the format bar themselves (they follow the note), never these.
+  // The note's tool bar, where its person keeps it: under the tabs, down a side, along the bottom, or floating. Made
+  // once a note: a key typed redraws the rows inside it (they follow the note), never the bar.
+  const at = useSyncExternalStore(workspace.subscribe, workspace.snapshot).bars.tools.at
   const toolsBar = useMemo(
     () =>
       editing ? (
-        <MovableBar key="tools" id="tools" label="tools bar">
-          <ToolStrip store={store} />
+        <MovableBar key="tools" id="tools" label="tool bar">
+          <NoteBar store={store} />
         </MovableBar>
       ) : null,
     [editing, store],
   )
-  const formatBar = useMemo(
-    () =>
-      editing ? (
-        <MovableBar key="format" id="format" label="format bar">
-          <FormatBar store={store} />
-        </MovableBar>
-      ) : null,
-    [editing, store],
-  )
-  const formatOnTop = bars.format.at === 'top'
-  // The notes being edited, made once a note and zoom: the page view follows the note itself, key by key (with a
-  // store, PageView shows the store's own note), so the workspace round it is not drawn again for each key.
+  // The status line has its place at the notes' foot, filled from here (a portal): what it says changes as the note
+  // is kept and its words are counted, and the panels round the notes are not drawn again for it. So has a notice, under
+  // the tabs and the tool bar.
+  const [statusPlace, setStatusPlace] = useState<HTMLElement | null>(null)
+  const [noticePlace, setNoticePlace] = useState<HTMLElement | null>(null)
+  // The notes being edited, made once a note, zoom and the bar's place: the page view follows the note itself, key by
+  // key (with a store, PageView shows the store's own note), so the workspace round it is not drawn again for each key.
   const notes = useMemo(
     () => (
-      <div className="pages-area">
-        {/* The format bar floats over the desk, so a change in its size never moves the pages; over the pages only, never a video beside them. */}
-        {formatOnTop ? <div className="format-row">{formatBar}</div> : null}
-        <PageView key={session.key} doc={store.doc} zoom={zoom} onZoom={setZoom} store={store} topSpace={formatOnTop ? FORMAT_BAR_SPACE : 0} />
-      </div>
+      <>
+        <div className="sh-tabs-place" ref={tabsAt} />
+        {at === 'top' ? toolsBar : null}
+        <div className="sh-notice-place" ref={setNoticePlace} />
+        <div className="sh-notes-row">
+          {at === 'left' ? <BarStrip side="left">{[toolsBar]}</BarStrip> : null}
+          <div className="pages-area">
+            <PageView key={session.key} doc={store.doc} zoom={zoom} onZoom={setZoom} store={store} />
+          </div>
+          {at === 'right' ? <BarStrip side="right">{[toolsBar]}</BarStrip> : null}
+        </div>
+        {at === 'bottom' ? <BarStrip side="bottom">{[toolsBar]}</BarStrip> : null}
+        <div className="sh-status-place" ref={setStatusPlace} />
+      </>
     ),
-    [formatOnTop, formatBar, session.key, store, zoom],
+    [at, toolsBar, session.key, store, zoom],
   )
-  const hasBars = (at: 'left' | 'right' | 'bottom'): boolean => bars.tools.at === at || bars.format.at === at
-  const barsAt = (at: 'left' | 'right' | 'bottom' | 'float') => [bars.tools.at === at ? toolsBar : null, bars.format.at === at ? formatBar : null]
 
   const rename = (title: string): void => {
     // `key`: keys typed in quick succession make one undo step.
@@ -644,123 +635,176 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
   }
   const status = statusOf(doc, file, note === undefined, now, openedAt)
   // Kept in a folder, the note is a file as it stands; Save then puts a copy elsewhere.
-  const keptWords = note !== undefined && library.place?.() !== undefined ? IN_FOLDER : status.kept
-  const librarySide = <LibrarySide store={library} tabs={tabs} note={note} folder={folder} title={doc.title} at={sideAt} onMove={moveSide} />
+  const place = note === undefined ? undefined : library.place?.()
+  const keptWords = place !== undefined ? IN_FOLDER : status.kept
+  // The words of the note, counted a moment after the typing, never with each key; each block counted once.
+  const settled = useDeferredValue(doc)
+  const words = useMemo(() => Object.values(settled.block).reduce((sum, block) => sum + wordsIn(block), 0), [settled])
+  const pages = doc.pages.length
+  const end = useSyncExternalStore(tabsEnd.subscribe, tabsEnd.snapshot)
+  const full = useSyncExternalStore(workspace.subscribe, workspace.snapshot).layout.full === 'notes'
+  // Why the note is read-only here, or a problem keeping it: under the tabs and the tool bar.
+  const noticeBar =
+    notice || problem ? (
+      <div className="notice" data-tone={problem ? 'error' : 'info'} role={problem ? 'alert' : 'status'}>
+        <TriangleAlert size={16} aria-hidden />
+        <span>{problem ?? notice}</span>
+        {!editing && mode === 'view' ? (
+          <button type="button" className="button" data-command="note.editHere" onClick={() => commands.tap('note.editHere')}>
+            Edit here instead
+          </button>
+        ) : null}
+      </div>
+    ) : null
+  const statusLine = (
+    <footer className="sh-status">
+      <span className={`file-status${status.changed ? '' : ' sh-good'}`} role="status" data-kept-rev={keptRev} data-unsaved={status.changed ? '' : undefined} data-late={status.late ? '' : undefined} title={keptWords}>
+        {status.changed ? <CircleAlert size={13} aria-hidden /> : <Check size={13} aria-hidden />}
+        {status.text}
+      </span>
+      <button type="button" title={`${keptWords} (opens Settings)`} data-command="settings.open" onClick={() => commands.tap('settings.open')}>
+        {place !== undefined ? <CloudCheck size={14} aria-hidden /> : <HardDrive size={14} aria-hidden />}
+        {note === undefined ? 'Not kept' : place !== undefined ? 'Kept in your folder' : inDesktopApp() ? 'Kept on this computer' : 'Kept in this browser'}
+      </button>
+      <span className="sh-grow" />
+      <span>
+        {pages} {pages === 1 ? 'page' : 'pages'}
+      </span>
+      <span>
+        {words} {words === 1 ? 'word' : 'words'}
+      </span>
+      <BarMenu label="Zoom" title="Zoom (Ctrl and the wheel, too)" className="sh-zoom" button={`${Math.round(zoom * 100)}%`}>
+        {(close) =>
+          (
+            [
+              ['in', 'Zoom in', 'Zoom in'],
+              ['out', 'Zoom out', 'Zoom out'],
+              ['actual', 'Actual size', 'Actual size, 100%'],
+            ] as const
+          ).map(([step, label, words]) => (
+            <MenuItem
+              key={step}
+              label={label}
+              command="screen.zoom"
+              onChoose={() => {
+                close()
+                commands.press('screen.zoom', { step })
+              }}
+            >
+              {words}
+            </MenuItem>
+          ))
+        }
+      </BarMenu>
+    </footer>
+  )
 
   return (
     <div className="app">
-      <header ref={appbar} className="appbar" data-tauri-drag-region="deep" data-tools-away={editing && bars.tools.at !== 'top' ? '' : undefined} data-program={editing && programs ? '' : undefined}>
-        <div className="appbar-side">
-          <button type="button" className="icon-button" aria-label="Back to notes" title="Back to notes" data-command="note.close" onClick={() => commands.press('note.close')}>
-            <ChevronLeft size={20} aria-hidden />
-          </button>
-          <input
-            className="title"
-            aria-label="Title"
-            data-command="note.rename"
-            spellCheck={false}
-            value={doc.title}
-            readOnly={!editing}
-            onChange={(event) => rename(event.target.value)}
-            onBlur={(event) => {
-              if (event.target.value.trim() === '') rename('Untitled')
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') event.currentTarget.blur()
-            }}
-          />
- {/* The save words are the Save button's: kept here unseen, for screen readers to read as they change. */}
-          <span className="file-status" role="status" data-kept-rev={keptRev}>
-            {status.text}
-          </span>
-        </div>
-        <div className="appbar-middle">{bars.tools.at === 'top' ? toolsBar : null}</div>
-        <div className="appbar-side appbar-end">
-          {editing ? <VideoButton store={store} /> : null}
-          {editing ? <SidePanelButton /> : null}
-          {editing ? <ProgramButton /> : null}
-          {editing ? (
-            <button
-              type="button"
-              className="icon-button"
-              aria-label="AI log"
-              aria-pressed={logShown}
-              title="The AI log: every request on this note, with Undo"
-              data-command="output.answers"
-              onClick={() => commands.tap('output.answers')}
-            >
-              <ScrollText size={18} aria-hidden />
-            </button>
-          ) : null}
-          <div className="zoom" role="group" aria-label="Zoom">
-            <button type="button" className="icon-button" aria-label="Zoom out" title="Zoom out" data-command="screen.zoom" onClick={() => commands.press('screen.zoom', { step: 'out' })}>
-              <Minus size={16} aria-hidden />
-            </button>
-            <button type="button" className="zoom-level" aria-label="Actual size" title="Actual size" data-command="screen.zoom" onClick={() => commands.press('screen.zoom', { step: 'actual' })}>
-              {Math.round(zoom * 100)}%
-            </button>
-            <button type="button" className="icon-button" aria-label="Zoom in" title="Zoom in" data-command="screen.zoom" onClick={() => commands.press('screen.zoom', { step: 'in' })}>
-              <Plus size={16} aria-hidden />
-            </button>
-          </div>
-          <div className="file" role="group" aria-label="File">
-            <button type="button" className="icon-button" aria-label="New note" title="A new note in this folder" data-command="note.new" onClick={() => commands.press('note.new', folder === null ? {} : { into: folder })}>
-              <FilePlus size={18} aria-hidden />
-            </button>
-            <button type="button" className="icon-button" aria-label="Open file" title="Open a .shellnote file (Ctrl+O)" data-command="file.open" onClick={() => commands.press('file.open')}>
-              <FolderOpen size={18} aria-hidden />
-            </button>
-            <button
-              type="button"
-              className="button primary save"
-              aria-label="Save"
-              title={`${status.text}. Save the note to a .shellnote file, the copy that lasts (Ctrl+S; Ctrl+Shift+S for a new file). ${keptWords}`}
-              data-unsaved={status.changed ? '' : undefined}
-              data-late={status.late ? '' : undefined}
-              data-command="file.save"
-              onClick={() => commands.press('file.save')}
-            >
-              <Save size={16} aria-hidden />
-              <span>Save</span>
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {notice || problem ? (
-        <div className="notice" data-tone={problem ? 'error' : 'info'} role={problem ? 'alert' : 'status'}>
-          <TriangleAlert size={16} aria-hidden />
-          <span>{problem ?? notice}</span>
-          {!editing && mode === 'view' ? (
-            <button type="button" className="button" data-command="note.editHere" onClick={() => commands.tap('note.editHere')}>
-              Edit here instead
-            </button>
-          ) : null}
-        </div>
-      ) : null}
       <main className="main">
-        {sideAt === 'left' ? librarySide : null}
-        {editing && hasBars('left') ? <BarStrip side="left">{barsAt('left')}</BarStrip> : null}
         {editing ? (
           <div className="main-middle">
             <EditorArea store={store} parts={parts}>
               {notes}
             </EditorArea>
-            {hasBars('bottom') ? <BarStrip side="bottom">{barsAt('bottom')}</BarStrip> : null}
           </div>
         ) : (
-          <div className="pages-area">
-            {mode === 'view' || mode === 'checking' ? (
-              <PageView doc={doc} zoom={zoom} onZoom={setZoom} assets={store.assets.snapshot()} />
-            ) : (
-              <PageView key={session.key} doc={doc} zoom={zoom} onZoom={setZoom} store={store} topSpace={FORMAT_BAR_SPACE} />
-            )}
+          <div className="sh-notes-alone">
+            <div className="sh-tabs-place" ref={tabsAt} />
+            {noticeBar}
+            <div className="pages-area">
+              {mode === 'view' || mode === 'checking' ? <PageView doc={doc} zoom={zoom} onZoom={setZoom} assets={store.assets.snapshot()} /> : <PageView key={session.key} doc={doc} zoom={zoom} onZoom={setZoom} store={store} />}
+            </div>
+            {statusLine}
           </div>
         )}
-        {editing && hasBars('right') ? <BarStrip side="right">{barsAt('right')}</BarStrip> : null}
-        {editing ? barsAt('float') : null}
-        {sideAt === 'right' ? librarySide : null}
+        {editing && at === 'float' ? toolsBar : null}
       </main>
+      {editing && statusPlace ? createPortal(statusLine, statusPlace) : null}
+      {editing && noticePlace && noticeBar ? createPortal(noticeBar, noticePlace) : null}
+      {end
+        ? createPortal(
+            <>
+              <BarMenu label="This note" title="This note: save a copy, open a file, what the AI changed" button={<Ellipsis size={18} aria-hidden />}>
+                {(close) => (
+                  <>
+                    <div className="sh-menu-head">This note</div>
+                    <MenuItem
+                      label="Save"
+                      title={`${status.text}. Save the note to a .shellnote file, the copy that lasts. ${keptWords}`}
+                      command="file.save"
+                      onChoose={() => {
+                        close()
+                        commands.press('file.save')
+                      }}
+                    >
+                      <FileDown size={18} aria-hidden />
+                      Save a copy as a file
+                      <kbd>Ctrl+S</kbd>
+                    </MenuItem>
+                    <MenuItem
+                      label="Save as"
+                      command="file.saveAs"
+                      onChoose={() => {
+                        close()
+                        commands.press('file.saveAs')
+                      }}
+                    >
+                      <FilePlus2 size={18} aria-hidden />
+                      Save as a new file
+                      <kbd>Ctrl+Shift+S</kbd>
+                    </MenuItem>
+                    <MenuItem
+                      label="Open file"
+                      title="Open a .shellnote file into this folder"
+                      command="file.open"
+                      onChoose={() => {
+                        close()
+                        commands.press('file.open')
+                      }}
+                    >
+                      <FolderOpen size={18} aria-hidden />
+                      Open a file…
+                      <kbd>Ctrl+O</kbd>
+                    </MenuItem>
+                    {editing ? (
+                      <>
+                        <hr />
+                        <MenuItem
+                          label={full ? 'Leave full view' : 'Full view: the notes alone'}
+                          title={full ? 'Leave full view (Esc)' : 'Full view: the notes alone, the panels beside them out of sight'}
+                          checked={full}
+                          kind="checkbox"
+                          command="panel.full"
+                          onChoose={() => {
+                            close()
+                            commands.tap('panel.full', full ? { on: false } : { pane: 'notes' })
+                          }}
+                        >
+                          <Maximize2 size={18} aria-hidden />
+                          The notes alone
+                        </MenuItem>
+                        <MenuItem
+                          label="AI log"
+                          title="The AI log: every request on this note, with Undo"
+                          command="output.answers"
+                          onChoose={() => {
+                            close()
+                            commands.tap('output.answers')
+                          }}
+                        >
+                          <ScrollText size={18} aria-hidden />
+                          What the AI changed
+                        </MenuItem>
+                      </>
+                    ) : null}
+                  </>
+                )}
+              </BarMenu>
+            </>,
+            end,
+          )
+        : null}
       {editing ? <AiLayer key={session.key} store={store} host={host} enabled={editing} /> : null}
       {settings ? <Settings onClose={() => setSettings(false)} beforeChange={flush} /> : null}
     </div>
@@ -776,60 +820,16 @@ const NOT_KEPT = 'A sample note is not kept. Save it to a file to keep it.'
 const IN_FOLDER = "The app keeps the note as a file in your library's folder as you work. Save puts a copy of it wherever you choose."
 
 
-/** The tightest step of the app bar in one row (app.css, data-tight), and the one used over two rows, for a finger on a phone. */
-const TIGHTEST = 4
-const TWO_ROWS_STEP = 3
-
-/**
- * The app bar in one row with every icon in it: the first of
- * its steps, loosest first, at which nothing overflows (the tools fit the room between the sides, the sides fit the
- * bar); two rows, at the tightest step, only when even that does not fit one. Measured, not set by widths, so a button
- * added, a font of another system or the app's own window buttons change nothing to do.
- */
-function useOneRow(): (header: HTMLElement | null) => void {
-  const stop = useRef<() => void>(undefined)
-  // A ref of the bar's own, so the watching starts when the bar is drawn (after the note opens) and stops when it goes.
-  return useCallback((header: HTMLElement | null) => {
-    stop.current?.()
-    stop.current = undefined
-    if (!header) return
-    // Nothing runs past the bar's end, and nothing wraps to make it taller than its one row.
-    const fits = (): boolean => header.scrollWidth <= header.clientWidth + 0.5 && header.offsetHeight <= parseFloat(getComputedStyle(header).minHeight) + 0.5
-    const fit = (): void => {
-      delete header.dataset.rows
-      for (let tight = 0; tight <= TIGHTEST; tight++) {
-        if (tight === 0) delete header.dataset.tight
-        else header.dataset.tight = String(tight)
-        if (fits()) return
-      }
-      // Two rows, at the tightest still: at full size the first row alone ran over the tools below it in the app at
-      // 760 px (its own window buttons too, 2 November 2026).
-      header.dataset.rows = '2'
-      header.dataset.tight = String(TWO_ROWS_STEP)
-      // Narrower still, as a phone is: the title and the buttons after it no longer fit side by side, and would lie over
-      // one another (found 6 November 2026, at 360 pixels: Back under Video). They run on as words do (app.css).
-      const title = header.querySelector('.title')?.getBoundingClientRect()
-      const buttons = header.querySelector('.appbar-end')?.getBoundingClientRect()
-      if (title && buttons && title.right > buttons.left) header.dataset.rows = '3'
-    }
-    fit()
-    // Again, at once, when the window or the bar's buttons change: both come before the next frame is drawn, so the
-    // page below never jumps (a timer let the bar be two rows high for a moment after a note opened, and tests that had
-    // just measured the page clicked beside it, 26 October 2026).
-    let width = header.clientWidth
-    const resized = (): void => {
-      if (header.clientWidth === width) return
-      width = header.clientWidth
-      fit()
-    }
-    window.addEventListener('resize', resized)
-    const changed = new MutationObserver(fit)
-    changed.observe(header, { childList: true, subtree: true })
-    stop.current = () => {
-      window.removeEventListener('resize', resized)
-      changed.disconnect()
-    }
-  }, [])
+/** Each block's words, counted once for each version of it: a block not changed keeps its count (blocks are never changed in place). */
+const counted = new WeakMap<object, number>()
+function wordsIn(block: Parameters<typeof textOf>[0]): number {
+  if (!block) return 0
+  let count = counted.get(block)
+  if (count === undefined) {
+    count = textOf(block).match(/\S+/gu)?.length ?? 0
+    counted.set(block, count)
+  }
+  return count
 }
 
 /** How safe the note is: whether its changes are in a file, and since when. */

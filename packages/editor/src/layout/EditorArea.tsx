@@ -1,5 +1,6 @@
-// The editing workspace: the notes, the video shown beside them, and the side
-// panel, docked like Obsidian's panes. The notes are what the app gives; the video and the side panel are the editor's.
+// The editing workspace: the notes, the panel beside them (the AI, or Beside), and the video and a program, shown
+// inside Beside or in panels of their own, docked like Obsidian's panes. The notes are what the app gives; the rest
+// are the editor's.
 import { lazy, memo, Suspense, useEffect, useSyncExternalStore, type ReactNode } from 'react'
 import { programHost } from '../program/host.js'
 import { ProgramPanel } from '../program/ProgramPanel.js'
@@ -9,7 +10,8 @@ import { videoShown } from '../video/state.js'
 import { VideoPanel } from '../video/VideoPanel.js'
 import { DockArea } from './DockArea.js'
 import { FullScreenButton } from './FullScreen.js'
-import { PanelBar } from './PanelBar.js'
+// Showing a video opens Beside on it, and playing one shows it (beside.ts).
+import './beside.js'
 import type { SideParts } from './SidePanel.js'
 // The countdown's clock runs from the start; the side panel's own code loads when it is first opened.
 import './side/timer.js'
@@ -30,14 +32,12 @@ export const EditorArea = memo(function EditorArea({ store, parts, children }: {
   useEffect(() => {
     if (shown !== undefined && !media) videoShown.set(undefined)
   }, [shown, media])
-  // With another panel beside them, the notes have a bar of their own to be moved by; alone, they need none.
-  const alone = !media && !saved.side && !program
+  // The notes have no bar of their own: the other panels are moved round them, and the note's menu gives its full view.
   return (
     <DockArea
       panels={{
         notes: (
           <section className="nw-notes-panel" aria-label="Notes">
-            {alone ? null : <PanelBar title="Notes" />}
             {children}
             <FullScreenButton />
           </section>

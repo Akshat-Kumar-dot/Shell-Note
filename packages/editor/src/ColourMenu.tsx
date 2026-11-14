@@ -6,7 +6,7 @@
 // Each colour is a 40 px target, for a finger or a pen. The panel closes with
 // its ✕, Escape, or a press outside it; a colour chosen closes it too.
 import { Color, type AnyColor } from '@shellnote/core'
-import { ChevronDown, Palette, X } from 'lucide-react'
+import { ChevronDown, Palette, Plus, X } from 'lucide-react'
 import { useCallback, useRef, useState, type CSSProperties, type MouseEvent } from 'react'
 import { isColourCode, recentColours, rememberColour } from './colours.js'
 import { useDismiss, type Dismissal } from './dismiss.js'
@@ -36,9 +36,14 @@ export interface ColourMenuProps {
   onDone?: () => void
   /** For the highlighter: the note colours show as it draws them, lighter. */
   highlighter?: boolean
+  /**
+   * What the button shows: the colour in use as a dot; a letter A over a line in the colour in use, for words; or a
+   * plus, for every colour besides those already in reach.
+   */
+  look?: 'dot' | 'letter' | 'more'
 }
 
-export function ColourMenu({ current, onNamed, onCode, onDone, highlighter = false }: ColourMenuProps) {
+export function ColourMenu({ current, onNamed, onCode, onDone, highlighter = false, look = 'dot' }: ColourMenuProps) {
   const [open, setOpen] = useState(false)
   const [more, setMore] = useState(false)
   const root = useRef<HTMLSpanElement>(null)
@@ -81,9 +86,10 @@ export function ColourMenu({ current, onNamed, onCode, onDone, highlighter = fal
       <button
         type="button"
         className="nw-ibtn nw-colour-button"
-        aria-label="Colour"
+        aria-label={look === 'more' ? 'More colours' : 'Colour'}
         aria-expanded={open}
-        title="Colour"
+        title={look === 'more' ? 'More colours' : 'Colour'}
+        data-look={look}
         onMouseDown={keepFocus}
         onClick={() => {
           if (open) return close()
@@ -92,8 +98,23 @@ export function ColourMenu({ current, onNamed, onCode, onDone, highlighter = fal
           setOpen(true)
         }}
       >
-        <span className="nw-colour-dot" style={{ '--swatch': css(current, highlighter) } as CSSProperties} aria-hidden />
-        <ChevronDown size={14} aria-hidden />
+        {look === 'more' ? (
+          <Plus size={15} aria-hidden />
+        ) : look === 'letter' ? (
+          <>
+            <svg className="nw-colour-letter" width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="m6 16 6-12 6 12" />
+              <path d="M8 12h8" />
+              <path d="M4 20h16" strokeWidth={3} style={{ stroke: css(current, highlighter) }} />
+            </svg>
+            <ChevronDown size={14} aria-hidden />
+          </>
+        ) : (
+          <>
+            <span className="nw-colour-dot" style={{ '--swatch': css(current, highlighter) } as CSSProperties} aria-hidden />
+            <ChevronDown size={14} aria-hidden />
+          </>
+        )}
       </button>
       {open && !more ? (
         <div ref={placeMenu} className="nw-popover nw-colour-panel" role="group" aria-label="Colours">

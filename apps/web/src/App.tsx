@@ -1,4 +1,5 @@
-// The app: the library's home page first, then a note. The address says where:
+// The app: the rail of its places on every screen (shell/Rail.tsx), and beside it
+// the library's home page first, then a note. The address says where:
 // #/ is the top level, #/folder/<id> a folder, #/deleted Recently deleted,
 // #/note/<id> a note, and #/new a new note at the top level (#/new/<folder> in
 // a folder). ?sample=mixed, physics or long opens a sample note, which is never
@@ -9,13 +10,18 @@
 // person chose (library/chosen.ts): then what another device writes into it
 // shows on the screens as it arrives.
 import { commands } from '@shellnote/editor'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { Home } from './library/Home.js'
 import { library } from './library/chosen.js'
 import { loadPenProfile } from './library/penProfile.js'
 import { Tabs } from './library/tabs.js'
 import { Recorder } from './record/Recorder.js'
 import { sampleDoc } from './samples.js'
+import { Rail } from './shell/Rail.js'
+import { rememberShown, shownLast, tabsPlace } from './shell/state.js'
+import { Tabs as TabRow } from './shell/Tabs.js'
+import { Tree } from './shell/Tree.js'
 import { askToKeep } from './storage/cache.js'
 import { sessionFor, Workspace, type Session } from './Workspace.js'
 
@@ -91,6 +97,15 @@ export function App() {
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
+  // The desktop app has no address to type: it starts again on the note it was last on, its tab still open.
+  useEffect(() => {
+    const last = location.hash === '' && location.search === '' ? shownLast() : undefined
+    if (last !== undefined) location.replace(`#/note/${last}`)
+  }, [])
+  useEffect(() => {
+    if (where.to === 'note') rememberShown(where.id)
+    else if (where.to !== 'new') rememberShown(undefined)
+  }, [where])
 
   // The app at the commands' disposal on every screen (app control): where it is, and the way elsewhere.
   useEffect(() => commands.provide('app', { where: () => whereLine(route(), sample !== undefined, recording), go, reloads: () => location.search !== '' }), [sample, recording])
@@ -107,19 +122,37 @@ export function App() {
     }
   }, [])
 
+  // The stroke recorder is a page of its own, outside the shell.
   if (recording) return <Recorder />
-  if (sample) return <SampleNote key="sample" doc={sample} />
-  if (!ready) return <div className="opening">Opening your library…</div>
-  switch (where.to) {
-    case 'home':
-      return <Home key={`folder:${where.folder}`} store={library} tabs={tabs} place={{ folder: where.folder }} {...(problem ? { problem } : {})} onOpen={(id) => go(`#/note/${id}`)} />
-    case 'bin':
-      return <Home key="bin" store={library} tabs={tabs} place="bin" {...(problem ? { problem } : {})} onOpen={(id) => go(`#/note/${id}`)} />
-    case 'new':
-      return <NewNote folder={where.folder} />
-    case 'note':
-      return <OpenNote key={where.id} id={where.id} />
+  const shown = (): ReactNode => {
+    if (sample) return <SampleNote key="sample" doc={sample} />
+    if (!ready) return <div className="opening">Opening your library…</div>
+    switch (where.to) {
+      case 'home':
+        return <Home key={`folder:${where.folder}`} store={library} tabs={tabs} place={{ folder: where.folder }} {...(problem ? { problem } : {})} onOpen={(id) => go(`#/note/${id}`)} />
+      case 'bin':
+        return <Home key="bin" store={library} tabs={tabs} place="bin" {...(problem ? { problem } : {})} onOpen={(id) => go(`#/note/${id}`)} />
+      case 'new':
+        return <NewNote folder={where.folder} />
+      case 'note':
+        return <OpenNote key={where.id} id={where.id} />
+    }
   }
+  // Where the tab row goes: over the note alone while one is on screen (its column's top), else over the whole screen.
+  const place = useSyncExternalStore(tabsPlace.subscribe, tabsPlace.snapshot)
+  // The shell: the rail of the app's places, the library's tree, then the tabs over the screen the address names.
+  const at = sample || !ready ? 'other' : where.to === 'home' ? 'library' : where.to === 'bin' ? 'bin' : 'other'
+  return (
+    <div className="shell">
+      <Rail store={library} screen={at} />
+      {/* Drawn from the start, so nothing beside it moves when the library has started (a sample note shows first). */}
+      <Tree store={library} tabs={tabs} bin={at === 'bin'} ready={ready} />
+      <section className="shell-main">
+        {place ? createPortal(<TabRow library={at !== 'other'} />, place) : <TabRow library={at !== 'other'} />}
+        <div className="shell-screen">{shown()}</div>
+      </section>
+    </div>
+  )
 }
 
 /** Make a new note, then open it in place of this address, so Back does not make another. */

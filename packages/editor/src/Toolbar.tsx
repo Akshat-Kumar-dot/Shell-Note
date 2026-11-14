@@ -1,31 +1,37 @@
-// The note's bars (a new look, no new features). The tool strip sits in the app bar: undo and
-// redo, the tools as tiles (with the Pen, Highlighter and Eraser), and Picture, Table and
-// Paper. With an ink tool chosen, the format bar shows the pen's own options (ink/PenBar.tsx).
-// Otherwise it floats below the strip with: the block's type and style tokens, colours, fonts,
-// marks for selected words, a table's tools, a picture's description. Every button goes through
-// core (format.ts), and none takes the focus, so the caret and selection stay put. In a caption
-// or a table's cell, the word marks act through the editor, which hands its changes to core like
-// any typing; so do the table's row and column buttons. Under a Select box, the word marks and
-// colours act on each piece of text the box holds. The bar is never locked: with nothing
-// selected, a change goes to the caret's word, or where the caret last was (target.ts). Every
-// button is at least 40 px, for a finger or a pen.
+// The note's row of tools, under the tabs: one slim row for words, or the pen's row while an ink tool is in hand
+// (ink/PenBar.tsx); both, one under the other, for whoever chooses so. The row for words: undo and redo, the block's
+// style, the font and size, bold, italic and underline, the colour, alignment and indent, a link, a picture, a table,
+// and More, which holds the rest. Every button goes through core (format.ts), and none takes the focus, so the caret
+// and selection stay put. In a caption or a table's cell, the word marks act through the editor, which hands its
+// changes to core like any typing; so do the table's row and column buttons. Under a Select box, the word marks and
+// colours act on each piece of text the box holds. The row is never locked: with nothing selected, a change goes to
+// the caret's word, or where the caret last was (target.ts).
 import { libraryFont, type AnyColor, type Id, type Op, type Role, type Size } from '@shellnote/core'
 import {
+  ALargeSmall,
   AlignCenter,
   AlignLeft,
   AlignRight,
   Bold,
+  ChevronDown,
   Code,
-  Eraser,
-  Grid3x3,
+  Ellipsis,
+  Heading1,
+  Heading2,
+  Heading3,
   Highlighter,
-  ImagePlus,
   IndentDecrease,
   IndentIncrease,
   Italic,
   Link,
+  List,
+  ListChecks,
+  ListOrdered,
+  MessageSquareText,
   PenLine,
-  Redo2,
+  Pilcrow,
+  Quote,
+  Rows2,
   SquareCheck,
   SquareDashedMousePointer,
   Strikethrough,
@@ -34,24 +40,22 @@ import {
   TextCursorInput,
   Type,
   Underline,
-  Undo2,
   type LucideIcon,
-  MessageSquareText,
 } from 'lucide-react'
-import { useCallback, useReducer, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react'
-import { PICTURE_TYPES } from './assets.js'
-import { useDismiss } from './dismiss.js'
+import { useReducer, useState, useSyncExternalStore } from 'react'
+import { BarMenu, keepFocus, MenuItem } from './BarMenu.js'
+import { PictureButton, UndoRedo } from './BarParts.js'
 import { activeEditor } from './frame/active.js'
 import { onWords } from './frame/words.js'
 import { FontLibrary } from './FontLibrary.js'
-import { placeMenu } from './popover.js'
 import { fontFamily, myFonts, saveMyFonts } from './fonts.js'
 import { ColourMenu } from './ColourMenu.js'
 import { commands } from './commands/index.js'
 import { colourOps, firstText, fontOps, marksOver, sizeOps, styleOps, styleOver, wordOps, type BlockChange, type WordMarks } from './format.js'
+import { bothRows, showBothRows } from './layout/rows.js'
 import { safeHref } from './links.js'
 import { paperOps, PAPERS, type Paper } from './paper.js'
-import { addPictures, caretSpot, lastCaretSpot, pictureSpot, type PictureSpot } from './pictures.js'
+import { caretSpot, lastCaretSpot } from './pictures.js'
 import type { EditorStore, Tool } from './store.js'
 import { TablePicker } from './TablePicker.js'
 import { addTable, enterTable, newTable } from './tables.js'
@@ -60,24 +64,22 @@ import { TableTools } from './TableTools.js'
 import { PenBar } from './ink/PenBar.js'
 import { isInkTool } from './ink/PenLayer.js'
 
-/** A block type's short sign, shown in place of its name when the bar runs down a side. */
-const ROLE_SIGNS: Record<Role, string> = { p: '¶', h1: 'H1', h2: 'H2', h3: 'H3', li: '•', oli: '1.', todo: '☐', quote: '❝' }
-
-const ROLES: [Role, string][] = [
-  ['p', 'Paragraph'],
-  ['h1', 'Heading 1'],
-  ['h2', 'Heading 2'],
-  ['h3', 'Heading 3'],
-  ['li', 'Bullet list'],
-  ['oli', 'Numbered list'],
-  ['todo', 'To-do list'],
-  ['quote', 'Quote'],
+/** The block's styles; a line is drawn before the lists. */
+const ROLES: [Role, string, LucideIcon][] = [
+  ['p', 'Paragraph', Pilcrow],
+  ['h1', 'Heading 1', Heading1],
+  ['h2', 'Heading 2', Heading2],
+  ['h3', 'Heading 3', Heading3],
+  ['li', 'Bullet list', List],
+  ['oli', 'Numbered list', ListOrdered],
+  ['todo', 'To-do list', ListChecks],
+  ['quote', 'Quote', Quote],
 ]
 const SIZES = [
-  ['s', 'S', 'Small'],
-  ['m', 'M', 'Normal size'],
-  ['l', 'L', 'Large'],
-  ['xl', 'XL', 'Extra large'],
+  ['s', 'Small', 'Small'],
+  ['m', 'Normal', 'Normal size'],
+  ['l', 'Large', 'Large'],
+  ['xl', 'Extra', 'Extra large'],
 ] as const
 const FONTS = [
   ['sans', 'Sans'],
@@ -85,38 +87,33 @@ const FONTS = [
   ['mono', 'Mono'],
   ['hand', 'Handwriting'],
 ] as const
-/** The last entry of the font menu, which opens the font library. */
-const MORE_FONTS = '+more'
 const ALIGNS: ['left' | 'center' | 'right', string, LucideIcon][] = [
   ['left', 'Align left', AlignLeft],
   ['center', 'Centre', AlignCenter],
   ['right', 'Align right', AlignRight],
 ]
-/** Word marks: our name, Tiptap's, the label, the shortcut and the icon. */
+/** Word marks: our name, Tiptap's, the label, the shortcut and the icon. The first three are in the row, the rest under More. */
 const MARKS: [keyof WordMarks, string, string, string, LucideIcon][] = [
   ['bold', 'bold', 'Bold', 'Ctrl+B', Bold],
   ['italic', 'italic', 'Italic', 'Ctrl+I', Italic],
-  ['strike', 'strike', 'Strikethrough', 'Ctrl+Shift+X', Strikethrough],
-  ['code', 'code', 'Code', 'Ctrl+E', Code],
-  ['highlight', 'highlight', 'Highlight', 'Ctrl+Shift+H', Highlighter],
   ['underline', 'underline', 'Underline', 'Ctrl+U', Underline],
+  ['strike', 'strike', 'Strikethrough', 'Ctrl+Shift+X', Strikethrough],
+  ['highlight', 'highlight', 'Highlight', 'Ctrl+Shift+H', Highlighter],
+  ['code', 'code', 'Code', 'Ctrl+E', Code],
   ['sub', 'subscript', 'Subscript', 'Ctrl+=', Subscript],
   ['sup', 'superscript', 'Superscript', 'Ctrl+Shift+=', Superscript],
 ]
+const IN_ROW = 3
 
-/** The tools: what a press on the page does. */
-const TOOLS: [Tool, string, string, LucideIcon][] = [
+/** What a press on the page does, while words are in hand: under More. */
+const POINTERS: [Tool, string, string, LucideIcon][] = [
   ['type', 'Type', 'Type: click in text to write; a click on empty paper chooses nothing', Type],
-  ['select', 'Select', 'Select: draw a box to take only what is inside it', SquareDashedMousePointer],
   ['free', 'Free cursor', 'Free cursor: click anywhere on the paper to start writing there', TextCursorInput],
-  ['pen', 'Pen', 'Pen: write and draw; hold still at the end for a straight line or a shape', PenLine],
-  ['highlighter', 'Highlighter', 'Highlighter: mark over words and ink', Highlighter],
-  ['eraser', 'Eraser', 'Eraser: whole strokes, or the part of a stroke it passes over', Eraser],
+  ['select', 'Select', 'Select: draw a box to take only what is inside it', SquareDashedMousePointer],
 ]
 
-/** A press on a button must not move the focus out of the text. */
-const keepFocus = (event: MouseEvent): void => event.preventDefault()
 const ICON = 18
+const ARROW = 14
 
 /** Apply operations as one undo step; a change that does not fit the selection is left out. */
 function runner(store: EditorStore) {
@@ -130,133 +127,27 @@ function runner(store: EditorStore) {
   }
 }
 
-/** The app bar's middle: undo and redo, the tools, and what can be put in. */
-export function ToolStrip({ store }: { store: EditorStore }) {
-  useSyncExternalStore(store.subscribe, store.snapshot)
+/**
+ * The note's tools: the row of what is in hand. A click in the text, or Type, brings the row for words; the pen, the
+ * highlighter or the eraser brings the pen's. With both rows chosen (More), the two show together.
+ */
+export function NoteBar({ store }: { store: EditorStore }) {
   const tool = useSyncExternalStore(store.subscribeTool, store.toolSnapshot)
-  // The Table button needs to know whether an editor has the caret.
-  useSyncExternalStore(activeEditor.subscribe, activeEditor.snapshot)
-  const editor = activeEditor.get()
-  const typing = editor?.isFocused === true && activeEditor.frame() !== undefined
-  const files = useRef<HTMLInputElement>(null)
-  const spot = useRef<PictureSpot | undefined>(undefined)
-
-  /** A table of the size picked on the grid, at the caret, or where it last was, with the caret in its first cell. */
-  const insertTable = (rows: number, columns: number): void => {
-    const at = caretSpot(store) ?? lastCaretSpot(store)
-    const id = at && addTable(store, at.frame, at.at, newTable(rows, columns))
-    const now = activeEditor.get()
-    if (id !== undefined && now) enterTable(now, id)
-  }
-
+  const both = useSyncExternalStore(bothRows.subscribe, bothRows.snapshot)
+  const ink = isInkTool(tool)
   return (
-    <div className="nw-toolstrip" role="toolbar" aria-label="Tools">
-      <span className="nw-group">
-        <button type="button" className="nw-ibtn" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!store.canUndo} data-command="edit.undo" onMouseDown={keepFocus} onClick={() => void commands.do('edit.undo')}>
-          <Undo2 size={ICON} aria-hidden />
-        </button>
-        <button type="button" className="nw-ibtn" aria-label="Redo" title="Redo (Ctrl+Y)" disabled={!store.canRedo} data-command="edit.redo" onMouseDown={keepFocus} onClick={() => void commands.do('edit.redo')}>
-          <Redo2 size={ICON} aria-hidden />
-        </button>
-      </span>
-      <span className="nw-sep" />
-      <span className="nw-group nw-tools" role="radiogroup" aria-label="Tools">
-        {TOOLS.map(([value, label, hint, Icon]) => (
-          <button key={value} type="button" role="radio" className="nw-tool" aria-label={label} aria-checked={tool === value} title={hint} data-command="tool.choose" onMouseDown={keepFocus} onClick={() => void commands.do('tool.choose', { tool: value })}>
-            <Icon size={20} aria-hidden />
-          </button>
-        ))}
-      </span>
-      <span className="nw-sep" />
-      <span className="nw-group">
-        <button
-          type="button"
-          className="nw-ibtn"
-          aria-label="Picture"
-          title="Add a picture: at the caret, or on the page"
-          onMouseDown={keepFocus}
-          onClick={() => {
-            spot.current = pictureSpot(store)
-            files.current?.click()
-          }}
-        >
-          <ImagePlus size={ICON} aria-hidden />
-        </button>
-        <input
-          ref={files}
-          type="file"
-          accept={PICTURE_TYPES.join(',')}
-          multiple
-          hidden
-          onChange={(event) => {
-            const picked = Array.from(event.target.files ?? [])
-            event.target.value = ''
-            if (spot.current) void addPictures(store, picked, spot.current)
-          }}
-        />
-        <TablePicker disabled={!typing && lastCaretSpot(store) === undefined} onPick={insertTable} />
-        <PaperMenu store={store} />
-      </span>
+    <div className="sh-rows" data-both={both ? '' : undefined}>
+      {both || !ink ? <TextRow store={store} /> : null}
+      {both || ink ? <PenBar store={store} /> : null}
     </div>
   )
 }
 
-/** The paper of the page in view, or of every page: blank, lines, squares or dots. */
-function PaperMenu({ store }: { store: EditorStore }) {
-  const doc = useSyncExternalStore(store.subscribe, store.snapshot)
-  const [open, setOpen] = useState(false)
-  const [everyPage, setEveryPage] = useState(true)
-  const root = useRef<HTMLSpanElement>(null)
-  const close = useCallback(() => setOpen(false), [])
-  useDismiss(open, root, close)
-  const inView = store.pageInView !== undefined && doc.page[store.pageInView] ? store.pageInView : doc.pages[0]!
-  const current = doc.page[inView]?.bg ?? 'blank'
-  const choose = (paper: Paper): void => runner(store)(paperOps(store.doc, everyPage ? store.doc.pages : [inView], paper))
-  return (
-    <span className="nw-popover-anchor" ref={root}>
-      <button type="button" className="nw-ibtn" aria-label="Paper" aria-expanded={open} title="Paper: blank, lines, squares or dots" onMouseDown={keepFocus} onClick={() => setOpen(!open)}>
-        <Grid3x3 size={ICON} aria-hidden />
-      </button>
-      {open ? (
-        <div ref={placeMenu} className="nw-popover nw-paper-menu" role="group" aria-label="Paper">
-          <div className="nw-paper-choices">
-            {PAPERS.map(([paper, label]) => (
-              <button key={paper} type="button" className="nw-paper" aria-pressed={current === paper} onMouseDown={keepFocus} onClick={() => choose(paper)}>
-                <span className="nw-paper-sample" data-bg={paper} aria-hidden />
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="nw-segmented" role="radiogroup" aria-label="Pages">
-            <button type="button" role="radio" aria-checked={everyPage} onMouseDown={keepFocus} onClick={() => setEveryPage(true)}>
-              All pages
-            </button>
-            <button type="button" role="radio" aria-checked={!everyPage} onMouseDown={keepFocus} onClick={() => setEveryPage(false)}>
-              This page
-            </button>
-          </div>
-        </div>
-      ) : null}
-    </span>
-  )
-}
-
-/** The floating bar: the pen's options with an ink tool; otherwise the block's type and style, colours, fonts, marks, and a table's or picture's own tools. */
-export function FormatBar({ store }: { store: EditorStore }) {
-  const tool = useSyncExternalStore(store.subscribeTool, store.toolSnapshot)
-  return isInkTool(tool) ? <PenBar store={store} /> : <TextBar store={store} />
-}
-
 /**
- * What a picture or a table shows, for whoever cannot see it. Along a bar, a field. Down a side, whose strip is 68 pixels
- * wide, the field hung off both its edges (found 6 November 2026), so there it is a button with the field in a small menu.
- * CSS shows one or the other: the bar knows its direction, this does not.
+ * What a picture or a table shows, for whoever cannot see it: a field at the row's end while one is chosen. Down a side,
+ * where a field hangs off both edges of the strip, a button with the field in a small menu. CSS shows one or the other.
  */
 function DescribeField({ kind, value, onChange }: { kind: 'picture' | 'table'; value: string; onChange: (value: string) => void }) {
-  const [open, setOpen] = useState(false)
-  const root = useRef<HTMLSpanElement>(null)
-  const close = useCallback(() => setOpen(false), [])
-  useDismiss(open, root, close)
   const field = (
     <label className="nw-describe">
       <span>Description</span>
@@ -266,29 +157,27 @@ function DescribeField({ kind, value, onChange }: { kind: 'picture' | 'table'; v
   return (
     <>
       <span className="nw-describe-along">{field}</span>
-      <span className="nw-popover-anchor nw-describe-down" ref={root}>
-        <button type="button" className="nw-ibtn" aria-label="Description" aria-expanded={open} title={`What the ${kind} shows (not on the page)`} onClick={() => setOpen(!open)}>
-          <MessageSquareText size={18} aria-hidden />
-        </button>
-        {open ? (
-          <div ref={placeMenu} className="nw-popover">
-            {field}
-          </div>
-        ) : null}
+      <span className="nw-describe-down">
+        <BarMenu label="Description" title={`What the ${kind} shows (not on the page)`} button={<MessageSquareText size={ICON} aria-hidden />}>
+          {() => field}
+        </BarMenu>
       </span>
     </>
   )
 }
 
-function TextBar({ store }: { store: EditorStore }) {
+function TextRow({ store }: { store: EditorStore }) {
   const doc = useSyncExternalStore(store.subscribe, store.snapshot)
   const selection = useSyncExternalStore(store.subscribeSelection, store.selectionSnapshot)
-  // The marks in captions and cells need to know which editor has the focus.
+  const tool = useSyncExternalStore(store.subscribeTool, store.toolSnapshot)
+  const both = useSyncExternalStore(bothRows.subscribe, bothRows.snapshot)
+  // The marks in captions and cells, and the Table button, need to know which editor has the focus.
   useSyncExternalStore(activeEditor.subscribe, activeEditor.snapshot)
   // Marks switched on for the next words typed change no document, so ask for a redraw.
   const [, redraw] = useReducer((n: number) => n + 1, 0)
+  const typing = activeEditor.get()?.isFocused === true && activeEditor.frame() !== undefined
 
-  // Where a change goes, and what the bar shows (target.ts): what is selected, else the caret's word, else where the caret last was.
+  // Where a change goes, and what the row shows (target.ts): what is selected, else the caret's word, else where the caret last was.
   const shown = aimAt(store)
   const block = firstText(doc, { blocks: shown.blocks })
   const words = shown.pieces.length > 0
@@ -298,6 +187,7 @@ function TextBar({ store }: { store: EditorStore }) {
   const table = chosen?.type === 'table' ? chosen : undefined
   const [fonts, setFonts] = useState(myFonts)
   const [library, setLibrary] = useState(false)
+  const [everyPage, setEveryPage] = useState(true)
   // The size and font of the words a change goes to: their own, or their line's; for the words typed next, the editor's.
   const lineSize = block?.style?.size ?? 'm'
   const lineFont = block?.style?.font ?? 'sans'
@@ -307,6 +197,10 @@ function TextBar({ store }: { store: EditorStore }) {
   const colour = (words ? styleOver(doc, shown.pieces, 'color') : ((shown.editor?.getAttributes('colour').color as string | undefined) ?? block?.style?.color ?? 'ink')) as AnyColor | undefined
   // The fonts in the menu, and the words' library font even when it is not one of them.
   const menuFonts = libraryFont(font) && !fonts.includes(font) ? [...fonts, font] : fonts
+  const role = block?.role ?? 'p'
+  const RoleIcon = ROLES.find(([value]) => value === role)?.[2] ?? Pilcrow
+  const align = block?.style?.align ?? 'left'
+  const AlignNow = ALIGNS.find(([value]) => value === align)?.[2] ?? AlignLeft
 
   const run = runner(store)
   const style = (change: BlockChange): void => run(styleOps(store.doc, { blocks: aimAt(store).blocks }, change))
@@ -326,7 +220,6 @@ function TextBar({ store }: { store: EditorStore }) {
     }
     redraw()
   }
-  const chooseFont = (value: string): void => wordStyle('font', value)
   /**
    * Colour words: the selected ones, the caret's word, or else the words
    * typed next. In a caption, a table's cell or a selection across lines,
@@ -348,6 +241,7 @@ function TextBar({ store }: { store: EditorStore }) {
     else if (aim.editor) onWords(aim.editor, (chain) => chain.toggleMark(tiptap))
     redraw()
   }
+  const markOn = (name: keyof WordMarks, tiptap: string): boolean => (words ? marks[name] : (shown.editor?.isActive(tiptap) ?? false))
   /** Link the selected words, or the caret's word; between words, the address goes in as a linked word. */
   const link = (): void => {
     const aim = aimAt(store)
@@ -364,142 +258,248 @@ function TextBar({ store }: { store: EditorStore }) {
     const now = store.doc.block[id]
     if ((now?.type === 'image' || now?.type === 'table') && (now.alt ?? '') !== alt) run([{ op: 'update', id, set: { alt: alt === '' ? null : alt } }], `alt:${id}`)
   }
+  /** A table of the size picked on the grid, at the caret, or where it last was, with the caret in its first cell. */
+  const insertTable = (rows: number, columns: number): void => {
+    const at = caretSpot(store) ?? lastCaretSpot(store)
+    const id = at && addTable(store, at.frame, at.at, newTable(rows, columns))
+    const now = activeEditor.get()
+    if (id !== undefined && now) enterTable(now, id)
+  }
+  /** The paper of the page in view, or of every page: blank, lines, squares or dots. */
+  const inView = store.pageInView !== undefined && doc.page[store.pageInView] ? store.pageInView : doc.pages[0]!
+  const paperNow = doc.page[inView]?.bg ?? 'blank'
+  const paper = (kind: Paper): void => run(paperOps(store.doc, everyPage ? store.doc.pages : [inView], kind))
 
-  // The block's type and size, before the colours.
-  const blockTools = (
-    <>
-      {/* Down a side, the menu shows as its sign; pressed, it opens with every name, as across. */}
-      <span className="nw-select-wrap">
-        <span className="nw-select-short" aria-hidden>
-          {ROLE_SIGNS[block?.role ?? 'p'] ?? '¶'}
-        </span>
-        <select
-          className="nw-select"
-          aria-label="Block type"
-          value={block?.role ?? 'p'}
-          onChange={(event) => {
-            style({ role: event.target.value as Role })
-            refocus()
-          }}
-        >
-          {ROLES.map(([role, label]) => (
-            <option key={role} value={role}>
-              {label}
-            </option>
-          ))}
-        </select>
-      </span>
-      <span className="nw-group nw-segment" role="group" aria-label="Size">
-        {SIZES.map(([value, short, label]) => (
-          <button key={value} type="button" className="nw-ibtn nw-text-btn" aria-label={label} title={label} aria-pressed={size === value} onMouseDown={keepFocus} onClick={() => wordStyle('size', value)}>
-            {short}
-          </button>
-        ))}
-      </span>
-      <span className="nw-sep" />
-    </>
-  )
-  // The font, alignment, indent and tick, after the colours.
-  const lineTools = (
-    <>
-      <span className="nw-sep" />
-      <span className="nw-font-menu nw-select-wrap">
-        <span className="nw-select-short" aria-hidden style={{ fontFamily: fontFamily(font) }}>
-          Aa
-        </span>
-        <select
-          className="nw-select"
-          aria-label="Font"
-          value={font}
-          onChange={(event) => {
-            if (event.target.value === MORE_FONTS) setLibrary(true)
-            else {
-              chooseFont(event.target.value)
-              refocus()
+  // A table or a picture chosen: its own tools take the place of those for text blocks, which do not apply to it.
+  const textTools = picture === undefined
+
+  return (
+    <div className="sh-tools" role="toolbar" aria-label="Formatting">
+      <UndoRedo store={store} />
+      <span className="sh-sep" />
+      {textTools ? (
+        <>
+          <BarMenu
+            label="Style"
+            title="Paragraph, headings, lists"
+            className="sh-b sh-word"
+            onDone={refocus}
+            button={
+              <>
+                <RoleIcon className="sh-word-sign" size={ICON} aria-hidden />
+                <span className="sh-word-text">{ROLES.find(([value]) => value === role)?.[1] ?? 'Paragraph'}</span>
+                <ChevronDown size={ARROW} aria-hidden />
+              </>
             }
-          }}
-        >
-          <optgroup label="Styles">
-            {FONTS.map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </optgroup>
-          {menuFonts.length > 0 ? (
-            <optgroup label="My fonts">
-              {menuFonts.map((id) => (
-                <option key={id} value={id} style={{ fontFamily: fontFamily(id) }}>
-                  {libraryFont(id)!.name}
-                </option>
-              ))}
-            </optgroup>
+          >
+            {(close) =>
+              ROLES.map(([value, label, Icon]) => (
+                <span key={value} style={{ display: 'contents' }}>
+                  {value === 'li' ? <hr /> : null}
+                  <MenuItem
+                    checked={role === value}
+                    onChoose={() => {
+                      style({ role: value })
+                      close()
+                    }}
+                  >
+                    <Icon size={ICON} aria-hidden />
+                    {label}
+                  </MenuItem>
+                </span>
+              ))
+            }
+          </BarMenu>
+          <BarMenu
+            label="Font and size"
+            width={236}
+            onDone={refocus}
+            button={
+              <>
+                <ALargeSmall size={ICON} aria-hidden />
+                <ChevronDown size={ARROW} aria-hidden />
+              </>
+            }
+          >
+            {(close) => (
+              <>
+                <div className="sh-menu-head">Size</div>
+                <div className="sh-seg" role="radiogroup" aria-label="Size">
+                  {SIZES.map(([value, short, label]) => (
+                    <button key={value} type="button" role="radio" aria-label={label} title={label} aria-checked={size === value} onMouseDown={keepFocus} onClick={() => wordStyle('size', value)}>
+                      {short}
+                    </button>
+                  ))}
+                </div>
+                <div className="sh-menu-head">Font</div>
+                {FONTS.map(([value, label]) => (
+                  <MenuItem
+                    key={value}
+                    checked={font === value}
+                    onChoose={() => {
+                      wordStyle('font', value)
+                      close()
+                    }}
+                  >
+                    <span style={{ fontFamily: fontFamily(value) }}>{label}</span>
+                  </MenuItem>
+                ))}
+                {menuFonts.map((id) => (
+                  <MenuItem
+                    key={id}
+                    checked={font === id}
+                    onChoose={() => {
+                      wordStyle('font', id)
+                      close()
+                    }}
+                  >
+                    <span style={{ fontFamily: fontFamily(id) }}>{libraryFont(id)!.name}</span>
+                  </MenuItem>
+                ))}
+                <hr />
+                <MenuItem
+                  onChoose={() => {
+                    setLibrary(true)
+                    close()
+                  }}
+                >
+                  More fonts…
+                </MenuItem>
+              </>
+            )}
+          </BarMenu>
+          {library ? (
+            <span className="nw-font-menu">
+              <FontLibrary
+                chosen={fonts}
+                onChange={(picked) => setFonts(saveMyFonts(picked))}
+                onClose={() => {
+                  setLibrary(false)
+                  refocus()
+                }}
+              />
+            </span>
           ) : null}
-          <option value={MORE_FONTS}>More fonts…</option>
-        </select>
-        {library ? (
-          <FontLibrary
-            chosen={fonts}
-            onChange={(chosen) => setFonts(saveMyFonts(chosen))}
-            onClose={() => {
-              setLibrary(false)
-              refocus()
-            }}
-          />
-        ) : null}
-      </span>
-      <span className="nw-sep" />
-      <span className="nw-group" role="group" aria-label="Alignment">
-        {ALIGNS.map(([align, label, Icon]) => (
-          <button key={align} type="button" className="nw-ibtn" aria-label={label} title={label} aria-pressed={(block?.style?.align ?? 'left') === align} onMouseDown={keepFocus} onClick={() => style({ align })}>
+          <span className="sh-sep" />
+        </>
+      ) : null}
+      <span className="nw-group" role="group" aria-label="Words">
+        {MARKS.slice(0, IN_ROW).map(([name, tiptap, label, keys, Icon]) => (
+          <button key={name} type="button" className="sh-b" aria-label={label} title={`${label} (${keys})`} aria-pressed={markOn(name, tiptap)} onMouseDown={keepFocus} onClick={() => mark(name, tiptap)}>
             <Icon size={ICON} aria-hidden />
           </button>
         ))}
       </span>
-      <span className="nw-group" role="group" aria-label="Indent">
-        <button type="button" className="nw-ibtn" aria-label="Indent less" title="Indent less (Shift+Tab)" disabled={block?.indent === 0} onMouseDown={keepFocus} onClick={() => style({ indent: 'out' })}>
-          <IndentDecrease size={ICON} aria-hidden />
-        </button>
-        <button type="button" className="nw-ibtn" aria-label="Indent more" title="Indent more (Tab)" onMouseDown={keepFocus} onClick={() => style({ indent: 'in' })}>
-          <IndentIncrease size={ICON} aria-hidden />
-        </button>
-      </span>
-      <button type="button" className="nw-ibtn" aria-label="Ticked" title="Tick the to-do" aria-pressed={block?.done === true} disabled={block?.role !== 'todo'} onMouseDown={keepFocus} onClick={() => style({ done: block?.done !== true })}>
-        <SquareCheck size={ICON} aria-hidden />
+      <ColourMenu current={colour} onNamed={(color) => paint(color)} onCode={(code) => paint(code as AnyColor)} onDone={refocus} look="letter" />
+      {textTools ? (
+        <BarMenu
+          label="Align and indent"
+          button={
+            <>
+              <AlignNow size={ICON} aria-hidden />
+              <ChevronDown size={ARROW} aria-hidden />
+            </>
+          }
+        >
+          {() => (
+            <>
+              {ALIGNS.map(([value, label, Icon]) => (
+                <MenuItem key={value} checked={align === value} onChoose={() => style({ align: value })}>
+                  <Icon size={ICON} aria-hidden />
+                  {label}
+                </MenuItem>
+              ))}
+              <hr />
+              <MenuItem label="Indent less" disabled={block?.indent === 0} onChoose={() => style({ indent: 'out' })}>
+                <IndentDecrease size={ICON} aria-hidden />
+                Indent less<kbd>Shift+Tab</kbd>
+              </MenuItem>
+              <MenuItem label="Indent more" onChoose={() => style({ indent: 'in' })}>
+                <IndentIncrease size={ICON} aria-hidden />
+                Indent more<kbd>Tab</kbd>
+              </MenuItem>
+            </>
+          )}
+        </BarMenu>
+      ) : null}
+      <span className="sh-sep" />
+      <button type="button" className="sh-b" aria-label="Link" title="Link the selected words" onMouseDown={keepFocus} onClick={link}>
+        <Link size={ICON} aria-hidden />
       </button>
-    </>
-  )
-  // A table or a picture chosen: its own tools take the place of those for text blocks, which do not apply to it, so the bar stays on one line.
-  const textTools = picture === undefined
-
-  return (
-    <div className="nw-formatbar" role="toolbar" aria-label="Formatting">
-      {textTools ? blockTools : null}
-      <ColourMenu current={colour} onNamed={(color) => paint(color)} onCode={(code) => paint(code as AnyColor)} onDone={refocus} />
-      {textTools ? lineTools : null}
-      <span className="nw-sep" />
-      <span className="nw-group" role="group" aria-label="Words">
-        {MARKS.map(([name, tiptap, label, keys, Icon]) => {
-          const on = words ? marks[name] : (shown.editor?.isActive(tiptap) ?? false)
-          return (
-            <button key={name} type="button" className="nw-ibtn" aria-label={label} title={`${label} (${keys})`} aria-pressed={on} onMouseDown={keepFocus} onClick={() => mark(name, tiptap)}>
-              <Icon size={ICON} aria-hidden />
-            </button>
-          )
-        })}
-        <button type="button" className="nw-ibtn" aria-label="Link" title="Link the selected words" onMouseDown={keepFocus} onClick={link}>
-          <Link size={ICON} aria-hidden />
-        </button>
-      </span>
+      <PictureButton store={store} />
+      <TablePicker disabled={!typing && lastCaretSpot(store) === undefined} onPick={insertTable} />
+      <BarMenu label="More" button={<Ellipsis size={ICON} aria-hidden />}>
+        {(close) => (
+          <>
+            {MARKS.slice(IN_ROW).map(([name, tiptap, label, keys, Icon]) => (
+              <MenuItem key={name} label={label} title={`${label} (${keys})`} kind="checkbox" checked={markOn(name, tiptap)} onChoose={() => mark(name, tiptap)}>
+                <Icon size={ICON} aria-hidden />
+                {label}
+                <kbd>{keys}</kbd>
+              </MenuItem>
+            ))}
+            {role === 'todo' ? (
+              <MenuItem kind="checkbox" label="Ticked" checked={block?.done === true} onChoose={() => style({ done: block?.done !== true })}>
+                <SquareCheck size={ICON} aria-hidden />
+                Tick the to-do
+              </MenuItem>
+            ) : null}
+            <hr />
+            <div className="sh-menu-head">A press on the page</div>
+            {POINTERS.map(([value, label, hint, Icon]) => (
+              <MenuItem
+                key={value}
+                label={label}
+                title={hint}
+                checked={tool === value}
+                command="tool.choose"
+                onChoose={() => {
+                  void commands.do('tool.choose', { tool: value })
+                  close()
+                }}
+              >
+                <Icon size={ICON} aria-hidden />
+                {value === 'select' ? 'Select with a box' : value === 'type' ? 'Type in the text' : 'Free cursor: write anywhere'}
+              </MenuItem>
+            ))}
+            <hr />
+            <div className="sh-menu-head">Paper</div>
+            <div className="sh-seg" role="radiogroup" aria-label="Paper">
+              {PAPERS.map(([kind, label]) => (
+                <button key={kind} type="button" role="radio" aria-checked={paperNow === kind} onMouseDown={keepFocus} onClick={() => paper(kind)}>
+                  {label}
+                </button>
+              ))}
+            </div>
+            <div className="sh-seg" role="radiogroup" aria-label="Pages">
+              <button type="button" role="radio" aria-checked={everyPage} onMouseDown={keepFocus} onClick={() => setEveryPage(true)}>
+                All pages
+              </button>
+              <button type="button" role="radio" aria-checked={!everyPage} onMouseDown={keepFocus} onClick={() => setEveryPage(false)}>
+                This page
+              </button>
+            </div>
+            <hr />
+            <MenuItem kind="checkbox" label="Show both rows" checked={both} title="The row for words and the pen's row, one under the other" onChoose={() => showBothRows(!both)}>
+              <Rows2 size={ICON} aria-hidden />
+              Show both rows
+            </MenuItem>
+          </>
+        )}
+      </BarMenu>
+      <span className="sh-sep" />
+      <button type="button" className="sh-b" aria-label="Pen" aria-pressed={false} title="Pen: write and draw; the pen's row takes this one's place" data-command="tool.choose" onMouseDown={keepFocus} onClick={() => void commands.do('tool.choose', { tool: 'pen' })}>
+        <PenLine size={ICON} aria-hidden />
+      </button>
       {table ? (
         <>
-          <span className="nw-sep" />
+          <span className="sh-sep" />
           <TableTools store={store} table={table} />
         </>
       ) : null}
       {picture ? (
         <>
-          <span className="nw-sep" />
+          <span className="sh-sep" />
           <DescribeField kind={picture.type === 'table' ? 'table' : 'picture'} value={picture.alt ?? ''} onChange={(value) => describe(picture.id, value)} />
         </>
       ) : null}

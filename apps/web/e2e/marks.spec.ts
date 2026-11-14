@@ -3,6 +3,7 @@
 // caption and on a Select box; and size and font on the selected words, a whole
 // line taking them as its style.
 import { expect, test, type Page } from './fixtures.js'
+import { chooseTool, fontAndSize, moreMark, textRow, textSize } from './shell.js'
 
 test.use({ viewport: { width: 1280, height: 1000 } })
 
@@ -56,10 +57,14 @@ test('underline, subscript and superscript by button and by key, with the keys i
   await start(page)
   await page.keyboard.type('H2O and x2 and under')
   await expect(page.getByRole('button', { name: 'Underline' })).toHaveAttribute('title', /Ctrl\+U/u)
-  await expect(page.getByRole('button', { name: 'Subscript' })).toHaveAttribute('title', /Ctrl\+=/u)
-  await expect(page.getByRole('button', { name: 'Superscript' })).toHaveAttribute('title', /Ctrl\+Shift\+=/u)
+  // Subscript and superscript are under More, each with its keys.
+  await textRow(page).getByRole('button', { name: 'More', exact: true }).click()
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Subscript', exact: true })).toHaveAttribute('title', /Ctrl\+=/u)
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Superscript', exact: true })).toHaveAttribute('title', /Ctrl\+Shift\+=/u)
+  await page.keyboard.press('Escape')
   await selectChars(page, 1, 2)
-  await page.getByRole('button', { name: 'Subscript' }).click()
+  await moreMark(page, 'Subscript')
+  await page.keyboard.press('Escape')
   await expect.poll(async () => (await texts(page))[0]!.md).toBe('H[2]{.sub}O and x2 and under')
   await expect(page.locator('.nw-frame sub')).toHaveText('2')
   await selectChars(page, 9, 10)
@@ -100,11 +105,12 @@ test('the marks work in a table cell, on a Select box, and in a caption', async 
   await page.keyboard.type('x2')
   await page.keyboard.press('Shift+ArrowLeft')
   await settled(page)
-  await page.getByRole('button', { name: 'Superscript' }).click()
+  await moreMark(page, 'Superscript')
+  await page.keyboard.press('Escape')
   await expect.poll(async () => (await blocks(page)).find((b) => b.type === 'table')?.rows?.[0]?.[0]).toBe('x[2]{.sup}')
   // A Select box around "words", then Ctrl+U.
   const words = await wordBox(page, 'words')
-  await page.getByRole('radio', { name: 'Select' }).click()
+  await chooseTool(page, 'select')
   await page.mouse.move(words.left - 2, words.top - 2)
   await page.mouse.down()
   await page.mouse.move(words.right + 2, words.bottom + 2, { steps: 5 })
@@ -112,7 +118,7 @@ test('the marks work in a table cell, on a Select box, and in a caption', async 
   await page.keyboard.press('Control+u')
   await expect.poll(async () => (await texts(page))[0]!.md).toBe('some [words]{.underline} here')
   // The table's caption: typed, selected, underlined from the bar.
-  await page.getByRole('radio', { name: 'Type' }).click()
+  await chooseTool(page, 'type')
   await page.locator('.nw-table td').first().click()
   await page.locator('.nw-table .nw-caption').click()
   await page.keyboard.type('Table one')
@@ -127,15 +133,16 @@ test('size and font change only the selected words, a whole line takes them as i
   await page.keyboard.type('Alpha beta gamma')
   const beta = await wordBox(page, 'beta')
   await page.mouse.dblclick((beta.left + beta.right) / 2, (beta.top + beta.bottom) / 2)
-  await page.getByRole('button', { name: 'Large', exact: true }).click()
+  await textSize(page, 'Large')
   await expect.poll(async () => (await texts(page))[0]!.md).toBe('Alpha [beta]{size=l} gamma')
-  await expect(page.getByRole('button', { name: 'Large', exact: true })).toHaveAttribute('aria-pressed', 'true')
-  await page.getByRole('combobox', { name: 'Font' }).selectOption('serif')
+  const menu = await fontAndSize(page)
+  await expect(menu.getByRole('radio', { name: 'Large', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await menu.getByRole('menuitemradio', { name: 'Serif', exact: true }).click()
   await expect.poll(async () => (await texts(page))[0]!.md).toBe('Alpha [[beta]{font=serif}]{size=l} gamma')
   await expect(page.locator('.nw-frame span[data-size="l"]')).toHaveCSS('font-size', /^18\.6/u)
   // The whole line: its own style, and the words' own size gives way to it.
   await page.mouse.click((beta.left + beta.right) / 2, (beta.top + beta.bottom) / 2, { clickCount: 3 })
-  await page.getByRole('button', { name: 'Extra large', exact: true }).click()
+  await textSize(page, 'Extra large')
   await expect.poll(async () => (await texts(page))[0]!.style).toEqual({ size: 'xl' })
   expect((await texts(page))[0]!.md).toBe('Alpha [beta]{font=serif} gamma')
   // Kept in the library: a reload gives the same words.

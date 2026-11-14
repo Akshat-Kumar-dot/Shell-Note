@@ -430,6 +430,13 @@ export const APP_COMMANDS: readonly CommandSpec[] = [
     example: {},
   },
   {
+    name: 'video.inside',
+    does: 'Put the video back inside the Beside panel, above its description and transcript, after video.place or video.float took it out',
+    says: ['tuck the video in', 'keep the video inside', 'video back inside the panel'],
+    input: inputs([]),
+    example: {},
+  },
+  {
     name: 'video.times',
     does: 'Show or hide, beside each line, when in the video it was written (⏱)',
     says: ['show the video times', 'hide the times beside the lines', 'show when each line was written', 'turn off the timestamps'],

@@ -5,7 +5,8 @@
 // the note and cropping stay the person's: a file picked, a screen chosen, a
 // box dragged.
 import { idTaken, newId, type Clip, type Media, type Op } from '@shellnote/core'
-import { changeLayout, setFull, setSideOpen, workspace as layout } from '../layout/state.js'
+import { putInside, setFull, setInside, setSideOpen, workspace as layout } from '../layout/state.js'
+import { showSideTab, videoTab } from '../layout/sideTab.js'
 import { dock, float, type PanelId, type Rect } from '../layout/tree.js'
 import type { EditorStore } from '../store.js'
 import { hardPart, moveVideo, playVideo, seekVideo, setTimesShown, timesShown, videoClock, videoCovered, videoShown, type VideoClock } from '../video/state.js'
@@ -169,13 +170,19 @@ export function defineVideo(commands: Commands): void {
     editable(workspace)
     return markPart(store, by)
   })
+  // Taken out of the Beside panel into a panel of its own, docked or floating; and put back inside it.
   commands.define('video.place', ['workspace'], ({ place }) => {
-    changeLayout((now) => dock(now, 'video', 'notes', place as 'left' | 'right' | 'top' | 'bottom'))
+    setInside('video', false, (now) => dock(now, 'video', 'notes', place as 'left' | 'right' | 'top' | 'bottom'))
     return `video panel docked at the ${String(place)}`
   })
   commands.define('video.float', ['workspace'], () => {
-    changeLayout((now) => float(now, 'video', now.floating.video ?? FLOAT_AT))
+    setInside('video', false, (now) => float(now, 'video', now.floating.video ?? FLOAT_AT))
     return 'video panel floating over the note'
+  })
+  commands.define('video.inside', ['workspace'], () => {
+    putInside('video')
+    showSideTab(videoTab())
+    return videoShown.value === undefined ? 'the video goes inside the Beside panel; none is shown now' : 'video inside the Beside panel, above its description and transcript'
   })
   commands.define('video.times', [], ({ on }) => {
     setTimesShown(on === true)

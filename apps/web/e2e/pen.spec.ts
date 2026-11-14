@@ -5,6 +5,7 @@
 // for one note; and palms, with pointer events as a touch screen sends them.
 import { readFileSync } from 'node:fs'
 import { expect, inApp, test, type Page } from './fixtures.js'
+import { chooseTool, eraserWay, openPenSettings, penKind, penWidth, zoom } from './shell.js'
 
 type Ink = { id: string; strokes: { pts: number[]; tool?: string; straight?: true; shape?: { kind: string; key: number[] } }[] }
 
@@ -39,15 +40,13 @@ async function write(page: Page, points: readonly [number, number][], hold?: () 
 /** A wavy line across, as handwriting goes: never straight. */
 const wave = (x: number, y: number, length: number): [number, number][] => Array.from({ length: 31 }, (_, i) => [x + (length * i) / 30, y + 3 * Math.sin(i / 2.5)])
 
-const tool = (page: Page, name: string) => page.getByRole('radio', { name, exact: true })
-
 // Tall enough to show a whole A4 page at 100%.
 test.use({ viewport: { width: 1280, height: 1200 } })
 
 test('the pen writes a stroke as one undo step, in a new ink block in front', async ({ page }) => {
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   await expect(page.getByRole('toolbar', { name: 'Pen' })).toBeVisible()
   await write(page, wave(40, 150, 60))
   await expect.poll(async () => (await added(page, before)).length).toBe(1)
@@ -70,7 +69,7 @@ test('the pen writes a stroke as one undo step, in a new ink block in front', as
 test('a clearly straight line is straightened, as a second undo step that gives back the line as drawn', async ({ page }) => {
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   await write(page, Array.from({ length: 12 }, (_, i): [number, number] => [40 + i * 6, 150 + (i % 2) * 0.2]))
   await expect.poll(async () => (await added(page, before))[0]?.strokes[0]?.straight).toBe(true)
   const line = (await added(page, before))[0]!.strokes[0]!
@@ -86,7 +85,7 @@ test('a stroke held still snaps to its shape, which one undo gives back as drawn
   await page.clock.install()
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   const circle = Array.from({ length: 41 }, (_, i): [number, number] => [100 + 20 * Math.cos((i / 40) * 2.1 * Math.PI), 160 + 20 * Math.sin((i / 40) * 2.1 * Math.PI)])
   // Held still for longer than the hold, without letting go.
   await write(page, circle, () => page.clock.runFor(700))
@@ -99,12 +98,12 @@ test('a stroke held still snaps to its shape, which one undo gives back as drawn
 
 test('the eraser takes whole strokes in one sweep, as one undo step', async ({ page }) => {
   await start(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   const strokes = await strokeCount(page)
   await write(page, wave(40, 150, 40))
   await write(page, wave(40, 160, 40))
   await expect.poll(() => strokeCount(page)).toBe(strokes + 2)
-  await tool(page, 'Eraser').click()
+  await chooseTool(page, 'eraser')
   await expect(page.getByRole('toolbar', { name: 'Eraser' })).toBeVisible()
   await write(page, Array.from({ length: 10 }, (_, i): [number, number] => [60, 140 + i * 3]))
   await expect.poll(() => strokeCount(page)).toBe(strokes)
@@ -115,11 +114,11 @@ test('the eraser takes whole strokes in one sweep, as one undo step', async ({ p
 test('the eraser can take only the part of a stroke it passes over', async ({ page }) => {
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   await write(page, wave(40, 150, 80))
   await expect.poll(async () => (await added(page, before)).length).toBe(1)
-  await tool(page, 'Eraser').click()
-  await page.getByRole('radio', { name: 'Part of a stroke' }).click()
+  await chooseTool(page, 'eraser')
+  await eraserWay(page, 'Part of a stroke')
   await write(page, Array.from({ length: 10 }, (_, i): [number, number] => [80, 140 + i * 2.5]))
   await expect.poll(async () => (await added(page, before))[0]?.strokes.length).toBe(2)
   await page.getByRole('button', { name: 'Undo' }).click()
@@ -129,7 +128,7 @@ test('the eraser can take only the part of a stroke it passes over', async ({ pa
 test('the highlighter marks over the words, see-through, in a layer under the ink', async ({ page }) => {
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Highlighter').click()
+  await chooseTool(page, 'highlighter')
   await expect(page.getByRole('toolbar', { name: 'Highlighter' })).toBeVisible()
   await write(page, Array.from({ length: 10 }, (_, i): [number, number] => [25 + i * 5, 40.5 + (i % 2) * 0.4]))
   await expect.poll(async () => (await added(page, before))[0]?.strokes[0]?.tool).toBe('highlighter')
@@ -141,8 +140,8 @@ test('the highlighter marks over the words, see-through, in a layer under the in
 
 test("a note's own pen switches go with it, as one undo step", async ({ page }) => {
   await start(page)
-  await tool(page, 'Pen').click()
-  await page.getByRole('button', { name: 'Pen settings' }).click()
+  await chooseTool(page, 'pen')
+  await openPenSettings(page)
   await page.getByRole('radio', { name: 'This note' }).click()
   await page.getByRole('combobox', { name: 'Shapes' }).selectOption({ label: 'Off' })
   await expect.poll(() => page.evaluate(() => window.__shellnote!.doc.pen)).toEqual({ shapes: 'off' })
@@ -203,14 +202,14 @@ async function tailInkAt(page: Page, x: number, y: number): Promise<boolean> {
 
 test("while a pen writes or erases, its dot or ring is drawn at its tip, as Windows hides the cursor then; gone when it lifts", async ({ page }) => {
   await start(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   const stroke = strokeOf('pen', 7, Array.from({ length: 12 }, (_, i): [number, number] => [40 + i * 3, 150 + Math.sin(i) * 2]))
   await send(page, stroke.slice(0, -1))
   expect(await tailInkAt(page, 40 + 10 * 3, 150 + Math.sin(10) * 2)).toBe(true)
   await send(page, stroke.slice(-1))
   expect(await tailInkAt(page, 40 + 10 * 3, 150 + Math.sin(10) * 2)).toBe(false)
   // The eraser's ring, the same way.
-  await tool(page, 'Eraser').click()
+  await chooseTool(page, 'eraser')
   const sweep = strokeOf('pen', 8, [[100, 200], [110, 200], [120, 200]])
   await send(page, sweep.slice(0, -1))
   expect(await tailInkAt(page, 110 + 2.5, 200)).toBe(true)
@@ -220,10 +219,10 @@ test("while a pen writes or erases, its dot or ring is drawn at its tip, as Wind
 
 test('the plain pen is a ballpoint, its width moving only a little with pressure; the fountain pen swings with it', async ({ page }) => {
   await start(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   /** The pressures a stroke keeps, written with pressures from light to firm. */
   const written = async (kind: string, y: number): Promise<number[]> => {
-    await page.getByRole('radio', { name: kind, exact: true }).click()
+    await penKind(page, kind as 'Plain pen' | 'Fountain pen')
     const before = await inks(page)
     const points = Array.from({ length: 16 }, (_, i): [number, number] => [40 + i * 3, y + Math.sin(i) * 3])
     await send(page, strokeOf('pen', 11, points).map((step, i) => ({ ...step, pressure: step.kind === 'pointerup' ? 0 : 0.05 + (i % 5) * 0.2 })))
@@ -241,8 +240,8 @@ test('the plain pen is a ballpoint, its width moving only a little with pressure
 test('pressure off: a pen draws an even width, however hard it presses', async ({ page }) => {
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
-  await page.getByRole('button', { name: 'Pen settings' }).click()
+  await chooseTool(page, 'pen')
+  await openPenSettings(page)
   await page.getByRole('combobox', { name: 'Pressure' }).selectOption({ label: 'Off (even width)' })
   await page.keyboard.press('Escape')
   const points = Array.from({ length: 14 }, (_, i): [number, number] => [40 + i * 3, 160 + Math.sin(i) * 3])
@@ -254,7 +253,7 @@ test('pressure off: a pen draws an even width, however hard it presses', async (
 
 test('a finger draws until a pen is used; a big contact, or a touch while the pen writes, is a palm and does nothing', async ({ page }) => {
   await start(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   const strokes = await strokeCount(page)
   await send(page, strokeOf('touch', 21, wave(40, 150, 40)))
   await expect.poll(() => strokeCount(page)).toBe(strokes + 1)
@@ -272,19 +271,19 @@ test('a finger draws until a pen is used; a big contact, or a touch while the pe
 
 test('the cursor stays the pen dot while writing, over the page and the desk around it', async ({ page }) => {
   await start(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   // While the pen is down its events go to the desk, which then gives the cursor: the same dot.
   const cursor = (selector: string) => page.locator(selector).first().evaluate((el) => getComputedStyle(el).cursor)
   expect(await cursor('.nw-desk')).toMatch(/^url\("data:image\/svg\+xml/)
   expect(await cursor('.nw-page')).toBe(await cursor('.nw-desk'))
-  await tool(page, 'Type').click()
+  await chooseTool(page, 'type')
   expect(await cursor('.nw-desk')).not.toMatch(/^url/)
 })
 
 test('a bracket is neatened the moment the pen lifts, as a second undo step, unless its switch is off', async ({ page }) => {
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   // An opening bracket, 10 mm tall: a shallow curve bulging left.
   const paren = (x: number): [number, number][] => Array.from({ length: 21 }, (_, i) => [x + 2.5 * (1 - Math.sin((i / 20) * Math.PI)), 150 + i * 0.5])
   await write(page, paren(60))
@@ -293,7 +292,7 @@ test('a bracket is neatened the moment the pen lifts, as a second undo step, unl
   await page.getByRole('button', { name: 'Undo' }).click()
   await expect.poll(async () => (await added(page, before))[0]?.strokes[0]?.shape).toBeUndefined()
   // Switched off in Pen settings: left as drawn.
-  await page.getByRole('button', { name: 'Pen settings' }).click()
+  await openPenSettings(page)
   await page.getByRole('checkbox', { name: '( )' }).uncheck()
   await page.keyboard.press('Escape')
   await write(page, paren(90))
@@ -305,14 +304,14 @@ test('a bracket is neatened the moment the pen lifts, as a second undo step, unl
 test('undoing a correction at once teaches the pen to leave strokes like that one alone, and it is kept with the library', async ({ page }) => {
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   const line = (y: number): [number, number][] => Array.from({ length: 12 }, (_, i) => [40 + i * 6, y + (i % 2) * 0.2])
   const strokes = async () => (await added(page, before)).flatMap((ink) => ink.strokes)
   await write(page, line(150))
   await expect.poll(async () => (await strokes())[0]?.straight).toBe(true)
   await page.getByRole('button', { name: 'Undo' }).click()
   await expect.poll(async () => (await strokes())[0]?.straight).toBeUndefined()
-  await page.getByRole('button', { name: 'Pen settings' }).click()
+  await openPenSettings(page)
   await expect(page.getByRole('group', { name: 'Your hand' })).toContainText('learned from 1 correction you undid')
   await page.keyboard.press('Escape')
   // The same stroke again, further down: left as drawn.
@@ -322,8 +321,8 @@ test('undoing a correction at once teaches the pen to leave strokes like that on
   // Kept in the library, so a reload still knows it.
   await page.reload()
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
-  await tool(page, 'Pen').click()
-  await page.getByRole('button', { name: 'Pen settings' }).click()
+  await chooseTool(page, 'pen')
+  await openPenSettings(page)
   await expect(page.getByRole('group', { name: 'Your hand' })).toContainText('learned from 1 correction you undid')
   // Forgotten, after asking.
   await page.getByRole('button', { name: 'Forget…' }).click()
@@ -334,7 +333,7 @@ test('undoing a correction at once teaches the pen to leave strokes like that on
 test('redoing a correction straight after undoing it keeps the correction, and the pen unlearns the lesson', async ({ page }) => {
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   const line = (y: number): [number, number][] => Array.from({ length: 12 }, (_, i) => [40 + i * 6, y + (i % 2) * 0.2])
   const strokes = async () => (await added(page, before)).flatMap((ink) => ink.strokes)
   await write(page, line(150))
@@ -343,7 +342,7 @@ test('redoing a correction straight after undoing it keeps the correction, and t
   await expect.poll(async () => (await strokes())[0]?.straight).toBeUndefined()
   await page.getByRole('button', { name: 'Redo' }).click()
   await expect.poll(async () => (await strokes())[0]?.straight).toBe(true)
-  await page.getByRole('button', { name: 'Pen settings' }).click()
+  await openPenSettings(page)
   await expect(page.getByRole('group', { name: 'Your hand' })).toContainText('the pen goes by general rules')
   await page.keyboard.press('Escape')
   // So the same line again is straightened, as before any lesson.
@@ -353,7 +352,7 @@ test('redoing a correction straight after undoing it keeps the correction, and t
 
 test('a quick scribble over a word deletes it, and is not kept itself; one undo brings the word back', async ({ page }) => {
   await start(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   const strokes = await strokeCount(page)
   await write(page, wave(40, 150, 25))
   await write(page, wave(40, 157, 25))
@@ -379,7 +378,7 @@ test('a quick scribble over a word deletes it, and is not kept itself; one undo 
 
 test('a new letter never redraws the letters before it, whichever way the ink grows', async ({ page }) => {
   await start(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   const letter = (x: number): [number, number][] => Array.from({ length: 25 }, (_, i) => [x + (i / 24) * 6 + 1.5 * Math.sin(i / 3), 150 - 6 * Math.abs(Math.sin((i / 24) * Math.PI * 1.3))])
   for (let k = 0; k < 3; k++) await write(page, letter(60 + k * 9))
   await expect(page.locator('[data-free="ink"]')).toHaveCount(2)
@@ -418,9 +417,9 @@ test.describe('at 125 % screen scaling, as on most laptops', () => {
   test('nothing on the screen changes when the pen lifts: the live line is the line kept, pixel for pixel', async ({ page }) => {
     await page.goto('/#/new')
     await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
-    await tool(page, 'Pen').click()
-    await page.getByRole('radio', { name: 'Extra fine' }).click()
-    for (let i = 0; i < 6; i++) await page.getByRole('button', { name: 'Zoom in' }).click()
+    await chooseTool(page, 'pen')
+    await penWidth(page, 'Extra fine')
+    for (let i = 0; i < 6; i++) await zoom(page, 'in')
     // The writing spot, 55 mm across and 38 mm down, in the middle of the view.
     await page.locator('.nw-desk').evaluate((desk) => {
       const sheet = desk.querySelector('.nw-page')!.getBoundingClientRect()
@@ -499,7 +498,7 @@ test("with shading and scratch-outs taught, shading across a drawing keeps it, a
   const circle = (cx: number, cy: number, r: number): [number, number][] => Array.from({ length: 61 }, (_, i): [number, number] => [cx + r * Math.cos((i / 60) * 2.1 * Math.PI), cy + r * Math.sin((i / 60) * 2.1 * Math.PI)])
 
   await start(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   const strokes = await strokeCount(page)
   // The premise: with the general rules alone, shading across a circle deletes it.
   await write(page, circle(55, 210, 18))
@@ -530,7 +529,7 @@ test("with shading and scratch-outs taught, shading across a drawing keeps it, a
   await expect(page.getByRole('status')).toContainText('your scratch-outs, your shading, which deletes nothing')
 
   await start(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   const now = await strokeCount(page)
   await write(page, circle(55, 210, 18))
   await expect.poll(() => strokeCount(page)).toBe(now + 1)
@@ -567,7 +566,7 @@ const newStrokes = async (page: Page, before: readonly Ink[]) => (await added(pa
 test('an arrow drawn in one stroke becomes an arrow as the pen lifts, with no hold, an inch long and under; the frame after the lift shows it', async ({ page }) => {
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   // The design: the shaft, a barb, back to the tip, the other barb. The shaft bows 1.2 mm, as a hand's does.
   const { tip, up, down } = head(40, 150, 40, 9)
   const shaft = Array.from({ length: 41 }, (_, i): [number, number] => [40 + i, 150 + 1.2 * Math.sin((i / 40) * Math.PI)])
@@ -609,7 +608,7 @@ test('an arrow drawn in one stroke becomes an arrow as the pen lifts, with no ho
 test('a line and its head drawn as the next stroke become one arrow, either first; one undo gives both back', async ({ page }) => {
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   // The line, then the head.
   const a = head(40, 200, 40, 9)
   await write(page, through([[40, 200], a.tip]))
@@ -631,7 +630,7 @@ test('held still a quarter of a second, a stroke shows as its shape and lifting 
   await page.clock.install()
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   const circle = (cx: number, cy: number) => Array.from({ length: 41 }, (_, i): [number, number] => [cx + 15 * Math.cos((i / 40) * 2.1 * Math.PI), cy + 15 * Math.sin((i / 40) * 2.1 * Math.PI)])
   await write(page, circle(60, 150), () => page.clock.runFor(300))
   await expect.poll(async () => (await newStrokes(page, before))[0]?.shape?.kind).toBe('circle')
@@ -653,7 +652,7 @@ test('held still a quarter of a second, a stroke shows as its shape and lifting 
 
 /** Smoothing off in this person's Pen settings, so a small flick drawn with the mouse stays as drawn. */
 async function smoothingOff(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Pen settings' }).click()
+  await openPenSettings(page)
   await page.getByRole('combobox', { name: 'Smoothing' }).selectOption({ label: 'Off' })
   await page.keyboard.press('Escape')
 }
@@ -672,7 +671,7 @@ const oh = (x: number, y: number): [number, number][] => Array.from({ length: 25
 test('a stroke is tidied as the pen lifts: the tail where it lifted is cut at once, as its own undo step', async ({ page }) => {
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   await smoothingOff(page)
   await write(page, ell(40, 150))
   // Kept already tidied: the foot, which flicked back up as drawn, ends where the downstroke did; nothing waits.
@@ -688,7 +687,7 @@ test('a stroke is tidied as the pen lifts: the tail where it lifted is cut at on
 test('a line is levelled as the next line starts: each word moved, whole, onto the line', async ({ page }) => {
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   // Two words on a line, the second written 1 mm lower.
   await write(page, oh(40, 150))
   await write(page, ell(42.3, 146, false))
@@ -715,8 +714,8 @@ test('the person chooses the word a line is put on: with Last word, the first wo
   await page.clock.install()
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
-  await page.getByRole('button', { name: 'Pen settings' }).click()
+  await chooseTool(page, 'pen')
+  await openPenSettings(page)
   await page.getByRole('combobox', { name: 'Line up words on' }).selectOption({ label: 'Last word' })
   await expect(page.getByRole('combobox', { name: 'Gap between words' })).toHaveValue('usual')
   await page.keyboard.press('Escape')
@@ -741,8 +740,8 @@ test('developer mode: each tidy rule on or off by itself; with Words onto the li
   await page.clock.install()
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
-  await page.getByRole('button', { name: 'Pen settings' }).click()
+  await chooseTool(page, 'pen')
+  await openPenSettings(page)
   await expect(page.getByRole('checkbox', { name: 'Words onto the line' })).toHaveCount(0)
   await page.getByRole('checkbox', { name: 'Developer mode' }).check()
   await page.getByRole('checkbox', { name: 'Words onto the line' }).uncheck()
@@ -766,7 +765,7 @@ test('the line being written is levelled when the pen rests 1.5 s, with no next 
   await page.clock.install()
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   // Two words on a line, the second 1 mm lower.
   await write(page, oh(40, 150))
   await write(page, ell(42.3, 146, false))
@@ -813,10 +812,10 @@ test("a recorded sentence, a word written a letter too high, comes level as the 
   const lines = strokes.map((stroke, i) => stroke.map(([x, y]): [number, number] => [30 + (x - x0) / 100, 120 + (y - y0) / 100 - (raised.has(i) ? 3 : 0)]))
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
+  await chooseTool(page, 'pen')
   // Written with Words only, so nothing levels it on a rest before it is measured; then Words and lines.
   const tidyMode = async (label: string) => {
-    await page.getByRole('button', { name: 'Pen settings' }).click()
+    await openPenSettings(page)
     await page.getByRole('combobox', { name: 'Tidy handwriting' }).selectOption({ label })
     await page.keyboard.press('Escape')
   }
@@ -856,8 +855,8 @@ test("a recorded sentence, a word written a letter too high, comes level as the 
 test('the wand: a box dragged over writing tidies just that, as one undo step; Whole note tidies all; Escape puts it away; switched off, it is off', async ({ page }) => {
   await start(page)
   const before = await inks(page)
-  await tool(page, 'Pen').click()
-  await page.getByRole('button', { name: 'Pen settings' }).click()
+  await chooseTool(page, 'pen')
+  await openPenSettings(page)
   await page.getByRole('combobox', { name: 'Tidy handwriting' }).selectOption({ label: 'Tidy button only' })
   await page.getByRole('combobox', { name: 'Smoothing' }).selectOption({ label: 'Off' })
   await page.keyboard.press('Escape')
@@ -890,7 +889,7 @@ test('the wand: a box dragged over writing tidies just that, as one undo step; W
   await expect.poll(async () => (await onPage(page, before)).every((s) => s.at(-1)![1] >= 15595)).toBe(true)
   await page.getByRole('button', { name: 'Undo' }).click()
   await expect.poll(async () => await onPage(page, before)).toEqual(drawn)
-  await page.getByRole('button', { name: 'Pen settings' }).click()
+  await openPenSettings(page)
   await page.getByRole('combobox', { name: 'Tidy handwriting' }).selectOption({ label: 'Off' })
   await page.keyboard.press('Escape')
   await expect(page.getByRole('button', { name: 'Tidy handwriting' })).toBeDisabled()
@@ -899,7 +898,7 @@ test('the wand: a box dragged over writing tidies just that, as one undo step; W
 test('elsewhere the pen’s live canvas goes straight on the screen, for less delay', async ({ page }) => {
   await page.goto('/#/new')
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
-  await page.getByRole('radio', { name: 'Pen', exact: true }).click()
+  await chooseTool(page, 'pen')
   await page.keyboard.press('Escape')
   const asked = await page.locator('.nw-live-ink').first().evaluate((canvas) => (canvas as HTMLCanvasElement).getContext('2d')?.getContextAttributes().desynchronized)
   expect(asked).toBe(true)
@@ -914,7 +913,7 @@ test('an ink tool leaves no caret and no text to type in, and nothing to select;
   await frame.click()
   await page.keyboard.type('Words')
   await expect(frame).toHaveAttribute('contenteditable', 'true')
-  await page.getByRole('radio', { name: 'Pen', exact: true }).click()
+  await chooseTool(page, 'pen')
   await page.keyboard.press('Escape')
   await expect(frame).toHaveAttribute('contenteditable', 'false')
   const inDesk = (): Promise<boolean> => page.evaluate(() => document.activeElement?.closest('.nw-desk') !== null && document.activeElement?.closest('.nw-desk') !== undefined)
@@ -922,7 +921,7 @@ test('an ink tool leaves no caret and no text to type in, and nothing to select;
   expect(await page.evaluate(() => window.getSelection()?.rangeCount ?? 0)).toBe(0)
   const looks = await page.evaluate(() => {
     const select = (selector: string): string => getComputedStyle(document.querySelector(selector)!).webkitUserSelect
-    return { page: select('.nw-page'), text: select('.nw-frame .ProseMirror'), button: select('.appbar button'), title: select('.appbar .title') }
+    return { page: select('.nw-page'), text: select('.nw-frame .ProseMirror'), button: select('.sh-tools button'), title: select('.sh-tab-title') }
   })
   expect(looks).toEqual({ page: 'none', text: 'none', button: 'none', title: 'text' })
   // A touch moved over the desk and a selection begun there are both kept by the page.
@@ -933,7 +932,7 @@ test('an ink tool leaves no caret and no text to type in, and nothing to select;
   })
   expect(kept).toEqual([true, true])
   // Typing again: the text is as it was, and takes the keys.
-  await page.getByRole('radio', { name: 'Type', exact: true }).click()
+  await chooseTool(page, 'type')
   await expect(frame).toHaveAttribute('contenteditable', 'true')
   await frame.click()
   await page.keyboard.press('End')
@@ -953,7 +952,7 @@ test.describe('on Android', () => {
   test('the pen draws on no canvas that goes straight on the screen', async ({ page }) => {
     await page.goto('/#/new')
     await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
-    await page.getByRole('radio', { name: 'Pen', exact: true }).click()
+    await chooseTool(page, 'pen')
     await page.keyboard.press('Escape')
     const asked = await page.locator('.nw-live-ink').first().evaluate((canvas) => (canvas as HTMLCanvasElement).getContext('2d')?.getContextAttributes().desynchronized)
     expect(asked).toBe(false)
