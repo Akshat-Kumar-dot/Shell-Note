@@ -71,6 +71,13 @@ async function walk(page: Page): Promise<void> {
   await look(page, 'library, empty')
   await terminal(page, 'folder.new name=Physics', 'folder.new name=Maths')
   await look(page, 'library')
+  // The library's top as Home, then as cards again for the rest of the walk.
+  const showAs = page.getByRole('group', { name: 'Show as' })
+  await showAs.getByRole('button', { name: 'Home', exact: true }).click()
+  await expect(page.getByRole('group', { name: 'Start a note' })).toBeVisible()
+  await look(page, 'library, as Home')
+  await showAs.getByRole('button', { name: 'Cards', exact: true }).click()
+  await expect(page.getByRole('group', { name: 'Start a note' })).toHaveCount(0)
   // The library column's menu.
   await page.getByRole('navigation', { name: 'Library' }).getByRole('button', { name: 'Sort and place' }).click()
   await look(page, 'library, the column menu')
@@ -218,7 +225,7 @@ const PERSON: { why: string; name?: RegExp; cls?: RegExp; within?: RegExp }[] = 
   { why: "The command box's own field: what it offers runs its command", within: /^the command box/u },
   { why: "The person's own: a line copied, for their AI app's settings", name: /^Copy the line$/u },
   { why: 'Reading: pages about ShellNote, opened in the browser', name: /^(The source code, on GitHub|The other projects ShellNote is built with.*|The fonts, and their licences|the guide to the MCP server)$/u },
-  { why: "Still to come, greyed with its later: boards, and the library's Home", name: /^(Boards, cards joined by arrows, come later|Home: later)$/u },
+  { why: 'Still to come, greyed with its later: boards', name: /^Boards, cards joined by arrows, come later$/u },
   { why: 'Where the person looks: both rows of tools at once, or the one in hand', name: /^Show both rows$/u },
   { why: "Opens a menu, a field or a dialog, whose own controls carry the commands (the pen's colours, a bar's places, a card's actions, the name typed, the folder chosen)", name: /^(New|Actions for .*|Pen settings|Video|Move the tool bar|Colour|More colours|Move to…|Rename|Paste again|Style|Font and size|Align and indent|More|Width|This note|Zoom|Sort and place|Where the video sits|Description|Kind|Page|Paper|Back to This note)$/u },
   { why: "The pen and the eraser: a press takes it in hand (tool.choose, from the words' row's Pen); in hand, a press opens its kinds or its ways", name: /^(Pen|Eraser)$/u, within: /Pen|Highlighter|Eraser/u },

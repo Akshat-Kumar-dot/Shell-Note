@@ -48,7 +48,7 @@ export const APP_COMMANDS: readonly CommandSpec[] = [
   },
   {
     name: 'library.look',
-    does: 'Show the library as cards or as a list; it opens that way from then on, on this device',
+    does: 'Show the library as cards, as a list, or, at its top, as Home (start a note, go on with the three edited last, the folders, then every other note); it opens that way from then on, on this device. Under Home, a folder shows as cards or a list, as last chosen in one',
     says: ['show the library as {view}', 'show my notes as a list', 'show the notes as cards', 'switch the library to the list look'],
     input: inputs(['view']),
     example: { view: 'list' },

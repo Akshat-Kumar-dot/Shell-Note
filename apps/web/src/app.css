@@ -693,6 +693,57 @@ a {
   color: var(--sh-text-3);
   font-size: 12px;
 }
+/* A kind still to come: greyed, as in the New menu. */
+.lib-start:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.lib-start:disabled:hover {
+  border-color: var(--sh-line);
+  background: var(--sh-surface);
+}
+
+/* ----- Home, the library's top as a home: a wide search, the starts, the notes to go on with, the folders, then
+   everything ----- */
+
+.lib-top-home {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 560px) minmax(0, 1fr);
+  margin: 6px 0 22px;
+}
+/* Its name stays for a screen reader: the search and the starts say what the screen is. */
+.lib-top-home .lib-head {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.lib-top-home .sh-grow {
+  display: none;
+}
+.lib-top-home .lib-find {
+  grid-column: 2;
+  width: 100%;
+}
+.lib-top-home > .sh-anchor {
+  grid-column: 3;
+  justify-self: end;
+}
+.lib-home .lib-starts {
+  width: 100%;
+  margin-top: 0;
+}
+.lib-cards.lib-wide {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.lib-wide .card-pic {
+  height: 150px;
+}
+.lib-home .lib-filters {
+  margin-bottom: 10px;
+}
 
 /* ----- empty states and notes ----- */
 
@@ -1167,6 +1218,23 @@ a {
   .lib-list .card-snip,
   .lib-list .card-kind {
     display: none;
+  }
+  .lib-top-home {
+    grid-template-columns: minmax(0, 1fr) auto;
+    margin: 0 0 16px;
+  }
+  .lib-top-home .lib-find {
+    order: 0;
+    grid-column: 1;
+  }
+  .lib-top-home > .sh-anchor {
+    grid-column: 2;
+  }
+  .lib-home .lib-starts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .lib-wide .card-pic {
+    height: 104px;
   }
 }
 @media (max-width: 760px) {

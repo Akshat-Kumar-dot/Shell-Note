@@ -295,12 +295,10 @@ export function Customise() {
             choices={[
               ['list', 'List'],
               ['cards', 'Cards'],
-              ['home', 'Home', true],
+              ['home', 'Home'],
             ]}
             command="library.look"
-            onChoose={(id) => {
-              if (id !== 'home') commands.tap('library.look', { view: id })
-            }}
+            onChoose={(id) => commands.tap('library.look', { view: id })}
           />
         </div>
       </SettingsPart>

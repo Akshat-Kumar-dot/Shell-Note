@@ -1,14 +1,15 @@
 // The library's screen, the first thing the app shows: its folders and notes as cards with their pictures or as a
-// list, folders inside folders, a path back up, a search of the titles and of the words inside notes, the notes of one
-// kind only, sorting by date, and Recently deleted, which keeps items 30 days. Every change goes through the storage
+// list, or its top as Home (start a note, the notes to go on with, the folders, then every other note), folders inside
+// folders, a path back up, a search of the titles and of the words inside notes, the notes of one kind only, sorting
+// by date, and Recently deleted, which keeps items 30 days. Every change goes through the storage
 // interface (store.ts), and other tabs hear of it. Its buttons, menus and keys call the app's commands (app control,
 // step 3b; ../commands.ts), which reach this screen's own code, so the agent does what they do.
 import type { NoteKind } from '@shellnote/core'
 import { BarMenu, commands, inDesktopApp, MenuItem, tabWord, type By, type HomePlace, type LibraryAt, type NewNote } from '@shellnote/editor'
-import { ArrowUpDown, ChevronDown, ChevronRight, Clock, FileText, Folder, FolderInput, FolderOpen, FolderPlus, ImageOff, ImagePlus, Info, Layers, LayoutGrid, NotebookPen, PenLine, Plus, RotateCcw, Rows3, Search, SquarePen, Trash2, TriangleAlert, Workflow, X, type LucideIcon } from 'lucide-react'
+import { ArrowUpDown, ChevronDown, ChevronRight, Clock, FileText, Folder, FolderInput, FolderOpen, FolderPlus, House, ImageOff, ImagePlus, Info, Layers, LayoutGrid, NotebookPen, PenLine, Plus, RotateCcw, Rows3, Search, SquarePen, Trash2, TriangleAlert, Workflow, X, type LucideIcon } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
 import { Card, nameOf, type CardItem } from './Card.js'
-import { libraryLook } from './look.js'
+import { folderLook, libraryLook, listLookOf, showingFolder, type LibraryLook, type ListLook } from './look.js'
 import { Dialog, Menu, type MenuItem as MenuLine } from './Dialog.js'
 import { importNote } from './importing.js'
 import { kindOf } from './kinds.js'
@@ -110,26 +111,64 @@ function itemsOf(library: Library, bin: boolean, folder: string | null, query: s
   ]
 }
 
+/** How many notes Home offers to go on with. */
+const GO_ON = 3
+
+/** Home's sections: the notes to go on with, its folders, every other note, and how many of those one kind hides. */
+interface HomeParts {
+  goOn: CardItem[]
+  folders: CardItem[]
+  rest: CardItem[]
+  byKind: number
+}
+
+/**
+ * Home, the library's top as a home: the notes edited last, wherever they are, to go on with; the folders at the top,
+ * sorted; then every other note of the library, sorted, of one kind only when one is chosen.
+ */
+function homeOf(library: Library, key: SortKey, order: SortOrder, show: Show): HomeParts {
+  const notes = library.notes.filter((note) => !hidden(library, note))
+  const goOn = sorted(notes, 'edited', 'newest').slice(0, GO_ON)
+  const taken = new Set(goOn.map((note) => note.id))
+  const others = notes.filter((note) => !taken.has(note.id))
+  const shown = others.filter((note) => show === 'all' || kindOf(note) === show)
+  return {
+    goOn: goOn.map((entry): CardItem => ({ kind: 'note', entry })),
+    folders: sorted(contents(library, null).folders, key, order).map((entry): CardItem => ({ kind: 'folder', entry })),
+    rest: sorted(shown, key, order).map((entry): CardItem => ({ kind: 'note', entry })),
+    byKind: others.length - shown.length,
+  }
+}
+
 /** How many cards the agent's line names; the rest are counted. */
 const NAMED = 30
 
-/** The screen as the agent reads it (the app-state map): where, how sorted, which notes, and its cards by name and id. */
-function libraryLine(library: Library | undefined, bin: boolean, folder: string | null, query: string, sort: string, show: Show, within: readonly string[]): string {
-  if (!library) return 'library: being read'
-  if (!bin && !isOpenFolder(library, folder)) return `library: folder ${folder}, not in the library any more`
-  const [, label, key, order] = SORTS.find(([id]) => id === sort) ?? SORTS[0]!
-  const items = itemsOf(library, bin, folder, query, key, order, show, within)
-  const where = bin ? 'Recently deleted' : query.trim() !== '' ? `search "${query.trim()}"` : folder === null ? 'the top' : `folder ${folderPath(library, folder).map((f) => `"${f.name}"`).join(' › ')} (${folder})`
-  const only = !bin && show !== 'all' ? ` · only the ${SHOW_WORDS[show]}` : ''
-  const folders = items.filter((item) => item.kind === 'folder').length
-  const notes = items.length - folders
-  const counted = `${folders} ${folders === 1 ? 'folder' : 'folders'}, ${notes} ${notes === 1 ? 'note' : 'notes'}`
+/** Cards by name and id, as the agent's line names them: the first ones, the rest counted. */
+function namedOf(items: readonly CardItem[]): string {
   const named = items
     .slice(0, NAMED)
     .map((item) => `${item.kind} "${nameOf(item)}" (${item.entry.id})${item.kind === 'note' && item.words ? ', its words hold the search' : ''}`)
     .join(', ')
-  const more = items.length > NAMED ? `, and ${items.length - NAMED} more` : ''
-  return `library: ${where}${bin ? '' : ` · ${label.toLowerCase()}`}${only} · ${counted}${items.length > 0 ? `: ${named}${more}` : ''}`
+  return `${named}${items.length > NAMED ? `, and ${items.length - NAMED} more` : ''}`
+}
+
+/** The screen as the agent reads it (the app-state map): where, how sorted, which notes, and its cards by name and id. */
+function libraryLine(library: Library | undefined, bin: boolean, folder: string | null, query: string, sort: string, show: Show, within: readonly string[], top: LibraryLook): string {
+  if (!library) return 'library: being read'
+  if (!bin && !isOpenFolder(library, folder)) return `library: folder ${folder}, not in the library any more`
+  const [, label, key, order] = SORTS.find(([id]) => id === sort) ?? SORTS[0]!
+  const only = !bin && show !== 'all' ? ` · only the ${SHOW_WORDS[show]}` : ''
+  if (!bin && folder === null && top === 'home' && query.trim() === '') {
+    const { goOn, folders, rest } = homeOf(library, key, order, show)
+    const listed = (items: readonly CardItem[]): string => (items.length > 0 ? `: ${namedOf(items)}` : '')
+    return `library: the top, as Home · to go on with, the ${goOn.length} edited last${listed(goOn)} · ${folders.length} ${folders.length === 1 ? 'folder' : 'folders'}${listed(folders)} · everything else, ${label.toLowerCase()}${only}, ${rest.length} ${rest.length === 1 ? 'note' : 'notes'}${listed(rest)}`
+  }
+  const items = itemsOf(library, bin, folder, query, key, order, show, within)
+  const where = bin ? 'Recently deleted' : query.trim() !== '' ? `search "${query.trim()}"` : folder === null ? 'the top' : `folder ${folderPath(library, folder).map((f) => `"${f.name}"`).join(' › ')} (${folder})`
+  const folders = items.filter((item) => item.kind === 'folder').length
+  const notes = items.length - folders
+  const counted = `${folders} ${folders === 1 ? 'folder' : 'folders'}, ${notes} ${notes === 1 ? 'note' : 'notes'}`
+  return `library: ${where}${bin ? '' : ` · ${label.toLowerCase()}`}${only} · ${counted}${items.length > 0 ? `: ${namedOf(items)}` : ''}`
 }
 
 interface Toast {
@@ -147,7 +186,10 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState(savedSort)
   const [show, setShow] = useState<Show>(() => shownLast)
-  const look = useSyncExternalStore(libraryLook.subscribe, libraryLook.snapshot)
+  // The top's look (Home among them), and the cards or list the rest of the library shows as.
+  const top = useSyncExternalStore(libraryLook.subscribe, libraryLook.snapshot)
+  const foldersLook = useSyncExternalStore(folderLook.subscribe, folderLook.snapshot)
+  const look = listLookOf(top, foldersLook)
   // The notes whose words hold the search, for the search they were found for.
   const [found, setFound] = useState<{ query: string; ids: readonly string[] }>({ query: '', ids: [] })
   const [active, setActive] = useState(0)
@@ -255,7 +297,18 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
 
   const [, , key, order] = SORTS.find(([id]) => id === sort) ?? SORTS[0]!
   const searching = searchText !== ''
-  const items = useMemo((): CardItem[] => (library ? itemsOf(library, bin, folder, query, key, order, show, within) : []), [library, bin, query, folder, key, order, show, within])
+  const atTop = !bin && folder === null
+  // Home, the top's own look: its sections, until a search shows what it finds.
+  const asHome = atTop && top === 'home'
+  const showsHome = asHome && !searching
+  const parts = useMemo(() => (library && showsHome ? homeOf(library, key, order, show) : undefined), [library, showsHome, key, order, show])
+  const items = useMemo((): CardItem[] => (parts ? [...parts.goOn, ...parts.folders, ...parts.rest] : library ? itemsOf(library, bin, folder, query, key, order, show, within) : []), [parts, library, bin, query, folder, key, order, show, within])
+
+  // Where the library is, for its switch: cards or a list chosen inside a folder under Home are the folders' alone.
+  useEffect(() => {
+    showingFolder(!atTop)
+    return () => showingFolder(false)
+  }, [atTop])
 
   // Thumbnails for the notes in view: the one kept, or drawn once for a note that has none, such as one just moved into the library.
   useEffect(() => {
@@ -480,7 +533,7 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
     const place: HomePlace = {
       at: () => at,
       loaded: () => loaded,
-      showing: () => libraryLine(now.current.library, bin, folder, now.current.query, now.current.sort, now.current.show, now.current.within),
+      showing: () => libraryLine(now.current.library, bin, folder, now.current.query, now.current.sort, now.current.show, now.current.within, libraryLook.value),
       search: (text) => own.current.searchFor(text),
       sort: (date, first) => own.current.sortBy(date, first),
       filter: (wanted) => own.current.filterBy(wanted),
@@ -602,7 +655,7 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
   }
   const pictureOf = (item: CardItem): string | undefined => (item.kind === 'note' ? thumbs[item.entry.id] : item.entry.cover ? covers[item.entry.id] : undefined)
 
-  const cardOf = (item: CardItem, index: number): ReactNode => {
+  const cardOf = (item: CardItem, index: number, as: ListLook = look): ReactNode => {
     const finding = searching && !bin
     // A line of the list: a note's first words in its middle, and when at its end; a folder's middle says what it
     // holds; a search's results say where they are.
@@ -614,7 +667,7 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
       <Card
         key={`${item.kind}:${item.entry.id}`}
         item={item}
-        look={look}
+        look={as}
         {...(bin ? {} : { command: item.kind === 'note' ? 'note.open' : 'library.open' })}
         meta={finding ? whereFor(item) : whenFor(item)}
         middle={middle}
@@ -654,6 +707,136 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
   const kept = keptIn !== undefined ? `Kept in the folder ${keptIn}` : inDesktopApp() ? 'Kept by the app, on this computer' : 'Kept in this browser'
   const keptMore = keptIn !== undefined ? '' : inDesktopApp() ? '' : ', which can clear them'
 
+  // Which notes show, how they are sorted, and the look: above the cards, or on Home above Everything. The top's
+  // switch has Home too; a folder's, cards or a list.
+  const filtersRow = (
+    <div className="lib-filters">
+      {bin ? (
+        <p className="lib-hint">Deleted notes and folders stay here for 30 days, then go for good.</p>
+      ) : (
+        <>
+          <div className="lib-kinds" role="group" aria-label="Which notes show">
+            {SHOWS.map(([value, word, Icon]) => (
+              <button key={value} type="button" className="lib-f" aria-pressed={show === value} data-command="library.filter" onClick={() => commands.tap('library.filter', { show: value })}>
+                {Icon ? <Icon size={15} aria-hidden /> : null}
+                {word}
+              </button>
+            ))}
+            <button type="button" className="lib-f" aria-pressed={false} disabled title="Boards, cards joined by arrows, come later">
+              <Workflow size={15} aria-hidden />
+              Boards<em>later</em>
+            </button>
+          </div>
+          <label className="lib-sort">
+            <ArrowUpDown size={15} aria-hidden />
+            <select
+              aria-label="Sort"
+              data-command="library.sort"
+              value={sort}
+              onChange={(event) => {
+                const [, , by, first] = SORTS.find(([id]) => id === event.target.value) ?? SORTS[0]!
+                commands.tap('library.sort', { by, order: first })
+              }}
+            >
+              {SORTS.map(([id, label]) => (
+                <option key={id} value={id}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
+      )}
+      <div className="lib-look" role="group" aria-label="Show as">
+        <button type="button" className="sh-b" aria-label="Cards" title="As cards, with their pictures" aria-pressed={(atTop ? top : look) === 'cards'} data-command="library.look" onClick={() => commands.tap('library.look', { view: 'cards' })}>
+          <LayoutGrid size={16} aria-hidden />
+        </button>
+        <button type="button" className="sh-b" aria-label="List" title="As a list, with their first words" aria-pressed={(atTop ? top : look) === 'list'} data-command="library.look" onClick={() => commands.tap('library.look', { view: 'list' })}>
+          <Rows3 size={16} aria-hidden />
+        </button>
+        {atTop ? (
+          <button type="button" className="sh-b" aria-label="Home" title="As Home: start a note, the notes to go on with, the folders, then everything" aria-pressed={top === 'home'} data-command="library.look" onClick={() => commands.tap('library.look', { view: 'home' })}>
+            <House size={16} aria-hidden />
+          </button>
+        ) : null}
+      </div>
+    </div>
+  )
+
+  /** A start: a new note of one kind, here. */
+  const start = (type: NoteKind, Icon: LucideIcon, name: string, words: string): ReactNode => (
+    <button key={type} type="button" className="lib-start" data-command="note.new" onClick={() => commands.tap('note.new', { ...here, type })}>
+      <span className="lib-start-icon">
+        <Icon size={18} aria-hidden />
+      </span>
+      <span>
+        <b>{name}</b>
+        <small>{words}</small>
+      </span>
+    </button>
+  )
+
+  // Home: the starts, the notes to go on with, the folders, then everything else with its filters. Its cards are one
+  // run for the arrow keys, in the order they show.
+  const homeBody = parts ? (
+    <div ref={list} className="lib-items lib-home">
+      <div className="lib-starts" role="group" aria-label="Start a note">
+        {start('text', FileText, 'Text note', 'Writing, no page breaks')}
+        {start('sketch', PenLine, 'Sketch', 'A sheet for the pen')}
+        {start('mixed', Layers, 'Mixed', 'Pages with both')}
+        <button type="button" className="lib-start" disabled title="Boards, cards joined by arrows, come later">
+          <span className="lib-start-icon">
+            <Workflow size={18} aria-hidden />
+          </span>
+          <span>
+            <b>Board</b>
+            <small>Cards and arrows, later</small>
+          </span>
+        </button>
+      </div>
+      {parts.goOn.length > 0 ? (
+        <section aria-label="Go on with">
+          <h2 className="lib-sec">
+            <Clock size={14} aria-hidden />
+            Go on with
+          </h2>
+          <div role="list" className="lib-cards lib-wide">
+            {parts.goOn.map((item, i) => cardOf(item, i, 'cards'))}
+          </div>
+        </section>
+      ) : null}
+      {parts.folders.length > 0 ? (
+        <section aria-label="Folders">
+          <h2 className="lib-sec">
+            <Folder size={14} aria-hidden />
+            Folders
+          </h2>
+          <div role="list" className="lib-cards">
+            {parts.folders.map((item, i) => cardOf(item, parts.goOn.length + i, 'cards'))}
+          </div>
+        </section>
+      ) : null}
+      <section aria-label="Everything">
+        <h2 className="lib-sec">Everything</h2>
+        {filtersRow}
+        {parts.rest.length > 0 ? (
+          <div role="list" className="lib-list">
+            {parts.rest.map((item, i) => cardOf(item, parts.goOn.length + parts.folders.length + i, 'list'))}
+          </div>
+        ) : parts.byKind > 0 ? (
+          <p className="lib-none">
+            No other {SHOW_WORDS[show as NoteKind]}: {parts.byKind === 1 ? 'one note of another kind is' : `${parts.byKind} notes of other kinds are`} hidden.{' '}
+            <button type="button" className="lib-link" data-command="library.filter" onClick={() => commands.tap('library.filter', { show: 'all' })}>
+              Show every note
+            </button>
+          </p>
+        ) : (
+          <p className="lib-none">{parts.goOn.length === 0 ? 'No notes yet: start one above, or open a .shellnote file from New.' : 'Every note is above, in Go on with.'}</p>
+        )}
+      </section>
+    </div>
+  ) : null
+
   return (
     <div className="home">
       <main className="lib">
@@ -665,7 +848,7 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
             </div>
           ) : null}
 
-          <header className="lib-top" data-tauri-drag-region="deep">
+          <header className={asHome ? 'lib-top lib-top-home' : 'lib-top'} data-tauri-drag-region="deep">
             <div className="lib-head">
               {!bin && folder !== null ? (
                 <nav className="lib-crumbs" aria-label="Folder path">
@@ -794,52 +977,7 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
             )}
           </header>
 
-          <div className="lib-filters">
-            {bin ? (
-              <p className="lib-hint">Deleted notes and folders stay here for 30 days, then go for good.</p>
-            ) : (
-              <>
-                <div className="lib-kinds" role="group" aria-label="Which notes show">
-                  {SHOWS.map(([value, word, Icon]) => (
-                    <button key={value} type="button" className="lib-f" aria-pressed={show === value} data-command="library.filter" onClick={() => commands.tap('library.filter', { show: value })}>
-                      {Icon ? <Icon size={15} aria-hidden /> : null}
-                      {word}
-                    </button>
-                  ))}
-                  <button type="button" className="lib-f" aria-pressed={false} disabled title="Boards, cards joined by arrows, come later">
-                    <Workflow size={15} aria-hidden />
-                    Boards<em>later</em>
-                  </button>
-                </div>
-                <label className="lib-sort">
-                  <ArrowUpDown size={15} aria-hidden />
-                  <select
-                    aria-label="Sort"
-                    data-command="library.sort"
-                    value={sort}
-                    onChange={(event) => {
-                      const [, , by, first] = SORTS.find(([id]) => id === event.target.value) ?? SORTS[0]!
-                      commands.tap('library.sort', { by, order: first })
-                    }}
-                  >
-                    {SORTS.map(([id, label]) => (
-                      <option key={id} value={id}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </>
-            )}
-            <div className="lib-look" role="group" aria-label="Show as">
-              <button type="button" className="sh-b" aria-label="Cards" title="As cards, with their pictures" aria-pressed={look === 'cards'} data-command="library.look" onClick={() => commands.tap('library.look', { view: 'cards' })}>
-                <LayoutGrid size={16} aria-hidden />
-              </button>
-              <button type="button" className="sh-b" aria-label="List" title="As a list, with their first words" aria-pressed={look === 'list'} data-command="library.look" onClick={() => commands.tap('library.look', { view: 'list' })}>
-                <Rows3 size={16} aria-hidden />
-              </button>
-            </div>
-          </div>
+          {showsHome ? null : filtersRow}
 
           {missing ? (
             <div className="empty">
@@ -851,6 +989,8 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
             </div>
           ) : library === undefined ? (
             <p className="lib-hint">Opening your library…</p>
+          ) : homeBody ? (
+            homeBody
           ) : libraryEmpty ? (
             <div className="empty">
               <span className="empty-art" aria-hidden>
@@ -859,33 +999,9 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
               <h2>Your library is empty</h2>
               <p>Start a note of the kind you need, or open a .shellnote file.</p>
               <div className="lib-starts">
-                <button type="button" className="lib-start" data-command="note.new" onClick={() => commands.tap('note.new', { ...here, type: 'text' })}>
-                  <span className="lib-start-icon">
-                    <FileText size={18} aria-hidden />
-                  </span>
-                  <span>
-                    <b>Text note</b>
-                    <small>Writing, no page breaks</small>
-                  </span>
-                </button>
-                <button type="button" className="lib-start" data-command="note.new" onClick={() => commands.tap('note.new', { ...here, type: 'sketch' })}>
-                  <span className="lib-start-icon">
-                    <PenLine size={18} aria-hidden />
-                  </span>
-                  <span>
-                    <b>Sketch</b>
-                    <small>A sheet for the pen</small>
-                  </span>
-                </button>
-                <button type="button" className="lib-start" data-command="note.new" onClick={() => commands.tap('note.new', { ...here, type: 'mixed' })}>
-                  <span className="lib-start-icon">
-                    <Layers size={18} aria-hidden />
-                  </span>
-                  <span>
-                    <b>Mixed</b>
-                    <small>Pages with both</small>
-                  </span>
-                </button>
+                {start('text', FileText, 'Text note', 'Writing, no page breaks')}
+                {start('sketch', PenLine, 'Sketch', 'A sheet for the pen')}
+                {start('mixed', Layers, 'Mixed', 'Pages with both')}
               </div>
             </div>
           ) : bin && items.length === 0 ? (

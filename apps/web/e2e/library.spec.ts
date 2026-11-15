@@ -234,6 +234,60 @@ test('search finds titles anywhere in the library, and sorting puts the oldest o
   await expect.poll(() => names(page)).toEqual(['Physics', 'Résumé of waves', 'Later'])
 })
 
+test('Home: the top as a home, its starts, the three notes to go on with, the folders, then everything; a folder keeps cards or a list', async ({ page }) => {
+  await home(page)
+  for (const title of ['One', 'Two', 'Three', 'Four']) await newNoteHere(page, title)
+  await newFrom(page, 'Folder')
+  await page.getByRole('textbox', { name: 'New name for Untitled folder' }).fill('Physics')
+  await page.keyboard.press('Enter')
+  await expect(card(page, 'Physics')).toBeVisible()
+
+  const look = page.getByRole('group', { name: 'Show as' })
+  await look.getByRole('button', { name: 'Home', exact: true }).click()
+  await expect(look.getByRole('button', { name: 'Home', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  // The four starts, the board greyed; the three edited last; the folders; every other note, as a list.
+  const starts = page.getByRole('group', { name: 'Start a note' })
+  await expect(starts.getByRole('button')).toHaveCount(4)
+  await expect(starts.getByRole('button', { name: /^Board/u })).toBeDisabled()
+  await expect(page.getByRole('region', { name: 'Go on with' }).locator('.card-name')).toHaveText(['Four', 'Three', 'Two'])
+  await expect(page.getByRole('region', { name: 'Folders' }).locator('.card-name')).toHaveText(['Physics'])
+  const everything = page.getByRole('region', { name: 'Everything' })
+  await expect(everything.locator('.lib-list .card-name')).toHaveText(['One'])
+  // One kind only: Everything says what it hides, and shows every note again.
+  await everything.getByRole('group', { name: 'Which notes show' }).getByRole('button', { name: 'Sketch' }).click()
+  await expect(everything).toContainText('No other sketches: one note of another kind is hidden.')
+  await everything.getByRole('button', { name: 'Show every note' }).click()
+  await expect(everything.locator('.lib-list .card-name')).toHaveText(['One'])
+
+  // A search shows what it finds in Home's place.
+  const search = page.getByRole('searchbox', { name: 'Search notes' })
+  await search.fill('two')
+  await expect(starts).toHaveCount(0)
+  await expect.poll(() => names(page)).toEqual(['Two'])
+  await search.press('Escape')
+  await expect(starts).toBeVisible()
+
+  // A start makes a note of its kind.
+  await starts.getByRole('button', { name: /^Text note/u }).click()
+  await expect(page.getByRole('textbox', { name: 'Title' })).toBeVisible()
+  await toLibrary(page)
+  await expect(page.getByRole('region', { name: 'Go on with' }).locator('.card').first()).toHaveAttribute('data-note', 'text')
+
+  // In a folder, cards or a list, no Home; a list chosen there leaves the top as Home.
+  await card(page, 'Physics').locator('.card-open').click()
+  await expect(page.getByRole('heading', { name: 'Physics', level: 1 })).toBeVisible()
+  await expect(look.getByRole('button')).toHaveCount(2)
+  await look.getByRole('button', { name: 'List', exact: true }).click()
+  await expect(look.getByRole('button', { name: 'List', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await page.getByRole('navigation', { name: 'Folder path' }).getByRole('link', { name: 'Library' }).click()
+  await expect(starts).toBeVisible()
+  // Kept after a reload, and the choice Customise shows.
+  await page.reload()
+  await expect(starts).toBeVisible()
+  const set = await settingsAt(page, 'Customise')
+  await expect(set.getByRole('radiogroup', { name: 'The library opens as' }).getByRole('radio', { name: 'Home' })).toHaveAttribute('aria-checked', 'true')
+})
+
 test('cards are reached with Tab and the arrows; Enter opens; a right-click opens the menu', async ({ page }) => {
   await home(page)
   await newNoteHere(page, 'One')

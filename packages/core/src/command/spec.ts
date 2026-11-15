@@ -110,7 +110,7 @@ export const FIELDS = {
   tools: z.enum(['typing', 'pen']).describe("Which row of tools a button is of: the bar for typing (typing; left out, this one) or the pen's row (pen)"),
   position: z.int().min(1).max(Math.max(TYPING_BUTTONS.length, PEN_BUTTONS.length)).describe('A place in a row of tools, counted from 1 at its start'),
   side: z.enum(['left', 'right', 'hidden']).describe('Which side of the window something sits on, left or right, or hidden'),
-  view: z.enum(['cards', 'list']).describe("How the library shows its folders and notes: as cards or as a list"),
+  view: z.enum(['cards', 'list', 'home']).describe('How the library shows its folders and notes: as cards, as a list, or, at its top, as Home (start a note, the three notes to go on with, the folders, then every other note)'),
   part: z.enum(['all', 'look', 'tools', 'pen', 'places']).describe("What goes back as it started: the places of the panels, the bars and the library's column (places), the app's look (look), the bar for typing's buttons (tools), the pen's row's buttons (pen), or all of it (all)"),
   show: z.enum(['all', 'text', 'sketch', 'mixed']).describe('Which notes the library shows: all of them, or only the text notes, the sketches or the mixed notes'),
   look: z.enum(['system', 'light', 'dark']).describe("The app's appearance; system follows Windows"),

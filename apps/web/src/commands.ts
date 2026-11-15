@@ -13,7 +13,7 @@ import { commands, inDesktopApp, placesReset, Shared, type AppPlace, type By, ty
 import type { Library, LibraryStore } from '@shellnote/library'
 import { deletedItems, folderPath, hidden } from '@shellnote/library/tree'
 import { loadSettings, modelsNow, saveSettings, withModel } from './ai/settings.js'
-import { setLibraryLook, type LibraryLook } from './library/look.js'
+import { resetLibraryLook, setLibraryLook, type LibraryLook } from './library/look.js'
 import { found, foundLine, searchAll } from './library/searchAll.js'
 import { lastSection, moveTree, openSearch, resetTree, searchAsked, showTree } from './shell/state.js'
 import { applyAccent, applyAppearance, applyDarkPaper, type Accent, type Appearance } from './theme.js'
@@ -36,7 +36,7 @@ export const assistantsChanged = new Shared(0)
 // The library's column and the library's look go back with the panels and the bars (layout.reset).
 placesReset.add(() => {
   resetTree()
-  setLibraryLook('cards')
+  resetLibraryLook()
 })
 
 type Kind = ItemRef['kind']
@@ -352,8 +352,10 @@ export function defineAppCommands(store: LibraryStore): void {
     return foundLine(result)
   })
   commands.define('library.look', [], ({ view }) => {
-    setLibraryLook(view as LibraryLook)
-    return view === 'list' ? 'the library shows a list' : 'the library shows cards'
+    const changed = setLibraryLook(view as LibraryLook)
+    if (view === 'home') return 'the library shows as Home at its top; a folder shows as cards or a list, as last chosen in one'
+    const shows = view === 'list' ? 'a list' : 'cards'
+    return changed === 'folders' ? `folders show ${shows}; the library's top stays Home` : `the library shows ${shows}`
   })
   commands.define('settings.theme', [], ({ look }) => {
     applyAppearance(look as Appearance)
