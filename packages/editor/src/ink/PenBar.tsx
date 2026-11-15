@@ -1,20 +1,24 @@
-// The pen's row of tools, while an ink tool is in hand: Select; the pen (its four kinds in a menu, with the pen's
-// settings), the highlighter, and the eraser (its way and its size in a menu); four colours in reach and every other
-// under Colour; one Width button; undo and redo; the wand that tidies handwriting; Type, back to the row for words;
-// and a picture. The Pen switches are for this person or for this note, with what the pen has learned of this
-// person's hand. Like every button in the rows, none takes the focus.
-import { StrokeWidth, type AnyColor, type Color, type Doc, type PenSettings, type SymbolKind, type TidyRules } from '@shellnote/core'
-import { Brush, ChevronDown, Eraser, Hand, Highlighter, Lasso, Pen, Pencil, PenLine, PenTool, SlidersHorizontal, Type, WandSparkles, type LucideIcon } from 'lucide-react'
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
+// The pen's row of tools, while an ink tool is in hand, its buttons in the person's order (layout/custom.ts; as it
+// starts: Select and Move the sheet; the pen, its four kinds in a menu with the pen's settings, the highlighter, and
+// the eraser, its way and its size in a menu; four colours in reach and every other under More colours; one Width
+// button; undo and redo; the wand that tidies handwriting; Type, back to the row for words; and a picture), and More,
+// which holds the rest, one click away. The pen and Type never leave it. The Pen switches are for this person or for
+// this note, with what the pen has learned of this person's hand. Like every button in the rows, none takes the focus.
+import { StrokeWidth, type AnyColor, type Color, type Doc, type PenButton, type PenSettings, type SymbolKind, type TidyRules } from '@shellnote/core'
+import { Brush, ChevronDown, Ellipsis, Eraser, Hand, Highlighter, Image, Lasso, Pen, Pencil, PenLine, PenTool, Redo2, SlidersHorizontal, Type, Undo2, WandSparkles, type LucideIcon } from 'lucide-react'
+import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { BarMenu, keepFocus, MenuItem } from '../BarMenu.js'
-import { PictureButton, UndoRedo } from '../BarParts.js'
+import { RedoButton, UndoButton, usePictures } from '../BarParts.js'
 import { ColourMenu } from '../ColourMenu.js'
 import { commands } from '../commands/index.js'
 import { optionOf, valueWord } from '../commands/pen.js'
 import { eraserWord, widthWord } from '../commands/tools.js'
 import { useDismiss } from '../dismiss.js'
+import { REDO_KEY, UNDO_KEY } from '../keys.js'
+import { penRow, underPenMore } from '../layout/custom.js'
 import { placeMenu } from '../popover.js'
 import type { EditorStore, Tool } from '../store.js'
+import { PEN_LOOK } from '../typingButtons.js'
 import { ERASER_RADIUS, lastInput, myPenSettings, penChoice, penProfile, penSettings, penSettingsFor, tidyBox, tidyRules, developerMode, typicalPressure, type EraserSize, type LastInput, type PenChoice } from './settings.js'
 
 const ICON = 18
@@ -32,22 +36,33 @@ const ERASER_SIZES: [EraserSize, string][] = [
   ['m', 'Medium eraser'],
   ['l', 'Large eraser'],
 ]
-/** The four colours kept in reach; every other is under Colour. */
-const INKS: [Color, string][] = [
-  ['ink', 'Black'],
-  ['blue', 'Blue'],
-  ['red', 'Red'],
-  ['green', 'Green'],
-]
 /** A width as a dot that grows with it, so the choice reads at a glance. */
 const dot = (width: StrokeWidth): CSSProperties => {
   const size = 3 + StrokeWidth.options.indexOf(width) * 2.5
   return { width: size, height: size }
 }
 
+/** The colours in reach: each a button of its own, drawn as its dot. */
+const DOTS: ReadonlySet<PenButton> = new Set(['black', 'blue', 'red', 'green', 'grey', 'orange', 'yellow', 'purple'])
+/** The note's colours, as More shows them when a colour, or More colours, is not in the row. */
+const NAMED: [Color, string][] = [
+  ['ink', 'Black'],
+  ['gray', 'Grey'],
+  ['red', 'Red'],
+  ['orange', 'Orange'],
+  ['yellow', 'Yellow'],
+  ['green', 'Green'],
+  ['blue', 'Blue'],
+  ['purple', 'Purple'],
+]
+
 export function PenBar({ store }: { store: EditorStore }) {
   const tool = useSyncExternalStore(store.subscribeTool, store.toolSnapshot)
   const choice = useSyncExternalStore(penChoice.subscribe, penChoice.snapshot)
+  const doc = useSyncExternalStore(store.subscribe, store.snapshot)
+  useSyncExternalStore(penSettings.subscribe, penSettings.snapshot)
+  const row = useSyncExternalStore(penRow.subscribe, penRow.snapshot)
+  const pictures = usePictures(store)
   const [settings, setSettings] = useState(false)
   const highlighter = tool === 'highlighter'
   const eraser = tool === 'eraser'
@@ -57,119 +72,168 @@ export function PenBar({ store }: { store: EditorStore }) {
   const paint = (next: AnyColor): void => void commands.do(command, { colour: next })
   const choose = (next: Tool): void => void commands.do('tool.choose', { tool: next })
   const KindNow = KINDS.find(([kind]) => kind === choice.kind)?.[2] ?? PenLine
-  return (
-    <div className="sh-tools nw-penbar" role="toolbar" aria-label={eraser ? 'Eraser' : highlighter ? 'Highlighter' : 'Pen'}>
-      <button type="button" className="sh-b" aria-label="Select" aria-pressed={tool === 'select'} title="Select: draw a box to take only what is inside it" data-command="tool.choose" onMouseDown={keepFocus} onClick={() => choose('select')}>
-        <Lasso size={ICON} aria-hidden />
-      </button>
-      <button type="button" className="sh-b" aria-label="Move the sheet" aria-pressed={tool === 'hand'} title="Move the sheet: drag it to look along it, writing nothing" data-command="tool.choose" onMouseDown={keepFocus} onClick={() => choose('hand')}>
-        <Hand size={ICON} aria-hidden />
-      </button>
-      <span className="sh-sep" />
-      <BarMenu
-        label="Pen"
-        title="Pen: write and draw; hold still at the end for a straight line or a shape. Pressed again: its kinds and settings"
-        pressed={tool === 'pen'}
-        onPress={() => {
-          // In hand already, the press opens its kinds; else it takes the pen up.
-          if (tool === 'pen') return true
-          choose('pen')
-          return false
-        }}
-        button={
-          <>
-            <KindNow size={ICON} aria-hidden />
-            <ChevronDown size={ARROW} aria-hidden />
-          </>
-        }
+  const tidyOff = penSettingsFor(doc).neaten === 'off'
+  // What applies now: no colours and no width while erasing; no wand with the highlighter or the eraser.
+  const applies = (button: PenButton): boolean => !(eraser && PEN_LOOK[button].group === 'colour') && !((highlighter || eraser) && button === 'tidy')
+  // The buttons the person keeps in the row, in their order; More holds the rest.
+  const inTheRow = row.filter(applies)
+  const inTheMore = underPenMore(row).filter(applies)
+  // A colour not in reach, or More colours under More: the note's colours there, once.
+  const coloursUnderMore = inTheMore.some((button) => DOTS.has(button) || button === 'colour')
+
+  /** A colour in reach: its dot. */
+  const dotOf = (button: PenButton): ReactNode => {
+    const named = PEN_LOOK[button].colour!
+    const label = PEN_LOOK[button].label
+    return (
+      <button
+        key={button}
+        type="button"
+        role="radio"
+        className="sh-dot"
+        aria-label={label}
+        title={label}
+        aria-checked={colour === named}
+        style={{ '--c': `var(--nw-${highlighter ? 'hl-' : ''}${named})` } as CSSProperties}
+        data-command={command}
+        onMouseDown={keepFocus}
+        onClick={() => paint(named)}
       >
-        {(close) => (
-          <>
-            {KINDS.map(([kind, label, Icon]) => (
-              <MenuItem key={kind} checked={choice.kind === kind} command="pen.set" onChoose={() => void commands.do('pen.set', { kind })}>
-                <Icon size={ICON} aria-hidden />
-                {label}
-              </MenuItem>
-            ))}
-            <hr />
-            <MenuItem
-              label="Pen settings"
-              title="Pen settings: fingers, lines, shapes, smoothing"
-              onChoose={() => {
-                close()
-                setSettings(true)
-              }}
-            >
-              <SlidersHorizontal size={ICON} aria-hidden />
-              Pen settings…
-            </MenuItem>
-          </>
-        )}
-      </BarMenu>
-      {settings ? <PenPanel store={store} onClose={() => setSettings(false)} /> : null}
-      <button type="button" className="sh-b" aria-label="Highlighter" aria-pressed={highlighter} title="Highlighter: mark over words and ink" data-command="tool.choose" onMouseDown={keepFocus} onClick={() => choose('highlighter')}>
-        <Highlighter size={ICON} aria-hidden />
+        <i />
       </button>
-      <BarMenu
-        label="Eraser"
-        title="Eraser: whole strokes, or the part of a stroke it passes over. Pressed again: its way and size"
-        pressed={eraser}
-        onPress={() => {
-          if (eraser) return true
-          choose('eraser')
-          return false
-        }}
-        button={
-          <>
-            <Eraser size={ICON} aria-hidden />
-            <ChevronDown size={ARROW} aria-hidden />
-          </>
-        }
-      >
-        {() => (
-          <>
-            <div className="sh-menu-head">Eraser takes</div>
-            <MenuItem checked={choice.eraser === 'stroke'} title="Whole strokes: a touch takes the whole stroke" command="eraser.set" onChoose={() => void commands.do('eraser.set', { erase: 'whole' })}>
-              Whole strokes
-            </MenuItem>
-            <MenuItem checked={choice.eraser === 'part'} title="Part of a stroke: only what the eraser passes over" command="eraser.set" onChoose={() => void commands.do('eraser.set', { erase: 'part' })}>
-              Part of a stroke
-            </MenuItem>
-            <div className="sh-menu-head">Size</div>
-            {ERASER_SIZES.map(([size, label]) => (
-              <MenuItem key={size} checked={choice.eraserSize === size} command="eraser.set" onChoose={() => void commands.do('eraser.set', { size: eraserWord(size) })}>
-                <span className="sh-weight" aria-hidden>
-                  <i style={{ width: 4 + ERASER_RADIUS[size] / 40, height: 4 + ERASER_RADIUS[size] / 40 }} />
-                </span>
-                {label}
-              </MenuItem>
-            ))}
-          </>
-        )}
-      </BarMenu>
-      <span className="sh-sep" />
-      {eraser ? null : (
-        <>
-          <span role="radiogroup" aria-label="Colours in reach" style={{ display: 'contents' }}>
-            {INKS.map(([name, label]) => (
-              <button
-                key={name}
-                type="button"
-                role="radio"
-                className="sh-dot"
-                aria-label={label}
-                title={label}
-                aria-checked={colour === name}
-                style={{ '--c': `var(--nw-${highlighter ? 'hl-' : ''}${name})` } as CSSProperties}
-                data-command={command}
-                onMouseDown={keepFocus}
-                onClick={() => paint(name)}
-              >
-                <i />
-              </button>
-            ))}
-          </span>
-          <ColourMenu current={colour} onNamed={paint} onCode={(code) => paint(code as AnyColor)} highlighter={highlighter} look="more" />
+    )
+  }
+
+  /** The pen's kinds, and its settings. */
+  function penChoices(close: () => void): ReactNode {
+    return (
+      <>
+        {KINDS.map(([kind, label, Icon]) => (
+          <MenuItem key={kind} checked={choice.kind === kind} command="pen.set" onChoose={() => void commands.do('pen.set', { kind })}>
+            <Icon size={ICON} aria-hidden />
+            {label}
+          </MenuItem>
+        ))}
+        <hr />
+        <MenuItem
+          label="Pen settings"
+          title="Pen settings: fingers, lines, shapes, smoothing"
+          onChoose={() => {
+            close()
+            setSettings(true)
+          }}
+        >
+          <SlidersHorizontal size={ICON} aria-hidden />
+          Pen settings…
+        </MenuItem>
+      </>
+    )
+  }
+
+  /** The eraser's way and its size, in its menu or under More. */
+  function eraserChoices(): ReactNode {
+    return (
+      <>
+        <div className="sh-menu-head">Eraser takes</div>
+        <MenuItem checked={choice.eraser === 'stroke'} title="Whole strokes: a touch takes the whole stroke" command="eraser.set" onChoose={() => void commands.do('eraser.set', { erase: 'whole' })}>
+          Whole strokes
+        </MenuItem>
+        <MenuItem checked={choice.eraser === 'part'} title="Part of a stroke: only what the eraser passes over" command="eraser.set" onChoose={() => void commands.do('eraser.set', { erase: 'part' })}>
+          Part of a stroke
+        </MenuItem>
+        <div className="sh-menu-head">Size</div>
+        {ERASER_SIZES.map(([size, label]) => (
+          <MenuItem key={size} checked={choice.eraserSize === size} command="eraser.set" onChoose={() => void commands.do('eraser.set', { size: eraserWord(size) })}>
+            <span className="sh-weight" aria-hidden>
+              <i style={{ width: 4 + ERASER_RADIUS[size] / 40, height: 4 + ERASER_RADIUS[size] / 40 }} />
+            </span>
+            {label}
+          </MenuItem>
+        ))}
+      </>
+    )
+  }
+
+  /** The widths, in their menu or under More. */
+  function widthChoices(): ReactNode {
+    return StrokeWidth.options.map((value) => (
+      <MenuItem key={value} checked={width === value} command={command} onChoose={() => void commands.do(command, { width: widthWord(value) })}>
+        <span className="sh-weight" aria-hidden>
+          <i style={dot(value)} />
+        </span>
+        {WIDTH_NAMES[value]}
+      </MenuItem>
+    ))
+  }
+
+  /** A button in the row. */
+  const inRow = (button: PenButton): ReactNode => {
+    switch (button) {
+      case 'select':
+        return (
+          <button type="button" className="sh-b" aria-label="Select" aria-pressed={tool === 'select'} title="Select: draw a box to take only what is inside it" data-command="tool.choose" onMouseDown={keepFocus} onClick={() => choose('select')}>
+            <Lasso size={ICON} aria-hidden />
+          </button>
+        )
+      case 'hand':
+        return (
+          <button type="button" className="sh-b" aria-label="Move the sheet" aria-pressed={tool === 'hand'} title="Move the sheet: drag it to look along it, writing nothing" data-command="tool.choose" onMouseDown={keepFocus} onClick={() => choose('hand')}>
+            <Hand size={ICON} aria-hidden />
+          </button>
+        )
+      case 'pen':
+        return (
+          <BarMenu
+            label="Pen"
+            title="Pen: write and draw; hold still at the end for a straight line or a shape. Pressed again: its kinds and settings"
+            pressed={tool === 'pen'}
+            onPress={() => {
+              // In hand already, the press opens its kinds; else it takes the pen up.
+              if (tool === 'pen') return true
+              choose('pen')
+              return false
+            }}
+            button={
+              <>
+                <KindNow size={ICON} aria-hidden />
+                <ChevronDown size={ARROW} aria-hidden />
+              </>
+            }
+          >
+            {(close) => penChoices(close)}
+          </BarMenu>
+        )
+      case 'highlighter':
+        return (
+          <button type="button" className="sh-b" aria-label="Highlighter" aria-pressed={highlighter} title="Highlighter: mark over words and ink" data-command="tool.choose" onMouseDown={keepFocus} onClick={() => choose('highlighter')}>
+            <Highlighter size={ICON} aria-hidden />
+          </button>
+        )
+      case 'eraser':
+        return (
+          <BarMenu
+            label="Eraser"
+            title="Eraser: whole strokes, or the part of a stroke it passes over. Pressed again: its way and size"
+            pressed={eraser}
+            onPress={() => {
+              if (eraser) return true
+              choose('eraser')
+              return false
+            }}
+            button={
+              <>
+                <Eraser size={ICON} aria-hidden />
+                <ChevronDown size={ARROW} aria-hidden />
+              </>
+            }
+          >
+            {() => eraserChoices()}
+          </BarMenu>
+        )
+      case 'colour':
+        return <ColourMenu current={colour} onNamed={paint} onCode={(code) => paint(code as AnyColor)} highlighter={highlighter} look="more" />
+      case 'width':
+        return (
           <BarMenu
             label="Width"
             title="Width: fine to broad"
@@ -182,42 +246,251 @@ export function PenBar({ store }: { store: EditorStore }) {
               </>
             }
           >
-            {() =>
-              StrokeWidth.options.map((value) => (
-                <MenuItem key={value} checked={width === value} command={command} onChoose={() => void commands.do(command, { width: widthWord(value) })}>
-                  <span className="sh-weight" aria-hidden>
-                    <i style={dot(value)} />
-                  </span>
-                  {WIDTH_NAMES[value]}
-                </MenuItem>
-              ))
-            }
+            {() => widthChoices()}
           </BarMenu>
-          <span className="sh-sep" />
-        </>
-      )}
-      <UndoRedo store={store} />
-      <span className="sh-sep" />
-      {highlighter || eraser ? null : <TidyButton store={store} />}
-      <button type="button" className="sh-b" aria-label="Type" title="Type: back to writing words, and their row" data-command="tool.choose" onMouseDown={keepFocus} onClick={() => choose('type')}>
-        <Type size={ICON} aria-hidden />
-      </button>
-      <PictureButton store={store} />
+        )
+      case 'undo':
+        return <UndoButton store={store} />
+      case 'redo':
+        return <RedoButton store={store} />
+      case 'tidy':
+        return <TidyButton off={tidyOff} />
+      case 'type':
+        return (
+          <button type="button" className="sh-b" aria-label="Type" title="Type: back to writing words, and their row" data-command="tool.choose" onMouseDown={keepFocus} onClick={() => choose('type')}>
+            <Type size={ICON} aria-hidden />
+          </button>
+        )
+      case 'picture':
+        return (
+          <button type="button" className="sh-b" aria-label="Picture" title="Add a picture: at the caret, or on the page" onMouseDown={keepFocus} onClick={pictures.choose}>
+            <Image size={ICON} aria-hidden />
+          </button>
+        )
+      default:
+        return dotOf(button)
+    }
+  }
+
+  /** A button under More: a line to choose, or a menu's choices under its name. The colours are drawn once, after. */
+  const inMore = (button: PenButton, close: () => void): ReactNode => {
+    switch (button) {
+      case 'select':
+        return (
+          <MenuItem
+            label="Select"
+            checked={tool === 'select'}
+            command="tool.choose"
+            onChoose={() => {
+              choose('select')
+              close()
+            }}
+          >
+            <Lasso size={ICON} aria-hidden />
+            Select
+          </MenuItem>
+        )
+      case 'hand':
+        return (
+          <MenuItem
+            label="Move the sheet"
+            checked={tool === 'hand'}
+            command="tool.choose"
+            onChoose={() => {
+              choose('hand')
+              close()
+            }}
+          >
+            <Hand size={ICON} aria-hidden />
+            Move the sheet
+          </MenuItem>
+        )
+      case 'highlighter':
+        return (
+          <MenuItem
+            label="Highlighter"
+            checked={highlighter}
+            command="tool.choose"
+            onChoose={() => {
+              choose('highlighter')
+              close()
+            }}
+          >
+            <Highlighter size={ICON} aria-hidden />
+            Highlighter
+          </MenuItem>
+        )
+      case 'eraser':
+        return (
+          <>
+            <MenuItem
+              label="Eraser"
+              checked={eraser}
+              command="tool.choose"
+              onChoose={() => {
+                choose('eraser')
+                close()
+              }}
+            >
+              <Eraser size={ICON} aria-hidden />
+              Eraser
+            </MenuItem>
+            {eraserChoices()}
+          </>
+        )
+      case 'width':
+        return (
+          <>
+            <div className="sh-menu-head">Width</div>
+            {widthChoices()}
+          </>
+        )
+      case 'undo':
+        return (
+          <MenuItem label="Undo" disabled={!store.canUndo} command="edit.undo" onChoose={() => void commands.do('edit.undo')}>
+            <Undo2 size={ICON} aria-hidden />
+            Undo<kbd>{UNDO_KEY}</kbd>
+          </MenuItem>
+        )
+      case 'redo':
+        return (
+          <MenuItem label="Redo" disabled={!store.canRedo} command="edit.redo" onChoose={() => void commands.do('edit.redo')}>
+            <Redo2 size={ICON} aria-hidden />
+            Redo<kbd>{REDO_KEY}</kbd>
+          </MenuItem>
+        )
+      case 'tidy':
+        return (
+          <MenuItem
+            label="Tidy handwriting"
+            title={tidyOff ? 'Tidy handwriting is off in Pen settings' : 'Tidy handwriting: drag a box over the writing to tidy it and level each line (one undo)'}
+            disabled={tidyOff}
+            onChoose={() => {
+              tidyBox.set(true)
+              close()
+            }}
+          >
+            <WandSparkles size={ICON} aria-hidden />
+            Tidy handwriting
+          </MenuItem>
+        )
+      case 'picture':
+        return (
+          <MenuItem
+            label="Picture"
+            title="Add a picture: at the caret, or on the page"
+            onChoose={() => {
+              close()
+              pictures.choose()
+            }}
+          >
+            <Image size={ICON} aria-hidden />
+            Picture…
+          </MenuItem>
+        )
+      default:
+        return null
+    }
+  }
+
+  // The row: a thin line where one group meets another; the colours in reach side by side, one group of choices.
+  const pieces: ReactNode[] = []
+  let dots: ReactNode[] = []
+  const endDots = (): void => {
+    if (dots.length === 0) return
+    pieces.push(
+      <span key={`dots-${pieces.length}`} role="radiogroup" aria-label="Colours in reach" style={{ display: 'contents' }}>
+        {dots}
+      </span>,
+    )
+    dots = []
+  }
+  inTheRow.forEach((button, i) => {
+    const before = inTheRow[i - 1]
+    if (before !== undefined && PEN_LOOK[button].group !== PEN_LOOK[before].group) {
+      endDots()
+      pieces.push(<span key={`line-${i}`} className="sh-sep" />)
+    }
+    if (DOTS.has(button)) dots.push(dotOf(button))
+    else {
+      endDots()
+      pieces.push(<Fragment key={button}>{inRow(button)}</Fragment>)
+    }
+  })
+  endDots()
+
+  return (
+    <div className="sh-tools nw-penbar" role="toolbar" aria-label={eraser ? 'Eraser' : highlighter ? 'Highlighter' : 'Pen'}>
+      {pieces}
+      {settings ? <PenPanel store={store} onClose={() => setSettings(false)} /> : null}
+      {pictures.input}
+      <TidyStatus off={tidyOff} />
+      {inTheMore.length > 0 ? (
+        <BarMenu label="More" title="The pen's row's other buttons" button={<Ellipsis size={ICON} aria-hidden />}>
+          {(close) => (
+            <>
+              {inTheMore.map((button) => (
+                <Fragment key={button}>{inMore(button, close)}</Fragment>
+              ))}
+              {coloursUnderMore ? (
+                <>
+                  <div className="sh-menu-head">Colour</div>
+                  <div className="sh-swatches" role="radiogroup" aria-label="Colour">
+                    {NAMED.map(([named, label]) => (
+                      <button
+                        key={named}
+                        type="button"
+                        role="radio"
+                        className="sh-swatch"
+                        aria-label={label}
+                        title={label}
+                        aria-checked={colour === named}
+                        style={{ '--swatch': `var(--nw-${highlighter ? 'hl-' : ''}${named})` } as CSSProperties}
+                        data-command={command}
+                        onMouseDown={keepFocus}
+                        onClick={() => {
+                          paint(named)
+                          close()
+                        }}
+                      />
+                    ))}
+                  </div>
+                </>
+              ) : null}
+            </>
+          )}
+        </BarMenu>
+      ) : null}
     </div>
   )
 }
 
-/**
- * The wand: tapped, the next drag on the page is a box, and the
- * handwriting in it is tidied, each row levelled, as one undo step (the pen
- * layer draws the box); "Whole note" does every page instead. Tapped again,
- * or Escape, and it is put away. Off when Tidy handwriting is switched off.
- */
-function TidyButton({ store }: { store: EditorStore }) {
-  const doc = useSyncExternalStore(store.subscribe, store.snapshot)
-  useSyncExternalStore(penSettings.subscribe, penSettings.snapshot)
+/** The wand: tapped, the next drag on the page is a box, and the handwriting in it is tidied (TidyStatus says so). */
+function TidyButton({ off }: { off: boolean }) {
   const boxing = useSyncExternalStore(tidyBox.subscribe, tidyBox.snapshot)
-  const off = penSettingsFor(doc).neaten === 'off'
+  return (
+    <button
+      type="button"
+      className="nw-ibtn"
+      aria-label="Tidy handwriting"
+      aria-pressed={boxing}
+      disabled={off}
+      title={off ? 'Tidy handwriting is off in Pen settings' : boxing ? 'Put the wand away (Escape)' : 'Tidy handwriting: drag a box over the writing to tidy it and level each line (one undo)'}
+      onMouseDown={keepFocus}
+      onClick={() => tidyBox.set(!boxing)}
+    >
+      <WandSparkles size={ICON} aria-hidden />
+    </button>
+  )
+}
+
+/**
+ * While the wand is out, wherever its button is (in the row or under More): the handwriting in the next box dragged
+ * on the page is tidied, each row levelled, as one undo step (the pen layer draws the box); "Whole note" does every
+ * page instead. Escape, another tool, or Tidy handwriting switched off, and it is put away.
+ */
+function TidyStatus({ off }: { off: boolean }) {
+  const boxing = useSyncExternalStore(tidyBox.subscribe, tidyBox.snapshot)
   useEffect(() => {
     if (off) tidyBox.set(false)
   }, [off])
@@ -231,31 +504,14 @@ function TidyButton({ store }: { store: EditorStore }) {
     window.addEventListener('keydown', key)
     return () => window.removeEventListener('keydown', key)
   }, [boxing])
-  /** Every page's handwriting tidied, one undo step (tidy.note). */
-  const whole = (): void => commands.tap('tidy.note')
+  if (!boxing) return null
   return (
-    <>
-      <button
-        type="button"
-        className="nw-ibtn"
-        aria-label="Tidy handwriting"
-        aria-pressed={boxing}
-        disabled={off}
-        title={off ? 'Tidy handwriting is off in Pen settings' : boxing ? 'Put the wand away (Escape)' : 'Tidy handwriting: drag a box over the writing to tidy it and level each line (one undo)'}
-        onMouseDown={keepFocus}
-        onClick={() => tidyBox.set(!boxing)}
-      >
-        <WandSparkles size={ICON} aria-hidden />
+    <span className="nw-tidy-box" role="status">
+      <span>Drag over the writing</span>
+      <button type="button" className="nw-tidy-whole" data-command="tidy.note" onMouseDown={keepFocus} onClick={() => commands.tap('tidy.note')}>
+        Whole note
       </button>
-      {boxing ? (
-        <span className="nw-tidy-box" role="status">
-          <span>Drag over the writing</span>
-          <button type="button" className="nw-tidy-whole" data-command="tidy.note" onMouseDown={keepFocus} onClick={whole}>
-            Whole note
-          </button>
-        </span>
-      ) : null}
-    </>
+    </span>
   )
 }
 

@@ -232,7 +232,7 @@
   flex: none;
   color: var(--sh-text-3);
 }
-.set-tool > span {
+.set-tool > span:not(.set-dot) {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -471,4 +471,23 @@
   .set-edit-by {
     grid-column: 1;
   }
+}
+
+/* A colour in reach of the pen's row: its own dot, in the list and in the row as it shows. */
+.set-dot {
+  flex: none;
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  /* A ring in the theme's own line colour, so black reads on a dark page too. */
+  box-shadow: 0 0 0 1px var(--sh-line-2);
+}
+/* A button that never leaves its row: said so where its minus would be. */
+.set-kept {
+  flex: none;
+  padding: 0 8px;
+  color: var(--sh-text-3);
+  font: 11px/1 var(--ui-font);
+  font-style: normal;
 }

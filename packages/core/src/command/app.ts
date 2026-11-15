@@ -409,9 +409,9 @@ export const APP_COMMANDS: readonly CommandSpec[] = [
   },
   {
     name: 'bar.button',
-    does: "Put a button in the bar for typing (on), at a place counted from its start (position; left out, at its end), or take it out (off) to the bar's More menu, where it stays one click away",
+    does: "Put a button in a row of tools (on), at a place counted from its start (position; left out, at its end), or take it out (off) to that row's More menu, where it stays one click away: the bar for typing's (tools left out), or the pen's row's (tools=pen), where the pen and Type always stay",
     says: ['put the {button} button in the toolbar', 'take the {button} button out of the toolbar', 'add the {button} button to the bar', 'remove the {button} button from the toolbar'],
-    input: inputs(['button', 'on'], ['position']),
+    input: inputs(['button', 'on'], ['position', 'tools']),
     example: { button: 'table', on: false },
   },
   {
@@ -423,7 +423,7 @@ export const APP_COMMANDS: readonly CommandSpec[] = [
   },
   {
     name: 'layout.reset',
-    does: "Put things back as they started, on this device: the places of the panels, the bars and the library's column, and the library as cards (places, or left out); the app's look (look); the bar for typing's buttons (tools); or all of it (all)",
+    does: "Put things back as they started, on this device: the places of the panels, the bars and the library's column, and the library as cards (places, or left out); the app's look (look); the bar for typing's buttons (tools); the pen's row's buttons (pen); or all of it (all)",
     says: ['reset the layout', 'put the panels back', 'default layout', 'restore the workspace'],
     input: inputs([], ['part']),
     example: { part: 'all' },

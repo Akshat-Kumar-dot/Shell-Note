@@ -1,10 +1,10 @@
 // The view, the panels and choosing blocks, as commands (app control, step
 // 3a): each does what its button did, and the buttons now call them.
-import { blockDetail, blockOf, blocksList, type Box, type Doc, type TypingButton } from '@shellnote/core'
+import { blockDetail, blockOf, blocksList, type Box, type Doc, type PenButton, type TypingButton } from '@shellnote/core'
 import { clampZoom, stepZoom } from '../geometry.js'
 import { placesReset, putButton, resetCustom, setAppLook, type AppLook } from '../layout/custom.js'
 import { dockPanel, workspace as layout, resetWorkspace, setBar, setSideOpen, type BarId } from '../layout/state.js'
-import { TYPING_LOOK } from '../typingButtons.js'
+import { PEN_LOOK, TYPING_LOOK } from '../typingButtons.js'
 import { showSideTab, sideTab, type SideTab } from '../layout/sideTab.js'
 import type { Commands } from './run.js'
 
@@ -79,17 +79,21 @@ export function defineView(commands: Commands): void {
     }
     if (all || part === 'look') resetCustom('look')
     if (all || part === 'tools') resetCustom('tools')
-    if (all) return "everything as it starts: the look, the bar for typing, the panels, the bars and the library's column"
+    if (all || part === 'pen') resetCustom('pen')
+    if (all) return "everything as it starts: the look, the bar for typing, the pen's row, the panels, the bars and the library's column"
     if (part === 'look') return 'the look as it starts: flat'
     if (part === 'tools') return 'the bar for typing as it starts'
+    if (part === 'pen') return "the pen's row as it starts"
     return 'panels and bars where they start'
   })
-  commands.define('bar.button', [], ({ button, on, position }) => {
-    const which = button as TypingButton
-    const bar = putButton(which, on !== false, position as number | undefined)
-    const label = TYPING_LOOK[which].label
-    if (on === false) return `${label} is under the bar's More, one click away`
-    return `${label} is in the bar for typing, ${bar.indexOf(which) + 1} of ${bar.length}`
+  commands.define('bar.button', [], ({ button, on, position, tools }) => {
+    const pen = tools === 'pen'
+    const which = String(button)
+    // A button the row has not is refused there, with the row's own buttons named.
+    const row = putButton(which as TypingButton | PenButton, on !== false, position as number | undefined, pen ? 'pen' : 'typing')
+    const label = pen ? PEN_LOOK[which as PenButton].label : TYPING_LOOK[which as TypingButton].label
+    if (on === false) return `${label} is under ${pen ? "the pen's row's" : "the bar's"} More, one click away`
+    return `${label} is in ${pen ? "the pen's row" : 'the bar for typing'}, ${row.indexOf(which) + 1} of ${row.length}`
   })
   commands.define('layout.look', [], ({ shell }) => {
     const look = shell as AppLook

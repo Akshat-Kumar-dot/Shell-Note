@@ -1,17 +1,24 @@
-// The buttons the bar for typing can hold: each one's name, its icon, and the group it sits with (a thin line is drawn
-// where one group meets another). The bar draws those the person keeps in it, in their order; More holds the rest.
-import type { TypingButton } from '@shellnote/core'
+// The buttons the two rows of tools can hold, the bar for typing's and the pen's row's: each one's name, its icon, and
+// the group it sits with (a thin line is drawn where one group meets another). A row draws those the person keeps in
+// it, in their order; its More holds the rest.
+import type { Color, PenButton, TypingButton } from '@shellnote/core'
 import {
   AlignLeft,
   ALargeSmall,
   Baseline,
   Bold,
+  CircleDot,
   Code,
+  Eraser,
+  Hand,
   Highlighter,
   Image,
   Italic,
+  Lasso,
   Link,
   ListChecks,
+  Palette,
+  PenLine,
   Pilcrow,
   Redo2,
   SquareDashedMousePointer,
@@ -19,8 +26,10 @@ import {
   Subscript,
   Superscript,
   Table2,
+  Type,
   Underline,
   Undo2,
+  WandSparkles,
   Workflow,
   type LucideIcon,
 } from 'lucide-react'
@@ -48,4 +57,33 @@ export const TYPING_LOOK: Readonly<Record<TypingButton, { label: string; icon: L
   todo: { label: 'To-do list', icon: ListChecks, group: 'words' },
   diagram: { label: 'Diagram', icon: Workflow, group: 'insert' },
   select: { label: 'Select with a box', icon: SquareDashedMousePointer, group: 'pointer' },
+}
+
+export type PenGroup = 'move' | 'ink' | 'colour' | 'history' | 'end'
+
+/**
+ * The pen's row's buttons. A colour in reach has its colour and no icon of its own: it is drawn as its dot. The pen
+ * and Type are kept: they never leave the row.
+ */
+export const PEN_LOOK: Readonly<Record<PenButton, { label: string; icon: LucideIcon; group: PenGroup; colour?: Color; kept?: true }>> = {
+  select: { label: 'Select', icon: Lasso, group: 'move' },
+  hand: { label: 'Move the sheet', icon: Hand, group: 'move' },
+  pen: { label: 'Pen', icon: PenLine, group: 'ink', kept: true },
+  highlighter: { label: 'Highlighter', icon: Highlighter, group: 'ink' },
+  eraser: { label: 'Eraser', icon: Eraser, group: 'ink' },
+  black: { label: 'Black', icon: CircleDot, group: 'colour', colour: 'ink' },
+  blue: { label: 'Blue', icon: CircleDot, group: 'colour', colour: 'blue' },
+  red: { label: 'Red', icon: CircleDot, group: 'colour', colour: 'red' },
+  green: { label: 'Green', icon: CircleDot, group: 'colour', colour: 'green' },
+  grey: { label: 'Grey', icon: CircleDot, group: 'colour', colour: 'gray' },
+  orange: { label: 'Orange', icon: CircleDot, group: 'colour', colour: 'orange' },
+  yellow: { label: 'Yellow', icon: CircleDot, group: 'colour', colour: 'yellow' },
+  purple: { label: 'Purple', icon: CircleDot, group: 'colour', colour: 'purple' },
+  colour: { label: 'More colours', icon: Palette, group: 'colour' },
+  width: { label: 'Width', icon: CircleDot, group: 'colour' },
+  undo: { label: 'Undo', icon: Undo2, group: 'history' },
+  redo: { label: 'Redo', icon: Redo2, group: 'history' },
+  tidy: { label: 'Tidy handwriting', icon: WandSparkles, group: 'end' },
+  type: { label: 'Type', icon: Type, group: 'end', kept: true },
+  picture: { label: 'Picture', icon: Image, group: 'end' },
 }
