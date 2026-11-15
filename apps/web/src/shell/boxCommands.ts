@@ -1,0 +1,213 @@
+// What the command box offers: each command a person may run from the box, by a short name of its own and its icon,
+// some as several lines with their choice made (Zoom in, Zoom out; each section of Settings). A command that is the
+// agent's alone, or that asks for what the box cannot hold, is left out on purpose, and says why: a test keeps every
+// command of the app on one list or the other.
+import {
+  ArrowUpDown,
+  Captions,
+  ClipboardList,
+  Clock,
+  Columns2,
+  Disc,
+  Eraser,
+  FileMinus,
+  FilePlus,
+  FileText,
+  Flag,
+  FolderOpen,
+  FolderPlus,
+  Grid2x2,
+  Hand,
+  Highlighter,
+  ImagePlus,
+  Layers,
+  LayoutGrid,
+  Library,
+  Maximize,
+  Maximize2,
+  MessageSquare,
+  Moon,
+  MousePointer2,
+  Palette,
+  PanelLeft,
+  PanelRight,
+  PanelRightClose,
+  PanelsTopLeft,
+  Pause,
+  Pencil,
+  PenLine,
+  PictureInPicture2,
+  Play,
+  Printer,
+  Redo2,
+  RotateCcw,
+  Ruler,
+  Rows3,
+  Save,
+  Scan,
+  Search,
+  Settings,
+  ShieldCheck,
+  Sparkles,
+  SquareDashed,
+  SquarePen,
+  StretchVertical,
+  SunMoon,
+  Timer,
+  TimerReset,
+  Trash2,
+  Undo2,
+  Video,
+  VideoOff,
+  WandSparkles,
+  Workflow,
+  X,
+  ZoomIn,
+  ZoomOut,
+  type LucideIcon,
+} from 'lucide-react'
+
+/** A line the box offers: its name, its icon, a choice already made, and the choices it may ask for, when fewer than its input's own. */
+export interface BoxLine {
+  title: string
+  icon: LucideIcon
+  input?: Record<string, unknown>
+  values?: Record<string, readonly string[]>
+}
+
+const SECTIONS: [string, string][] = [
+  ['general', 'General: the keys'],
+  ['appearance', 'Appearance'],
+  ['customise', 'Customise'],
+  ['pen', 'Pen'],
+  ['ai', 'AI'],
+  ['assistants', 'Assistants'],
+  ['storage', 'Sync and storage'],
+  ['about', 'About'],
+]
+
+/** Each command the box offers, by the name the box gives it: one line, or several with a choice made. */
+export const BOX: Readonly<Record<string, BoxLine | readonly BoxLine[]>> = {
+  // the library
+  'library.open': { title: 'Go to the library', icon: Library },
+  'library.search': { title: 'Library: search the titles', icon: Search },
+  'library.findWords': { title: 'Search in every note', icon: Search },
+  'library.sort': [
+    { title: 'Library: sort, newest first', icon: ArrowUpDown, input: { by: 'edited', order: 'newest' } },
+    { title: 'Library: sort, oldest first', icon: ArrowUpDown, input: { by: 'edited', order: 'oldest' } },
+  ],
+  'library.filter': { title: 'Library: show one kind (text, sketch, mixed)', icon: Layers },
+  'library.look': { title: 'Library: show as cards or a list', icon: LayoutGrid },
+  'library.column': { title: 'Library column: left, right or hidden', icon: PanelLeft },
+  'bin.open': { title: 'Open Recently deleted', icon: Trash2 },
+  'bin.empty': { title: 'Empty Recently deleted', icon: Trash2 },
+  // notes, files
+  'note.new': { title: 'New note', icon: FilePlus },
+  'note.editHere': { title: 'Edit this note here', icon: SquarePen },
+  'note.close': { title: 'Close the note', icon: X },
+  'note.rename': { title: 'Rename the note', icon: Pencil },
+  'note.delete': { title: 'Move the note to Recently deleted', icon: Trash2 },
+  'note.kind': { title: 'Note: change its kind (text, sketch, mixed)', icon: Layers },
+  'note.seamless': { title: 'Note: no page breaks, or pages', icon: StretchVertical },
+  'note.cover': { title: 'Note: a cover picture', icon: ImagePlus },
+  'note.print': { title: 'Print, or save as PDF', icon: Printer },
+  'folder.new': { title: 'New folder', icon: FolderPlus },
+  'file.save': { title: 'Save to its file', icon: Save },
+  'file.saveAs': { title: 'Save to a new file', icon: Save },
+  'file.open': { title: 'Open a file…', icon: FolderOpen },
+  // pages
+  'page.size': { title: 'Page: change the size (A4, A5, A6, Letter)', icon: Ruler },
+  'page.paper': { title: 'Page: change the paper (blank, ruled, squares, dots)', icon: Grid2x2 },
+  'page.add': { title: 'Page: add a page', icon: FilePlus },
+  'page.remove': { title: 'Page: take a page out', icon: FileMinus },
+  'screen.page': { title: 'Go to a page', icon: FileText },
+  // the tools in hand
+  'tool.choose': { title: 'Choose a tool (type, select, pen…)', icon: MousePointer2 },
+  'pen.set': { title: 'Pen: take it up', icon: PenLine },
+  'highlighter.set': { title: 'Highlighter: take it up', icon: Highlighter },
+  'eraser.set': { title: 'Eraser: take it up', icon: Eraser },
+  'tidy.note': { title: 'Tidy all the handwriting', icon: WandSparkles },
+  'select.none': { title: 'Let go of what is chosen', icon: SquareDashed },
+  'settings.penReset': { title: 'Pen: my own settings in this note', icon: RotateCcw },
+  'settings.developer': { title: 'Pen: developer mode', icon: Hand },
+  'edit.undo': { title: 'Undo', icon: Undo2 },
+  'edit.redo': { title: 'Redo', icon: Redo2 },
+  // the view
+  'screen.zoom': [
+    { title: 'Zoom in', icon: ZoomIn, input: { step: 'in' } },
+    { title: 'Zoom out', icon: ZoomOut, input: { step: 'out' } },
+    { title: 'Zoom: actual size', icon: Scan, input: { step: 'actual' } },
+  ],
+  'screen.fullscreen': { title: 'Full screen', icon: Maximize },
+  'panel.full': { title: 'Full view: one panel fills the window', icon: Maximize2 },
+  'panel.show': { title: 'Panel: open a part (AI, description, transcript, web, timer…)', icon: PanelRight },
+  'panel.hide': { title: 'Panel: close', icon: PanelRightClose },
+  'panel.dock': { title: 'Panel: AI and Beside on the left or the right', icon: Columns2, values: { side: ['left', 'right'] } },
+  'bar.place': { title: 'Tool bar: dock it (top, bottom, left, right)', icon: Rows3, input: { bar: 'tools' } },
+  'bar.float': { title: 'Tool bar: float it over the note', icon: Rows3, input: { bar: 'tools' } },
+  'bar.turn': { title: 'Tool bar: turn it across or down', icon: Rows3, input: { bar: 'tools' } },
+  'layout.look': { title: 'Layout: change the look (flat, islands, dock)', icon: PanelsTopLeft },
+  'layout.reset': [
+    { title: 'Layout: panels and bars back where they started', icon: RotateCcw },
+    { title: 'Customise: everything back as it started', icon: RotateCcw, input: { part: 'all' } },
+  ],
+  // the video, its transcript, the timer
+  'video.show': { title: 'Video: show', icon: Video },
+  'video.hide': { title: 'Video: hide', icon: VideoOff },
+  'video.play': { title: 'Video: play', icon: Play },
+  'video.pause': { title: 'Video: pause', icon: Pause },
+  'video.seek': { title: 'Video: go to a time', icon: Clock },
+  'video.playFrom': { title: 'Video: play from a time', icon: Play },
+  'video.mark': { title: 'Video: mark a hard part', icon: Flag },
+  'video.place': { title: 'Video: dock it (top, bottom, left, right)', icon: PictureInPicture2 },
+  'video.float': { title: 'Video: float it over the note', icon: PictureInPicture2 },
+  'video.inside': { title: 'Video: back inside Beside', icon: PictureInPicture2 },
+  'video.times': { title: 'Video: the times beside the lines', icon: Clock },
+  'transcript.find': { title: 'Transcript: find words', icon: Captions },
+  'transcript.remove': { title: 'Transcript: take it out', icon: Captions },
+  'timer.start': { title: 'Timer: start', icon: Timer },
+  'timer.pause': { title: 'Timer: pause', icon: Timer },
+  'timer.stop': { title: 'Timer: stop', icon: TimerReset },
+  'timer.countdown': { title: 'Timer: count down', icon: Timer },
+  'timer.stopwatch': { title: 'Timer: stopwatch', icon: Timer },
+  // the AI
+  'ai.open': { title: 'Ask the AI about what is selected', icon: Sparkles },
+  'ai.close': { title: 'AI box: close', icon: Sparkles },
+  'ai.stop': { title: 'AI: stop', icon: Sparkles },
+  'ai.undo': { title: 'AI: undo its last change', icon: Undo2 },
+  'output.answers': { title: "AI: its answers and its log", icon: MessageSquare },
+  'output.made': { title: 'AI: what it made, on the scratch pad', icon: ClipboardList },
+  'chat.choose': { title: 'Chat: what it makes (ask, table, flowchart, summary)', icon: MessageSquare },
+  'chat.stop': { title: 'Chat: stop', icon: MessageSquare },
+  'chat.clearPicture': { title: 'Chat: take the picture away', icon: MessageSquare },
+  'chat.putAnswer': { title: 'Chat: put its answer into the note', icon: MessageSquare },
+  // settings
+  'settings.open': SECTIONS.map(([section, name]) => ({ title: `Settings: ${name}`, icon: Settings, input: { section } })),
+  'settings.accent': { title: 'Theme: choose a colour', icon: Palette },
+  'settings.theme': { title: 'Theme: light, dark or as Windows is', icon: SunMoon },
+  'settings.paper': { title: 'Theme: dark paper in the dark', icon: Moon },
+  'settings.keepStorage': { title: 'Ask the browser to keep the notes', icon: ShieldCheck },
+  'settings.assistants': { title: 'Assistants: let them reach my notes, or not', icon: Workflow },
+  'recorder.open': { title: 'Stroke recorder: teach the pen your hand', icon: Disc },
+}
+
+/** The commands the box leaves out on purpose, and why: the agent's alone, or asking for what a box cannot hold. */
+export const NOT_IN_THE_BOX: Readonly<Record<string, string>> = {
+  'note.blocks': "the agent's: the note's blocks listed by their ids",
+  'select.area': "the agent's: an area chosen by its place in millimetres",
+  'note.move': 'asks for a folder: the move dialog, from the note or its card',
+  'page.move': 'asks for where the page goes: the page buttons',
+  'bar.button': 'asks for a row and a button: Customise, in Settings',
+  'settings.tidyRule': "developer mode's: Settings, Pen",
+  'pen.forget': 'cannot be undone: Settings, Pen, asks first',
+  'chat.send': 'sends what is typed in the chat',
+  'chat.frame': "a frame of the note's own video, from its panel",
+  'pad.put': 'a thing of the scratch pad, chosen there',
+  'pad.remove': 'a thing of the scratch pad, chosen there',
+}
+
+/** The lines the box offers for a command, none for one left out. */
+export const linesOf = (command: string): readonly BoxLine[] => {
+  const lines = BOX[command]
+  return lines === undefined ? [] : 'title' in lines ? [lines as BoxLine] : (lines as readonly BoxLine[])
+}

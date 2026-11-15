@@ -39,8 +39,16 @@ test('Ctrl+P opens a note by its name, and runs a command, asking for the choice
   // Words that give the choice: it runs at once.
   await page.keyboard.press('Control+p')
   await box.fill('dark')
-  await page.getByRole('option', { name: /appearance/u }).click()
+  await page.getByRole('option', { name: /^Theme: light, dark/u }).click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  // A line that makes its own choice runs it, the chosen line showing its Enter: Settings, at Pen.
+  await page.keyboard.press('Control+p')
+  await box.fill('settings pen')
+  const chosen = page.locator('.cmd-item[aria-selected="true"]')
+  await expect(chosen).toContainText('Settings: Pen')
+  await expect(chosen.locator('.cmd-enter')).toHaveText('Enter')
+  await box.press('Enter')
+  await expect(page.getByRole('heading', { name: 'Pen', level: 1 })).toBeVisible()
   // Escape closes it, and Ctrl+P again too.
   await page.keyboard.press('Control+p')
   await expect(box).toBeFocused()

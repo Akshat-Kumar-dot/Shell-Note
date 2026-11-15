@@ -850,8 +850,8 @@ html[data-own-titlebar] .tree[data-at='right'] .tree-head {
   margin-left: auto;
 }
 .cmd-item > .cmd-enter {
+  flex: none;
   margin-left: auto;
-  color: var(--sh-text-3);
 }
 .cmd-quiet {
   margin: 0;
