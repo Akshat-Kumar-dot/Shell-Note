@@ -12,6 +12,10 @@ export const BIN = 'Recently deleted'
 /** The mark that a folder is a ShellNote library: without it, nothing in the folder is taken as deleted. */
 export const MARK = `${HIDDEN}/library.json`
 export const PEN_PROFILE = `${HIDDEN}/pen-profile.json`
+/** Whether assistants, other AI apps through ShellNote's MCP server, may reach the library: no file, they may; `{ "on": false }` stops them. */
+export const ASSISTANTS = `${HIDDEN}/assistants.json`
+/** What the assistants' file says, when there is one: only `{ "on": true }` lets them in, so a file that cannot be read keeps them out. */
+export const assistantsAllowed = (kept: unknown): boolean => typeof kept === 'object' && kept !== null && (kept as { on?: unknown }).on === true
 export const previewPath = (note: string): string => `${HIDDEN}/previews/${note}.webp`
 /** When a deleted item went, and from where: one small file for each, named after it, so two devices never write the same one for two items. */
 export const recordPath = (name: string): string => `${HIDDEN}/deleted/${name}.json`

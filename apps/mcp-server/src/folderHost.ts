@@ -16,6 +16,7 @@ import { NodeFiles } from './nodeFiles.js'
 export type Lock = <T>(work: () => Promise<T>) => Promise<T>
 
 const UNREACHABLE = "The library's folder cannot be reached just now. Nothing was changed; try again when it is back."
+const SWITCHED_OFF = 'The person has switched assistants off in ShellNote (Settings, Assistants): nothing can be read or changed. Ask them to switch assistants on if they want this done.'
 
 export class FolderHost implements NoteHost {
   #queue: Promise<unknown> = Promise.resolve()
@@ -41,6 +42,15 @@ export class FolderHost implements NoteHost {
     return this.#alone(async () => {
       // The library's mark gone (the folder emptied, or another put under its name): nothing is read or written.
       if (this.still && !(await this.still().catch(() => false))) throw new NoteError('unreachable', UNREACHABLE)
+      // The person's switch, read before every call: off, nothing is read or written. A folder that cannot be reached
+      // is said so, and nothing is done either way.
+      let allowed: boolean
+      try {
+        allowed = await this.library.assistants()
+      } catch {
+        throw new NoteError('unreachable', UNREACHABLE)
+      }
+      if (!allowed) throw new NoteError('switched_off', SWITCHED_OFF)
       await this.library.sync()
       if (this.library.problem() !== undefined) throw new NoteError('unreachable', UNREACHABLE)
       return work()

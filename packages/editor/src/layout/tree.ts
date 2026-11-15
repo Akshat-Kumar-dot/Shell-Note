@@ -171,6 +171,37 @@ export function giveBack(layout: Layout, id: PanelId): Layout {
   return { ...layout, root: layout.root.kind === 'panel' ? layout.root : take(layout.root), floating }
 }
 
+/** Which side of the notes the panel beside them is on, while both are docked across one row; none otherwise. */
+export function sideOfPanel(layout: Layout): 'left' | 'right' | undefined {
+  const root = layout.root
+  if (root.kind !== 'split' || root.dir !== 'row') return undefined
+  const panel = root.kids.findIndex((kid) => contains(kid, 'side'))
+  const notes = root.kids.findIndex((kid) => contains(kid, 'notes'))
+  if (panel < 0 || notes < 0 || panel === notes) return undefined
+  return panel < notes ? 'left' : 'right'
+}
+
+/**
+ * The panel beside the notes on their left or their right, with what is docked with it (a video above it), as wide
+ * as it was. Floating, or docked some other way, it is docked at that side of the whole area.
+ */
+export function panelTo(layout: Layout, side: 'left' | 'right'): Layout {
+  const now = sideOfPanel(layout)
+  if (now === side) return layout
+  const root = layout.root
+  if (now === undefined || root.kind !== 'split') return dock(layout, 'side', 'area', side)
+  const at = root.kids.findIndex((kid) => contains(kid, 'side'))
+  const kids = [...root.kids]
+  const sizes = [...root.sizes]
+  const [moved] = kids.splice(at, 1)
+  const [share] = sizes.splice(at, 1)
+  const notes = kids.findIndex((kid) => contains(kid, 'notes'))
+  const where = side === 'left' ? notes : notes + 1
+  kids.splice(where, 0, moved!)
+  sizes.splice(where, 0, share!)
+  return { ...layout, root: split('row', kids, sizes), full: undefined }
+}
+
 /** Float `id` at `rect`, out of the tree. The notes always stay docked. */
 export function float(layout: Layout, id: PanelId, rect: Rect): Layout {
   if (id === 'notes') return layout

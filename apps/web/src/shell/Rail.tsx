@@ -16,8 +16,8 @@ const ICON = { size: 18, strokeWidth: 1.75, 'aria-hidden': true } as const
 
 export interface RailProps {
   store: LibraryStore
-  /** The screen shown: the library, Recently deleted, or neither (a note, or one still opening). */
-  screen: 'library' | 'bin' | 'other'
+  /** The screen shown: the library, Recently deleted, Settings, or none of them (a note, or one still opening). */
+  screen: 'library' | 'bin' | 'settings' | 'other'
 }
 
 export function Rail({ store, screen }: RailProps) {
@@ -35,8 +35,8 @@ export function Rail({ store, screen }: RailProps) {
   /** The caret into the library's search box: beside a note, or on the library's own screen. */
   const find = (): void => {
     findWanted.set(true)
-    // Recently deleted has no search: the library's top has.
-    if (screen === 'bin') commands.press('library.open')
+    // Recently deleted and Settings have no search: the library's top has.
+    if (screen === 'bin' || screen === 'settings') commands.press('library.open')
   }
 
   const folder = store.place?.()
@@ -46,7 +46,7 @@ export function Rail({ store, screen }: RailProps) {
   return (
     <nav className="rail" aria-label="Places" data-tauri-drag-region>
       <img className="rail-mark" src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" width={26} height={26} data-tauri-drag-region />
-      <button type="button" className="sh-b" aria-label="Library" aria-pressed={screen !== 'other'} title="Library: your folders and notes" data-command="library.open" onClick={() => commands.press('library.open')}>
+      <button type="button" className="sh-b" aria-label="Library" aria-pressed={screen === 'library' || screen === 'bin'} title="Library: your folders and notes" data-command="library.open" onClick={() => commands.press('library.open')}>
         <Library {...ICON} />
       </button>
       <button type="button" className="sh-b rail-find" aria-label="Search" title="Search the titles and the words inside your notes" onClick={find}>
@@ -88,10 +88,10 @@ export function Rail({ store, screen }: RailProps) {
         <SquareTerminal {...ICON} />
       </button>
       <span className="rail-grow" data-tauri-drag-region />
-      <button type="button" className="sh-b" aria-label="Where your notes are kept" title={`${kept} (opens Settings)`} data-kept={folder !== undefined ? 'folder' : 'app'} data-command="settings.open" onClick={() => commands.tap('settings.open')}>
+      <button type="button" className="sh-b" aria-label="Where your notes are kept" title={`${kept} (opens Settings, Sync and storage)`} data-kept={folder !== undefined ? 'folder' : 'app'} data-command="settings.open" onClick={() => commands.tap('settings.open', { section: 'storage' })}>
         <Kept {...ICON} />
       </button>
-      <button type="button" className="sh-b" aria-label="Settings" title="Settings" data-command="settings.open" onClick={() => commands.tap('settings.open')}>
+      <button type="button" className="sh-b" aria-label="Settings" aria-pressed={screen === 'settings'} title="Settings" data-command="settings.open" onClick={() => commands.tap('settings.open')}>
         <Settings {...ICON} />
       </button>
     </nav>

@@ -3,7 +3,7 @@
 // under Colour; one Width button; undo and redo; the wand that tidies handwriting; Type, back to the row for words;
 // and a picture. The Pen switches are for this person or for this note, with what the pen has learned of this
 // person's hand. Like every button in the rows, none takes the focus.
-import { StrokeWidth, type AnyColor, type Color, type PenSettings, type SymbolKind, type TidyRules } from '@shellnote/core'
+import { StrokeWidth, type AnyColor, type Color, type Doc, type PenSettings, type SymbolKind, type TidyRules } from '@shellnote/core'
 import { Brush, ChevronDown, Eraser, Hand, Highlighter, Lasso, Pen, Pencil, PenLine, PenTool, SlidersHorizontal, Type, WandSparkles, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import { BarMenu, keepFocus, MenuItem } from '../BarMenu.js'
@@ -334,11 +334,48 @@ const SWITCHES: { key: keyof PenSettings; label: string; choices: [string | numb
 /** The Pen switches, opened from the pen's menu: this person's own, or this note's, which travel with it and win. */
 function PenPanel({ store, onClose }: { store: EditorStore; onClose: () => void }) {
   const doc = useSyncExternalStore(store.subscribe, store.snapshot)
-  useSyncExternalStore(penSettings.subscribe, penSettings.snapshot)
   const [forNote, setForNote] = useState(false)
   const root = useRef<HTMLSpanElement>(null)
   useDismiss(true, root, onClose)
-  const shown = forNote ? penSettingsFor(doc) : myPenSettings()
+  return (
+    <span className="nw-popover-anchor" ref={root}>
+      <div ref={placeMenu} className="nw-popover nw-pen-panel" role="group" aria-label="Pen settings">
+        <div className="nw-segmented" role="radiogroup" aria-label="Settings for">
+          <button type="button" role="radio" aria-checked={!forNote} onMouseDown={keepFocus} onClick={() => setForNote(false)}>
+            My defaults
+          </button>
+          <button type="button" role="radio" aria-checked={forNote} onMouseDown={keepFocus} onClick={() => setForNote(true)}>
+            This note
+          </button>
+        </div>
+        <PenSwitches doc={forNote ? doc : undefined} />
+        {forNote && doc.pen ? (
+          <button type="button" className="nw-pen-reset" data-command="settings.penReset" onMouseDown={keepFocus} onClick={() => commands.tap('settings.penReset')}>
+            Use my defaults in this note
+          </button>
+        ) : null}
+      </div>
+    </span>
+  )
+}
+
+/** The person's own pen settings, as Settings shows them (Pen): every switch, the pen check, their hand and developer mode. */
+export function PenSettingsPart() {
+  return (
+    <div className="nw-pen-panel nw-pen-settings" role="group" aria-label="Pen settings">
+      <PenSwitches doc={undefined} />
+    </div>
+  )
+}
+
+/**
+ * The switches, the symbols, the pen check, what the pen learned of the person's hand, and developer mode. With a
+ * note, its own settings, which travel with it and win; without, the person's own.
+ */
+function PenSwitches({ doc }: { doc: Doc | undefined }) {
+  useSyncExternalStore(penSettings.subscribe, penSettings.snapshot)
+  const forNote = doc !== undefined
+  const shown = doc ? penSettingsFor(doc) : myPenSettings()
   /** A setting changed (settings.pen), the person's own or this note's. */
   const set = (key: keyof PenSettings, value: PenSettings[keyof PenSettings]): void => {
     const option = optionOf(key)
@@ -347,21 +384,12 @@ function PenPanel({ store, onClose }: { store: EditorStore; onClose: () => void 
     commands.tap('settings.pen', { option, value: words, scope: forNote ? 'note' : 'mine' })
   }
   return (
-    <span className="nw-popover-anchor" ref={root}>
-      <div ref={placeMenu} className="nw-popover nw-pen-panel" role="group" aria-label="Pen settings">
-          <div className="nw-segmented" role="radiogroup" aria-label="Settings for">
-            <button type="button" role="radio" aria-checked={!forNote} onMouseDown={keepFocus} onClick={() => setForNote(false)}>
-              My defaults
-            </button>
-            <button type="button" role="radio" aria-checked={forNote} onMouseDown={keepFocus} onClick={() => setForNote(true)}>
-              This note
-            </button>
-          </div>
+    <>
           {SWITCHES.map(({ key, label, choices }) => (
             <label key={key} className="nw-pen-switch">
               <span>
                 {label}
-                {forNote && doc.pen?.[key] !== undefined ? <em> (this note)</em> : null}
+                {doc?.pen?.[key] !== undefined ? <em> (this note)</em> : null}
               </span>
               <select aria-label={label} value={String(shown[key])} data-command="settings.pen" onChange={(event) => set(key, choices.find(([value]) => String(value) === event.target.value)![0] as PenSettings[keyof PenSettings])}>
                 {choices.map(([value, text]) => (
@@ -373,7 +401,7 @@ function PenPanel({ store, onClose }: { store: EditorStore; onClose: () => void 
             </label>
           ))}
           <fieldset className="nw-pen-symbols">
-            <legend>Symbols, neatened as you lift{forNote && doc.pen?.symbols !== undefined ? <em> (this note)</em> : null}</legend>
+            <legend>Symbols, neatened as you lift{doc?.pen?.symbols !== undefined ? <em> (this note)</em> : null}</legend>
             {SYMBOLS.map(([kind, label]) => (
               <label key={kind}>
                 <input type="checkbox" checked={shown.symbols.includes(kind)} data-command="settings.pen" onChange={(event) => set('symbols', event.target.checked ? [...shown.symbols, kind] : shown.symbols.filter((k) => k !== kind))} />
@@ -384,13 +412,7 @@ function PenPanel({ store, onClose }: { store: EditorStore; onClose: () => void 
           <PenCheck />
           <YourHand />
           <DeveloperRules />
-          {forNote && doc.pen ? (
-            <button type="button" className="nw-pen-reset" data-command="settings.penReset" onMouseDown={keepFocus} onClick={() => commands.tap('settings.penReset')}>
-              Use my defaults in this note
-            </button>
-          ) : null}
-      </div>
-    </span>
+    </>
   )
 }
 

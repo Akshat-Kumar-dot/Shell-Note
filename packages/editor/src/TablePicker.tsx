@@ -11,15 +11,9 @@ import { placeMenu } from './popover.js'
 /** A press on the grid must not move the focus out of the text. */
 const keepFocus = (event: MouseEvent): void => event.preventDefault()
 
-export function TablePicker({ disabled, onPick }: { disabled: boolean; onPick: (rows: number, columns: number) => void }) {
-  const [open, setOpen] = useState(false)
+/** The grid itself: move over it to choose the columns and rows, then click. In the picker's box, or in a menu. */
+export function TableGrid({ onPick }: { onPick: (rows: number, columns: number) => void }) {
   const [size, setSize] = useState({ rows: 0, columns: 0 })
-  // Near the window's right edge, the grid opens leftwards so it stays on screen.
-  const root = useRef<HTMLSpanElement>(null)
-  const close = useCallback(() => setOpen(false), [])
-  // A press anywhere else, or Escape, closes the grid.
-  useDismiss(open, root, close)
-
   const cells = []
   for (let rows = 1; rows <= PICK_ROWS; rows++) {
     for (let columns = 1; columns <= PICK_COLUMNS; columns++) {
@@ -33,15 +27,28 @@ export function TablePicker({ disabled, onPick }: { disabled: boolean; onPick: (
           onMouseDown={keepFocus}
           onMouseEnter={() => setSize({ rows, columns })}
           onFocus={() => setSize({ rows, columns })}
-          onClick={() => {
-            setOpen(false)
-            onPick(rows, columns)
-          }}
+          onClick={() => onPick(rows, columns)}
         />,
       )
     }
   }
+  return (
+    <>
+      <div className="nw-table-size">{size.rows > 0 ? `${size.columns} × ${size.rows} table` : 'Insert a table'}</div>
+      <div className="nw-pick-cells" style={{ gridTemplateColumns: `repeat(${PICK_COLUMNS}, 18px)` }} onMouseLeave={() => setSize({ rows: 0, columns: 0 })}>
+        {cells}
+      </div>
+    </>
+  )
+}
 
+export function TablePicker({ disabled, onPick }: { disabled: boolean; onPick: (rows: number, columns: number) => void }) {
+  const [open, setOpen] = useState(false)
+  // Near the window's right edge, the grid opens leftwards so it stays on screen.
+  const root = useRef<HTMLSpanElement>(null)
+  const close = useCallback(() => setOpen(false), [])
+  // A press anywhere else, or Escape, closes the grid.
+  useDismiss(open, root, close)
   return (
     <span className="nw-table-picker" ref={root}>
       <button
@@ -52,19 +59,18 @@ export function TablePicker({ disabled, onPick }: { disabled: boolean; onPick: (
         title="Insert a table at the caret"
         disabled={disabled}
         onMouseDown={keepFocus}
-        onClick={() => {
-          setSize({ rows: 0, columns: 0 })
-          setOpen(!open)
-        }}
+        onClick={() => setOpen(!open)}
       >
         <Table2 size={18} aria-hidden />
       </button>
       {open ? (
         <div ref={placeMenu} className="nw-table-grid" role="group" aria-label="Table size">
-          <div className="nw-table-size">{size.rows > 0 ? `${size.columns} × ${size.rows} table` : 'Insert a table'}</div>
-          <div className="nw-pick-cells" style={{ gridTemplateColumns: `repeat(${PICK_COLUMNS}, 18px)` }} onMouseLeave={() => setSize({ rows: 0, columns: 0 })}>
-            {cells}
-          </div>
+          <TableGrid
+            onPick={(rows, columns) => {
+              setOpen(false)
+              onPick(rows, columns)
+            }}
+          />
         </div>
       ) : null}
     </span>

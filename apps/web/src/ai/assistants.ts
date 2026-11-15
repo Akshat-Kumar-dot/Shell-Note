@@ -65,6 +65,35 @@ export function withAssistants(log: readonly LogItem[], kept: unknown, doc: Doc)
   return [...log, ...fresh].map((item, index) => ({ item, index })).sort((a, b) => a.item.entry.at - b.item.entry.at || a.index - b.index).map(({ item }) => item)
 }
 
+/** An edit an assistant made, as Settings lists it: which note, when, the app that made it, what it was asked and what came of it. */
+export interface AssistantEdit {
+  note: string
+  title: string
+  at: number
+  by: string
+  asked: string
+  result: string
+}
+
+/**
+ * The newest edits assistants made, across the notes given (the ones edited last): each note's log as the server
+ * keeps it on this computer, its entries taken as data.
+ */
+export async function recentAssistantEdits(notes: readonly { id: string; title: string }[], most = 12): Promise<AssistantEdit[]> {
+  const found: AssistantEdit[] = []
+  for (const note of notes) {
+    const kept = await assistantLog(note.id)
+    if (!Array.isArray(kept)) continue
+    for (const item of kept) {
+      if (!isRecord(item)) continue
+      const parsed = LogEntry.safeParse(item.entry)
+      if (!parsed.success || parsed.data.source !== 'mcp') continue
+      found.push({ note: note.id, title: note.title || 'Untitled', at: parsed.data.at, by: parsed.data.model, asked: parsed.data.instruction, result: parsed.data.result })
+    }
+  }
+  return found.sort((a, b) => b.at - a.at).slice(0, most)
+}
+
 /** The server's log of a note, as it is on this computer now; nothing when there is none, or it cannot be read. */
 export async function assistantLog(note: string): Promise<unknown> {
   try {

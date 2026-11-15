@@ -1,15 +1,16 @@
 // The app: the rail of its places on every screen (shell/Rail.tsx), and beside it
 // the library's home page first, then a note. The address says where:
 // #/ is the top level, #/folder/<id> a folder, #/deleted Recently deleted,
-// #/note/<id> a note, and #/new a new note at the top level (#/new/<folder> in
-// a folder). ?sample=mixed, physics or long opens a sample note, which is never
+// #/note/<id> a note, #/new a new note at the top level (#/new/<folder> in
+// a folder), and #/settings/<section> Settings, as a tab of its own. ?sample=mixed, physics or long opens a sample note, which is never
 // kept; ?record=strokes the stroke recorder (record/Recorder.tsx). On start,
 // the note storage version 1 kept moves into the library once, safely, items
 // past their 30 days in Recently deleted go, and the pen profile is read
 // (library/penProfile.ts). In the desktop app the library may be a folder the
 // person chose (library/chosen.ts): then what another device writes into it
 // shows on the screens as it arrives.
-import { commands } from '@shellnote/editor'
+import { SETTINGS_SECTIONS, type SettingsSection } from '@shellnote/core'
+import { appLook, commands } from '@shellnote/editor'
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Home } from './library/Home.js'
@@ -17,9 +18,11 @@ import { library } from './library/chosen.js'
 import { loadPenProfile } from './library/penProfile.js'
 import { Tabs } from './library/tabs.js'
 import { Recorder } from './record/Recorder.js'
+import { SettingsNav } from './settings/SettingsNav.js'
+import { SettingsScreen } from './settings/SettingsScreen.js'
 import { sampleDoc } from './samples.js'
 import { Rail } from './shell/Rail.js'
-import { rememberShown, shownLast, tabsPlace } from './shell/state.js'
+import { keepSettingsTab, lastSection, rememberElsewhere, rememberSection, rememberShown, shownLast, tabsPlace } from './shell/state.js'
 import { Tabs as TabRow } from './shell/Tabs.js'
 import { Tree } from './shell/Tree.js'
 import { askToKeep } from './storage/cache.js'
@@ -28,7 +31,7 @@ import { sessionFor, Workspace, type Session } from './Workspace.js'
 export { library }
 const tabs = new Tabs()
 
-type Route = { to: 'home'; folder: string | null } | { to: 'bin' } | { to: 'note'; id: string } | { to: 'new'; folder: string | null }
+type Route = { to: 'home'; folder: string | null } | { to: 'bin' } | { to: 'note'; id: string } | { to: 'new'; folder: string | null } | { to: 'settings'; section: SettingsSection }
 
 /** Where the address points. */
 function route(hash = location.hash): Route {
@@ -37,6 +40,7 @@ function route(hash = location.hash): Route {
   if (kind === 'folder' && id) return { to: 'home', folder: id }
   if (kind === 'deleted') return { to: 'bin' }
   if (kind === 'new') return { to: 'new', folder: id || null }
+  if (kind === 'settings') return { to: 'settings', section: SETTINGS_SECTIONS.includes(id as SettingsSection) ? (id as SettingsSection) : lastSection() }
   return { to: 'home', folder: null }
 }
 
@@ -47,6 +51,7 @@ function whereLine(at: Route, sample: boolean, recording: boolean): string {
   if (at.to === 'note') return `screen: note ${at.id}`
   if (at.to === 'bin') return 'screen: Recently deleted'
   if (at.to === 'new') return 'screen: a new note'
+  if (at.to === 'settings') return `screen: Settings, ${at.section}`
   return at.folder === null ? 'screen: the library, at the top' : `screen: the library, folder ${at.folder}`
 }
 
@@ -104,8 +109,14 @@ export function App() {
   }, [])
   useEffect(() => {
     if (where.to === 'note') rememberShown(where.id)
-    else if (where.to !== 'new') rememberShown(undefined)
+    else if (where.to !== 'new' && where.to !== 'settings') rememberShown(undefined)
+    // Settings has its tab while it shows, and keeps it until it is closed; its close goes back to the screen before.
+    if (where.to === 'settings') {
+      keepSettingsTab(true)
+      rememberSection(where.section)
+    } else rememberElsewhere(location.hash)
   }, [where])
+  const look = useSyncExternalStore(appLook.subscribe, appLook.snapshot)
 
   // The app at the commands' disposal on every screen (app control): where it is, and the way elsewhere.
   useEffect(() => commands.provide('app', { where: () => whereLine(route(), sample !== undefined, recording), go, reloads: () => location.search !== '' }), [sample, recording])
@@ -126,6 +137,8 @@ export function App() {
   if (recording) return <Recorder />
   const shown = (): ReactNode => {
     if (sample) return <SampleNote key="sample" doc={sample} />
+    // Settings needs no library: it shows at once.
+    if (where.to === 'settings') return <SettingsScreen section={where.section} />
     if (!ready) return <div className="opening">Opening your library…</div>
     switch (where.to) {
       case 'home':
@@ -136,19 +149,22 @@ export function App() {
         return <NewNote folder={where.folder} />
       case 'note':
         return <OpenNote key={where.id} id={where.id} />
+      default:
+        return null
     }
   }
   // Where the tab row goes: over the note alone while one is on screen (its column's top), else over the whole screen.
   const place = useSyncExternalStore(tabsPlace.subscribe, tabsPlace.snapshot)
   // The shell: the rail of the app's places, the library's tree, then the tabs over the screen the address names.
-  const at = sample || !ready ? 'other' : where.to === 'home' ? 'library' : where.to === 'bin' ? 'bin' : 'other'
+  const at = sample ? 'other' : where.to === 'settings' ? 'settings' : !ready ? 'other' : where.to === 'home' ? 'library' : where.to === 'bin' ? 'bin' : 'other'
+  const row = <TabRow library={at === 'library' || at === 'bin'} settings={at === 'settings'} />
   return (
-    <div className="shell">
+    <div className="shell" data-look={look}>
       <Rail store={library} screen={at} />
-      {/* Drawn from the start, so nothing beside it moves when the library has started (a sample note shows first). */}
-      <Tree store={library} tabs={tabs} bin={at === 'bin'} ready={ready} />
+      {/* Drawn from the start, so nothing beside it moves when the library has started (a sample note shows first). In Settings, its sections take the column's place. */}
+      {at === 'settings' && where.to === 'settings' ? <SettingsNav section={where.section} /> : <Tree store={library} tabs={tabs} bin={at === 'bin'} ready={ready} />}
       <section className="shell-main">
-        {place ? createPortal(<TabRow library={at !== 'other'} />, place) : <TabRow library={at !== 'other'} />}
+        {place ? createPortal(row, place) : row}
         <div className="shell-screen">{shown()}</div>
       </section>
     </div>

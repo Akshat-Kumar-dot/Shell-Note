@@ -27,8 +27,6 @@ export interface WorkspacePlace {
   entry(): string | undefined
   /** False for a moment after the note opens, while the other windows are asked whether one edits it. */
   ready(): boolean
-  /** Open Settings over this screen. */
-  openSettings(): void
   /** Undo the AI's last change still in its log (ai.undo); says which, or throws why it cannot. */
   undoAi(): string
   /** Edit the note here when another window edits it (note.editHere): that one keeps its work and steps back. */
@@ -113,8 +111,6 @@ export interface HomePlace {
   /** A person is asked on screen; the agent's call was asked already. */
   deleteForever(item: ItemRef, by: By): Promise<string>
   emptyBin(by: By): Promise<string>
-  /** Open Settings over this screen. */
-  openSettings(): void
 }
 
 /** The app as a whole, always there: where it is, how to go elsewhere, and the library. */

@@ -119,6 +119,13 @@ export class ChosenLibrary implements LibraryStore {
   setFolderCover(id: string, picture: Blob | undefined): Promise<void> {
     return this.#store.setFolderCover ? this.#store.setFolderCover(id, picture) : Promise.reject(new Error('This library keeps no folder covers.'))
   }
+  /** A library kept by the app or the browser has no server to reach it: nothing to switch. */
+  assistants(): Promise<boolean> {
+    return this.#store.assistants ? this.#store.assistants() : Promise.resolve(false)
+  }
+  setAssistants(on: boolean): Promise<void> {
+    return this.#store.setAssistants ? this.#store.setAssistants(on) : Promise.reject(new Error('Assistants work on a library kept in a folder, in the desktop app: choose a folder in Settings, Sync and storage.'))
+  }
   penProfile(): Promise<PenProfile | undefined> {
     return this.#store.penProfile()
   }

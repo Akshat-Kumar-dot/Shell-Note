@@ -1,0 +1,474 @@
+/* Settings, as a tab: its column takes the library column's place (the tree's own look), its page the screen's. */
+.set {
+  box-sizing: border-box;
+  height: 100%;
+  overflow: auto;
+  padding: 30px 40px 48px;
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  font: 14px/1.5 var(--ui-font);
+}
+.set-in {
+  max-width: 860px;
+  margin: 0 auto;
+}
+.set-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+}
+.set h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.set-top p {
+  max-width: 64ch;
+  margin: 0;
+  color: var(--sh-text-2);
+}
+.set-part,
+.set .settings-part {
+  margin-top: 30px;
+  padding: 0;
+}
+.set h2,
+.set .settings-part h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: var(--sh-text);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.set h2 small,
+.set h3 small {
+  color: var(--sh-text-3);
+  font-size: 12px;
+  font-weight: 400;
+}
+.set h3 {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0 0 8px;
+  color: var(--sh-text-2);
+  font-size: 12px;
+  font-weight: 600;
+}
+/* The AI's own part names itself; its page has the name already. */
+.set[data-section='ai'] .settings-part > h3:first-child {
+  display: none;
+}
+.set a {
+  color: var(--ui-accent-text);
+}
+.set code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--sh-hover);
+  color: var(--sh-text);
+  font: 12.5px/1.5 ui-monospace, Consolas, monospace;
+}
+.set kbd {
+  display: inline-block;
+  min-width: 20px;
+  box-sizing: border-box;
+  padding: 2px 6px;
+  border: 1px solid var(--sh-line-2);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--sh-panel);
+  color: var(--sh-text);
+  font: 500 12px/1.3 var(--ui-font);
+  text-align: center;
+}
+.set-quiet {
+  margin: 0;
+  color: var(--sh-text-3);
+  font-size: 13px;
+}
+
+/* A way back: all of it at the top, each part by its heading. */
+.set-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--sh-line-2);
+  border-radius: 20px;
+  background: none;
+  color: var(--sh-text-2);
+  font: 500 12px/1 var(--ui-font);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.set-pill:hover {
+  background: var(--sh-hover);
+  color: var(--sh-text);
+}
+.set-reset {
+  align-self: center;
+  margin-left: auto;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--sh-text-3);
+  font: 500 12px/1 var(--ui-font);
+  cursor: pointer;
+}
+.set-reset:hover {
+  background: var(--sh-hover);
+  color: var(--sh-text);
+}
+
+/* ----- Customise: the looks ----- */
+.set-looks {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.set-look {
+  display: block;
+  padding: 12px;
+  border: 1px solid var(--sh-line);
+  border-radius: 12px;
+  background: var(--sh-panel);
+  color: var(--sh-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.set-look:hover {
+  border-color: var(--sh-line-2);
+}
+.set-look[aria-checked='true'] {
+  border-color: var(--ui-hue);
+  box-shadow: 0 0 0 1px var(--ui-hue);
+}
+.set-look svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: 10px;
+  border-radius: 6px;
+  background: var(--sh-desk);
+  fill: color-mix(in srgb, var(--sh-text) 13%, transparent);
+}
+.set-look svg .hot {
+  fill: var(--ui-hue);
+}
+.set-look b {
+  display: block;
+  font-weight: 600;
+}
+.set-look small {
+  color: var(--sh-text-3);
+  font-size: 12px;
+}
+
+/* ----- Customise: the bar for typing, as it shows, then what is in it and what waits under More ----- */
+.set-bar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: fit-content;
+  max-width: 100%;
+  height: 44px;
+  box-sizing: border-box;
+  margin-bottom: 14px;
+  padding: 0 6px;
+  overflow: hidden;
+  border: 1px solid var(--sh-line-2);
+  border-radius: 11px;
+  background: var(--sh-surface);
+  box-shadow: var(--sh-shadow);
+}
+.set-bar-b {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--sh-text-2);
+}
+.set-cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+.set-cols > div {
+  padding: 12px;
+  border: 1px solid var(--sh-line);
+  border-radius: 12px;
+  background: var(--sh-panel);
+}
+.set-tools {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.set-tool {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 2px 0 8px;
+  border-radius: 7px;
+  color: var(--sh-text);
+}
+.set-tool:hover {
+  background: var(--sh-hover);
+}
+.set-tool > svg {
+  flex: none;
+  color: var(--sh-text-3);
+}
+.set-tool > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.set-tool .sh-b {
+  height: 28px;
+  min-width: 28px;
+}
+.set-tool[draggable='true'] {
+  cursor: grab;
+}
+.set-tool[data-dragged] {
+  opacity: 0.4;
+}
+.set-tool[data-over] {
+  box-shadow: inset 0 2px 0 var(--ui-hue);
+}
+.set-tool:focus-visible {
+  outline: 2px solid var(--ui-hue);
+  outline-offset: -2px;
+}
+
+/* ----- Customise: where things sit ----- */
+.set-places {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px 16px;
+}
+.set-places > span {
+  color: var(--sh-text-2);
+}
+.set-seg {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--sh-hover);
+}
+.set-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--sh-text-2);
+  font: 500 13px/1 var(--ui-font);
+  cursor: pointer;
+}
+.set-seg button[aria-checked='true'] {
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
+}
+/* A choice still to come: greyed, with its "later". */
+.set-seg button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.set-seg em {
+  color: inherit;
+  font: 11px/1 var(--ui-font);
+  font-style: normal;
+}
+
+/* ----- General: the keys ----- */
+.set-keys {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+}
+.set-keys > div {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: 7px;
+}
+.set-keys > div:hover {
+  background: var(--sh-hover);
+}
+.set-keys dt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.set-keys dd {
+  margin: 0;
+  color: var(--sh-text-2);
+}
+.set-way {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.set-or {
+  margin: 0 4px;
+  color: var(--sh-text-3);
+  font-size: 12px;
+}
+
+/* ----- Assistants ----- */
+.set-steps {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 20px;
+  color: var(--sh-text-2);
+}
+.set-code {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 6px 6px 10px;
+  border: 1px solid var(--sh-line);
+  border-radius: 8px;
+  background: var(--sh-panel);
+}
+.set-code code {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 0;
+  background: none;
+  white-space: nowrap;
+}
+.set-edits {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.set-edits li {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) minmax(0, 1fr);
+  gap: 2px 14px;
+  padding: 8px;
+  border-radius: 7px;
+}
+.set-edits li:hover {
+  background: var(--sh-hover);
+}
+.set-edits a {
+  overflow: hidden;
+  color: var(--sh-text);
+  font-weight: 500;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.set-edits a:hover {
+  text-decoration: underline;
+}
+.set-edit-what {
+  overflow: hidden;
+  color: var(--sh-text-2);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.set-edit-by {
+  grid-column: 2;
+  color: var(--sh-text-3);
+  font-size: 12px;
+}
+
+/* ----- About ----- */
+.set-facts {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.set-facts > div {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 16px;
+}
+.set-facts dt {
+  color: var(--sh-text-2);
+}
+.set-facts dd {
+  margin: 0;
+}
+.set-links {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* ----- Pen: the pen's own switches, flat on the page rather than in their box ----- */
+.set .nw-pen-panel {
+  position: static;
+  width: auto;
+  max-width: 560px;
+  max-height: none;
+  overflow: visible;
+  margin-top: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+@media (max-width: 779px) {
+  .set {
+    padding: 20px 16px 40px;
+  }
+  .set-looks,
+  .set-cols,
+  .set-places,
+  .set-keys > div,
+  .set-facts > div,
+  .set-edits li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .set-places {
+    gap: 4px;
+  }
+  .set-places > span {
+    margin-top: 10px;
+  }
+  .set-edit-by {
+    grid-column: 1;
+  }
+}

@@ -1,13 +1,14 @@
 // The tab row: the Library first, then a tab for each open note, the one on screen with its title to rename in
-// place; a plus for a new note; and at its end whatever the note on screen puts there (its own menu). Only the note
+// place, and Settings while it is open; a plus for a new note; and at its end whatever the note on screen puts there
+// (its own menu). Only the note
 // on screen is live: a press on another tab keeps this one and opens that one, as opening a note always did. The
 // tabs are each person's own, kept in their browser.
 import type { NoteKind } from '@shellnote/core'
 import { commands } from '@shellnote/editor'
-import { House, PanelLeft, Plus, X } from 'lucide-react'
+import { House, PanelLeft, Plus, Settings, X } from 'lucide-react'
 import { useEffect, useSyncExternalStore } from 'react'
 import { KIND_ICON } from '../library/kinds.js'
-import { closeTab, noteScreen, openNotes, openTab, showTree, tabsEnd, treeShown } from './state.js'
+import { closeTab, keepSettingsTab, lastElsewhere, noteScreen, openNotes, openTab, settingsTab, tabsEnd, treeAt, treeShown } from './state.js'
 
 const ICON = { size: 15, strokeWidth: 1.75, 'aria-hidden': true } as const
 
@@ -22,8 +23,9 @@ const endPlace = (element: HTMLElement | null): void => {
   if (tabsEnd.value !== element) tabsEnd.set(element)
 }
 
-export function Tabs({ library }: { library: boolean }) {
+export function Tabs({ library, settings }: { library: boolean; settings: boolean }) {
   const open = useSyncExternalStore(openNotes.subscribe, openNotes.snapshot)
+  const settingsOpen = useSyncExternalStore(settingsTab.subscribe, settingsTab.snapshot)
   const now = useSyncExternalStore(noteScreen.subscribe, noteScreen.snapshot)
   const tree = useSyncExternalStore(treeShown.subscribe, treeShown.snapshot)
 
@@ -40,6 +42,11 @@ export function Tabs({ library }: { library: boolean }) {
     else commands.press('note.open', { note: next })
   }
   const rename = (title: string): void => void commands.do('note.rename', { name: title })
+  /** Settings' tab closed: while Settings shows, back to the screen it was opened from. */
+  const closeSettings = (): void => {
+    keepSettingsTab(false)
+    if (settings) location.hash = lastElsewhere()
+  }
   // A sample note is on screen with no place in the library: it has a tab while it shows, and none after.
   const shown = now !== undefined && now.id === undefined ? [...open, { id: '', title: now.title, kind: now.kind }] : open
   const current = now === undefined ? undefined : (now.id ?? '')
@@ -47,7 +54,7 @@ export function Tabs({ library }: { library: boolean }) {
   return (
     <header className="sh-tabs" data-tauri-drag-region="deep">
       {tree ? null : (
-        <button type="button" className="sh-b sh-tabs-tree" aria-label="Show the library" title="Show the library column: your folders and notes" onClick={() => showTree(true)}>
+        <button type="button" className="sh-b sh-tabs-tree" aria-label="Show the library" title="Show the library column: your folders and notes" data-command="library.column" onClick={() => commands.tap('library.column', { side: treeAt.value })}>
           <PanelLeft {...ICON} />
         </button>
       )}
@@ -91,6 +98,25 @@ export function Tabs({ library }: { library: boolean }) {
             </div>
           ),
         )}
+        {settings ? (
+          <div role="tab" className="sh-tab" aria-selected aria-label="Settings" data-tab="settings">
+            <Settings {...ICON} />
+            <span>Settings</span>
+            <button type="button" className="sh-tab-x" aria-label="Close Settings" title="Close Settings" onClick={closeSettings}>
+              <X size={13} aria-hidden />
+            </button>
+          </div>
+        ) : settingsOpen ? (
+          <div className="sh-tab" data-tab="settings">
+            <button type="button" role="tab" className="sh-tab-open" aria-selected={false} title="Settings" data-command="settings.open" onClick={() => commands.tap('settings.open')}>
+              <Settings {...ICON} />
+              <span>Settings</span>
+            </button>
+            <button type="button" className="sh-tab-x" aria-label="Close the tab of Settings" title="Close this tab" onClick={closeSettings}>
+              <X size={13} aria-hidden />
+            </button>
+          </div>
+        ) : null}
       </div>
       <button type="button" className="sh-b sh-tabs-new" aria-label="New tab" title="A new note, in a new tab" data-command="note.new" onClick={() => commands.press('note.new', now?.folder ? { into: now.folder } : {})}>
         <Plus size={16} strokeWidth={1.75} aria-hidden />

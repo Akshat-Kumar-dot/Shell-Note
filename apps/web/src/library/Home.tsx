@@ -6,13 +6,13 @@
 import type { NoteKind } from '@shellnote/core'
 import { BarMenu, commands, inDesktopApp, MenuItem, tabWord, type By, type HomePlace, type LibraryAt, type NewNote } from '@shellnote/editor'
 import { ArrowUpDown, ChevronDown, ChevronRight, Clock, FileText, Folder, FolderInput, FolderOpen, FolderPlus, ImageOff, ImagePlus, Info, Layers, LayoutGrid, NotebookPen, PenLine, Plus, RotateCcw, Rows3, Search, SquarePen, Trash2, TriangleAlert, Workflow, X, type LucideIcon } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
-import { Card, nameOf, type CardItem, type Look } from './Card.js'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
+import { Card, nameOf, type CardItem } from './Card.js'
+import { libraryLook } from './look.js'
 import { Dialog, Menu, type MenuItem as MenuLine } from './Dialog.js'
 import { importNote } from './importing.js'
 import { kindOf } from './kinds.js'
 import { MoveDialog } from './MoveDialog.js'
-import { Settings } from './Settings.js'
 import type { FolderEntry, ItemRef, Library, LibraryStore, NoteEntry } from '@shellnote/library'
 import type { Tabs } from './tabs.js'
 import { contents, counts, daysLeft, deletedItems, folderPath, hidden, inside, isOpenFolder, search, sorted, type SortKey, type SortOrder } from '@shellnote/library/tree'
@@ -69,14 +69,6 @@ let shownLast: Show = 'all'
 /** No notes found by their words: one list, so what is drawn from it is not made again. */
 const NONE: readonly string[] = []
 
-const LOOK_KEY = 'shellnote:libraryLook'
-function savedLook(): Look {
-  try {
-    return localStorage.getItem(LOOK_KEY) === 'list' ? 'list' : 'cards'
-  } catch {
-    return 'cards'
-  }
-}
 
 /** How long ago, in words: minutes and hours today, then Yesterday, then the date. */
 export function ago(time: number, now = Date.now()): string {
@@ -156,7 +148,7 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
   const [query, setQuery] = useState('')
   const [sort, setSort] = useState(savedSort)
   const [show, setShow] = useState<Show>(() => shownLast)
-  const [look, setLook] = useState<Look>(savedLook)
+  const look = useSyncExternalStore(libraryLook.subscribe, libraryLook.snapshot)
   // The notes whose words hold the search, for the search they were found for.
   const [found, setFound] = useState<{ query: string; ids: readonly string[] }>({ query: '', ids: [] })
   const [active, setActive] = useState(0)
@@ -165,7 +157,6 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
   const [menu, setMenu] = useState<{ item: CardItem; x: number; y: number } | null>(null)
   const [moving, setMoving] = useState<CardItem | null>(null)
   const [confirm, setConfirm] = useState<{ title: string; text: string; action: string; run: () => Promise<void> } | null>(null)
-  const [settings, setSettings] = useState(false)
   const [toast, setToast] = useState<Toast | null>(null)
   const [elsewhere, setElsewhere] = useState<Set<string>>(() => tabs.editedElsewhere())
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
@@ -490,14 +481,6 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
     setShow(wanted)
     return wanted === 'all' ? 'every note shows' : `only the ${SHOW_WORDS[wanted]} show, and the folders`
   }
-  const chooseLook = (wanted: Look): void => {
-    setLook(wanted)
-    try {
-      localStorage.setItem(LOOK_KEY, wanted)
-    } catch {
-      // Kept for this visit only.
-    }
-  }
 
   // This screen at the commands' disposal while it shows (app control): its buttons and the agent reach it alike.
   const own = useRef({ newNote, newFolder, openFile, renameItem, move, remove, folderCover, restore, deleteForever, emptyBin, searchFor, sortBy, filterBy })
@@ -522,7 +505,6 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
       restore: (item) => own.current.restore(item),
       deleteForever: (item, by) => own.current.deleteForever(item, by),
       emptyBin: (by) => own.current.emptyBin(by),
-      openSettings: () => setSettings(true),
     }
     return commands.provide('home', place)
   }, [bin, folder, loaded])
@@ -861,10 +843,10 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
               </>
             )}
             <div className="lib-look" role="group" aria-label="Show as">
-              <button type="button" className="sh-b" aria-label="Cards" title="As cards, with their pictures" aria-pressed={look === 'cards'} onClick={() => chooseLook('cards')}>
+              <button type="button" className="sh-b" aria-label="Cards" title="As cards, with their pictures" aria-pressed={look === 'cards'} data-command="library.look" onClick={() => commands.tap('library.look', { view: 'cards' })}>
                 <LayoutGrid size={16} aria-hidden />
               </button>
-              <button type="button" className="sh-b" aria-label="List" title="As a list, with their first words" aria-pressed={look === 'list'} onClick={() => chooseLook('list')}>
+              <button type="button" className="sh-b" aria-label="List" title="As a list, with their first words" aria-pressed={look === 'list'} data-command="library.look" onClick={() => commands.tap('library.look', { view: 'list' })}>
                 <Rows3 size={16} aria-hidden />
               </button>
             </div>
@@ -1036,7 +1018,6 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
           <p>{confirm.text}</p>
         </Dialog>
       ) : null}
-      {settings ? <Settings onClose={() => setSettings(false)} /> : null}
       {toast ? (
         <div className="toast" role={toast.tone === 'error' ? 'alert' : 'status'} data-tone={toast.tone}>
           <span>{toast.text}</span>

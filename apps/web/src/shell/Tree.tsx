@@ -9,7 +9,7 @@ import { ArrowUpDown, ChevronDown, ChevronRight, FilePlus, Folder, FolderOpen, F
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import type { Tabs } from '../library/tabs.js'
 import { KIND_ICON, kindOf } from '../library/kinds.js'
-import { findWanted, noteScreen, showTree, tabsFollow, treeAt, treeShown, moveTree } from './state.js'
+import { findWanted, noteScreen, showTree, tabsFollow, treeAt, treeShown } from './state.js'
 
 const OPENED = 'shellnote:library-side-open'
 const SORT = 'shellnote:tree-sort'
@@ -322,8 +322,9 @@ export function Tree({ store, tabs, bin, ready }: TreeProps) {
               <hr />
               <MenuItem
                 label={`Move the library to the ${other}`}
+                command="library.column"
                 onChoose={() => {
-                  moveTree(other)
+                  commands.tap('library.column', { side: other })
                   close()
                 }}
               >
@@ -332,8 +333,9 @@ export function Tree({ store, tabs, bin, ready }: TreeProps) {
               </MenuItem>
               <MenuItem
                 label="Hide the library"
+                command="library.column"
                 onChoose={() => {
-                  showTree(false)
+                  commands.tap('library.column', { side: 'hidden' })
                   close()
                 }}
               >

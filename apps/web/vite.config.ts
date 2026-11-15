@@ -8,6 +8,12 @@ function policy(): Record<string, string> {
   return conf.app.security.csp
 }
 
+/** The app's version, as the desktop app's configuration keeps it: Settings, About, shows it. */
+function version(): string {
+  const conf = JSON.parse(readFileSync(new URL('../desktop/src-tauri/tauri.conf.json', import.meta.url), 'utf8')) as { version?: unknown }
+  return typeof conf.version === 'string' ? conf.version : ''
+}
+
 const asText = (directives: Record<string, string>): string =>
   Object.entries(directives)
     .map(([directive, sources]) => `${directive} ${sources}`)
@@ -61,6 +67,7 @@ export const forWebsite: Plugin = {
 
 export default defineConfig({
   plugins: [react(), underPolicy ? forDesktop : forWebsite],
+  define: { __SHELLNOTE_VERSION__: JSON.stringify(version()) },
   // The end-to-end tests run their own server, and may run while a dev server
   // is open: each bundles its dependencies into its own folder, so neither
   // replaces the other's files mid-run.

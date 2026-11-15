@@ -2,7 +2,7 @@
 // where the panels are, which are open, where each bar is, and whether the video and a program are shown inside the
 // Beside panel or taken out into panels of their own.
 import { Shared } from '../video/state.js'
-import { DEFAULT_LAYOUT, dock, float, giveBack, layoutFrom, type Layout, type PanelId } from './tree.js'
+import { DEFAULT_LAYOUT, dock, float, giveBack, layoutFrom, panelTo, sideOfPanel, type Layout, type PanelId } from './tree.js'
 
 /** A bar along a side of the workspace, or floating as a box at a place, across or down. */
 export type BarPlace = { at: 'top' | 'bottom' | 'left' | 'right' } | { at: 'float'; x: number; y: number; dir: 'row' | 'column' }
@@ -110,6 +110,14 @@ export function setInside(what: Inside, inside: boolean, change?: (layout: Layou
 export function putInside(what: Inside): void {
   setInside(what, true, (layout) => (what === 'video' ? dock(giveBack(layout, 'video'), 'video', 'side', 'top') : dock(giveBack(layout, 'program'), 'program', 'area', 'right')))
 }
+
+/** The panel beside the notes, AI and Beside, on their left or their right. */
+export function dockPanel(side: 'left' | 'right'): void {
+  changeLayout((layout) => panelTo(layout, side))
+}
+
+/** Which side of the notes the panel beside them is on now; right while it floats or sits some other way. */
+export const panelSide = (): 'left' | 'right' => sideOfPanel(workspace.value.layout) ?? 'right'
 
 /** Back to how the workspace starts: the design sketch, the bars on top, the video and a program inside Beside. */
 export function resetWorkspace(): void {

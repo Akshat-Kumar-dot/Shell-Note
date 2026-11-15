@@ -15,6 +15,8 @@ The [Model Context Protocol](https://modelcontextprotocol.io) (MCP) is the commo
 | | Reach the internet: the server has no network code at all |
 | | Touch other programs, or the program panel |
 
+**You can switch assistants off.** In ShellNote, Settings, Assistants: while they are off, the server reads and changes nothing, and tells the AI app that you switched them off. It looks at the switch before every request, so a change takes effect at once. The same page shows the line to give your AI app, with your library's folder filled in, and the latest edits assistants made.
+
 Everything an assistant changes can be taken back, and what it takes is kept on this computer only:
 
 - **The note's AI log.** Each edit an assistant makes shows in the note's AI log in the desktop app, marked as from outside the app, with the name the AI app gave itself and the reason it gave. **Undo** takes the edit back while its blocks are still as the edit left them. An edit that was refused is listed too, with why.

@@ -1,8 +1,10 @@
 // The view, the panels and choosing blocks, as commands (app control, step
 // 3a): each does what its button did, and the buttons now call them.
-import { blockDetail, blockOf, blocksList, type Box, type Doc } from '@shellnote/core'
+import { blockDetail, blockOf, blocksList, type Box, type Doc, type TypingButton } from '@shellnote/core'
 import { clampZoom, stepZoom } from '../geometry.js'
-import { workspace as layout, resetWorkspace, setBar, setSideOpen, type BarId } from '../layout/state.js'
+import { placesReset, putButton, resetCustom, setAppLook, type AppLook } from '../layout/custom.js'
+import { dockPanel, workspace as layout, resetWorkspace, setBar, setSideOpen, type BarId } from '../layout/state.js'
+import { TYPING_LOOK } from '../typingButtons.js'
 import { showSideTab, sideTab, type SideTab } from '../layout/sideTab.js'
 import type { Commands } from './run.js'
 
@@ -50,27 +52,56 @@ export function defineView(commands: Commands): void {
     setSideOpen(false)
     return 'side panel closed'
   })
-  commands.define('bar.place', ['workspace'], ({ bar, place }) => {
+  // The bars' places are the person's, kept for every note: Customise in Settings sets them with no note open.
+  commands.define('bar.place', [], ({ bar, place }) => {
     setBar(bar as BarId, { at: place as 'top' | 'bottom' | 'left' | 'right' })
     return `${String(bar)} bar at the ${String(place)}`
   })
-  commands.define('bar.float', ['workspace'], ({ bar }) => {
+  commands.define('bar.float', [], ({ bar }) => {
     const id = bar as BarId
     const now = layout.value.bars[id]
     // Floating already, it stays where it is; else near the workspace's top left, as its menu puts it.
     if (now.at !== 'float') setBar(id, { at: 'float', x: 80, y: 80, dir: 'row' })
     return `${id} bar floating over the note`
   })
-  commands.define('bar.turn', ['workspace'], ({ bar }) => {
+  commands.define('bar.turn', [], ({ bar }) => {
     const id = bar as BarId
     const now = layout.value.bars[id]
     if (now.at !== 'float') throw new Error(`The ${id} bar is along a side, where it lies as the side does: bar.float first.`)
     setBar(id, { ...now, dir: now.dir === 'row' ? 'column' : 'row' })
     return `${id} bar turned ${now.dir === 'row' ? 'down' : 'across'}`
   })
-  commands.define('layout.reset', ['workspace'], () => {
-    resetWorkspace()
+  commands.define('layout.reset', [], ({ part }) => {
+    const all = part === 'all'
+    if (all || part === undefined || part === 'places') {
+      resetWorkspace()
+      for (const more of placesReset) more()
+    }
+    if (all || part === 'look') resetCustom('look')
+    if (all || part === 'tools') resetCustom('tools')
+    if (all) return "everything as it starts: the look, the bar for typing, the panels, the bars and the library's column"
+    if (part === 'look') return 'the look as it starts: flat'
+    if (part === 'tools') return 'the bar for typing as it starts'
     return 'panels and bars where they start'
+  })
+  commands.define('bar.button', [], ({ button, on, position }) => {
+    const which = button as TypingButton
+    const bar = putButton(which, on !== false, position as number | undefined)
+    const label = TYPING_LOOK[which].label
+    if (on === false) return `${label} is under the bar's More, one click away`
+    return `${label} is in the bar for typing, ${bar.indexOf(which) + 1} of ${bar.length}`
+  })
+  commands.define('layout.look', [], ({ shell }) => {
+    const look = shell as AppLook
+    setAppLook(look)
+    // Each look has its own place for the bar for typing: under the tabs, or at the bottom in the dock.
+    setBar('tools', { at: look === 'dock' ? 'bottom' : 'top' })
+    return look === 'flat' ? 'the flat look: one row of tools under the tabs' : look === 'islands' ? 'the islands look: rounded panels, the tools floating over the note' : 'the dock look: no rail, the tools at the bottom'
+  })
+  commands.define('panel.dock', [], ({ side }) => {
+    if (side !== 'left' && side !== 'right') throw new Error('AI and Beside sit on the left or the right of the note: panel.hide puts the panel away.')
+    dockPanel(side)
+    return `AI and Beside on the ${side} of the note`
   })
   commands.define('note.blocks', ['note'], ({ page }, { note }) => blocksList(note.store.doc, page as number | undefined, drawnBoxes(note.store.doc)))
   commands.define('note.block', ['note'], ({ block }, { note }) => blockDetail(note.store.doc, String(block), drawnBoxes(note.store.doc)))

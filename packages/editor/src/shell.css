@@ -757,3 +757,34 @@
   background: var(--ui-hue);
   color: var(--ui-on-hue);
 }
+
+/* ----- under More: a button taken out of the bar for typing, with its choices in the menu ----- */
+/* Colour: the note's colours, one round swatch each. */
+.sh-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 8px 8px;
+}
+.sh-swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--swatch);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.14);
+  cursor: pointer;
+}
+.sh-swatch:hover {
+  transform: scale(1.1);
+}
+.sh-swatch[aria-checked='true'] {
+  box-shadow:
+    0 0 0 2px var(--sh-surface),
+    0 0 0 4px var(--sh-text);
+}
+/* Table: the picker's grid, in the menu. */
+.sh-menu-grid {
+  padding: 0 8px 8px;
+}

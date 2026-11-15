@@ -153,6 +153,13 @@ export interface LibraryStore {
   /** Give a folder a cover picture, or take it off (undefined). */
   setFolderCover?(id: string, picture: Blob | undefined): Promise<void>
   /**
+   * Whether assistants, other AI apps connected through ShellNote's MCP server, may read and change this library: a
+   * library kept in a folder only, the one the server works on. They may until the person says not.
+   */
+  assistants?(): Promise<boolean>
+  /** Let assistants reach this library (true), or stop them (false): the server reads this before each request. */
+  setAssistants?(on: boolean): Promise<void>
+  /**
    * The person's pen profile (core's schema/profile.ts): the strokes the pen
    * learns their hand from. Kept with the library, not in any note, so the
    * desktop and phone apps will keep it as a file in the library's folder.

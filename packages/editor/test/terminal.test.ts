@@ -96,7 +96,7 @@ describe('lines', () => {
   it("refuse the note's own operations while another window edits the note, as every command does", async () => {
     const store = open()
     const before = store.doc
-    const readOnly = commands.provide('workspace', { zoom: () => 1, setZoom: () => undefined, close: async () => undefined, save: async () => '', openFile: async () => '', newNote: async () => ({ id: '', title: '' }), rename: () => undefined, editing: () => false, entry: () => undefined, ready: () => true, openSettings: () => undefined, undoAi: () => '', editHere: () => '', print: () => '' })
+    const readOnly = commands.provide('workspace', { zoom: () => 1, setZoom: () => undefined, close: async () => undefined, save: async () => '', openFile: async () => '', newNote: async () => ({ id: '', title: '' }), rename: () => undefined, editing: () => false, entry: () => undefined, ready: () => true, undoAi: () => '', editHere: () => '', print: () => '' })
     try {
       const frame = Object.values(store.doc.block).find((block) => block.type === 'frame')!
       const out = await runLines([`op {"op":"add","block":{"type":"text","parent":"${frame.id}","role":"p","indent":0,"md":"Not here"}}`], { commands, ask: yes })

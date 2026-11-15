@@ -8,12 +8,35 @@
 // names. For the agent, a command goes where a person would first (the open
 // note closed and kept, then the library), and waits for that screen, so its
 // next line finds it there.
-import type { NoteKind } from '@shellnote/core'
-import { commands, inDesktopApp, type AppPlace, type By, type HomePlace, type ItemRef, type LibraryAt, type Places } from '@shellnote/editor'
+import type { NoteKind, SettingsSection } from '@shellnote/core'
+import { commands, inDesktopApp, placesReset, Shared, type AppPlace, type By, type HomePlace, type ItemRef, type LibraryAt, type Places } from '@shellnote/editor'
 import type { Library, LibraryStore } from '@shellnote/library'
 import { deletedItems, folderPath, hidden } from '@shellnote/library/tree'
 import { loadSettings, modelsNow, saveSettings, withModel } from './ai/settings.js'
+import { setLibraryLook, type LibraryLook } from './library/look.js'
+import { lastSection, moveTree, resetTree, showTree } from './shell/state.js'
 import { applyAccent, applyAppearance, applyDarkPaper, type Accent, type Appearance } from './theme.js'
+
+/** Each section of Settings, as a sentence names it. */
+export const SECTION_WORDS: Readonly<Record<SettingsSection, string>> = {
+  general: 'General',
+  appearance: 'Appearance',
+  customise: 'Customise',
+  pen: 'Pen',
+  ai: 'AI',
+  assistants: 'Assistants',
+  storage: 'Sync and storage',
+  about: 'About',
+}
+
+/** Told each time the assistants' switch changes, so Settings shows it as it now is. */
+export const assistantsChanged = new Shared(0)
+
+// The library's column and the library's look go back with the panels and the bars (layout.reset).
+placesReset.add(() => {
+  resetTree()
+  setLibraryLook('cards')
+})
 
 type Kind = ItemRef['kind']
 type Here = Places & { app: AppPlace }
@@ -292,9 +315,34 @@ export function defineAppCommands(store: LibraryStore): void {
   })
 
   // ----- settings, the recorder -----
-  commands.define('settings.open', [['workspace', 'home']], (_, places) => {
-    ;(places.workspace ?? places.home)!.openSettings()
-    return 'Settings open'
+  commands.define('settings.open', ['app'], async ({ section }, places, by) => {
+    // Settings is a tab of its own: the note on screen is kept first, as opening another note keeps it.
+    const to = (section as SettingsSection | undefined) ?? lastSection()
+    await leaveNote(places, by)
+    places.app.go(`#/settings/${to}`)
+    return `Settings open, at ${SECTION_WORDS[to]}`
+  })
+  commands.define('settings.assistants', [], async ({ on }, _, by) => {
+    const allow = on !== false
+    // Letting other programs reach the notes is the person's own choice; the agent may only stop them.
+    if (allow && by === 'agent') throw new Error('Letting assistants reach the notes is the person\'s own choice: Settings, Assistants.')
+    if (!store.setAssistants) throw new Error('Assistants work on a library kept in a folder, in the desktop app: choose a folder in Settings, Sync and storage.')
+    await store.setAssistants(allow)
+    assistantsChanged.set(assistantsChanged.value + 1)
+    return allow ? 'assistants may read and change the notes; each change shows in its note\'s AI log, with Undo' : 'assistants are switched off: the server reads and changes nothing'
+  })
+  commands.define('library.column', [], ({ side }) => {
+    if (side === 'hidden') {
+      showTree(false)
+      return "the library's column is hidden"
+    }
+    moveTree(side as 'left' | 'right')
+    showTree(true)
+    return `the library's column on the ${String(side)}`
+  })
+  commands.define('library.look', [], ({ view }) => {
+    setLibraryLook(view as LibraryLook)
+    return view === 'list' ? 'the library shows a list' : 'the library shows cards'
   })
   commands.define('settings.theme', [], ({ look }) => {
     applyAppearance(look as Appearance)

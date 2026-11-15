@@ -1,6 +1,6 @@
 // What the shell round every screen knows of the screen inside it: the note on screen, the notes open in tabs, and
 // the places a screen may put something of its own into the shell.
-import type { NoteKind } from '@shellnote/core'
+import { SETTINGS_SECTIONS, type NoteKind, type SettingsSection } from '@shellnote/core'
 import { inDesktopApp, Shared } from '@shellnote/editor'
 
 /** The note on screen: being edited here or shown read-only; its place in the library (none for a sample), its title and its kind as they are now. */
@@ -153,3 +153,46 @@ export function moveTree(at: 'left' | 'right'): void {
   save(TREE_AT, at)
   treeAt.set(at)
 }
+
+/** The library's column as it starts: on the left, shown where the window has room. */
+export function resetTree(): void {
+  for (const key of [TREE_SHOWN, TREE_AT]) {
+    try {
+      localStorage.removeItem(key)
+    } catch {
+      // Storage is off: nothing was kept.
+    }
+  }
+  treeAt.set('left')
+  treeShown.set(typeof window !== 'undefined' && window.innerWidth >= ROOMY)
+}
+
+// ----- Settings, as a tab: open or not, the section shown last, and the place it was opened from -----
+
+const SETTINGS_OPEN = 'shellnote:settings-tab'
+const SETTINGS_SECTION = 'shellnote:settings-section'
+
+/** The Settings tab is in the tab row: from when Settings is opened until its tab is closed. */
+export const settingsTab = new Shared<boolean>(saved(SETTINGS_OPEN) === true)
+
+export function keepSettingsTab(open: boolean): void {
+  save(SETTINGS_OPEN, open)
+  settingsTab.set(open)
+}
+
+/** The section of Settings shown last, where Settings opens again; General the first time. */
+export function lastSection(): SettingsSection {
+  const kept = saved(SETTINGS_SECTION)
+  return SETTINGS_SECTIONS.includes(kept as SettingsSection) ? (kept as SettingsSection) : 'general'
+}
+
+export function rememberSection(section: SettingsSection): void {
+  save(SETTINGS_SECTION, section)
+}
+
+/** The address of the last screen that was not Settings: closing the Settings tab goes back there. */
+let elsewhere = '#/'
+export const rememberElsewhere = (hash: string): void => {
+  elsewhere = hash === '' ? '#/' : hash
+}
+export const lastElsewhere = (): string => elsewhere

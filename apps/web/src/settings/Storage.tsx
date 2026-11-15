@@ -1,25 +1,13 @@
-// The settings, from the home page or a note: light, dark or the system's look
-// and the app's own colour (the paper always stays white), the AI (ai/AiSettings.tsx), how much this
-// browser's storage the library uses, whether the browser has agreed not to
-// clear it, and the plain truth that a saved .shellnote file is the copy
-// that lasts. In the app on Windows, also where the notes are kept: in the
-// app, or in a folder the person chooses (LibraryPlace.tsx).
+// Sync and storage: where the notes are kept (in the app, or a folder the person chooses, which OneDrive or Dropbox
+// can carry to their other devices: LibraryPlace.tsx), how much of this browser's or the app's storage they use,
+// whether it has agreed not to clear them, and the plain truth that a saved .shellnote file is the copy that lasts.
 import { commands, inDesktopApp, inWindowsApp } from '@shellnote/editor'
-import { HardDrive, Monitor, Moon, ShieldCheck, Sun, TriangleAlert } from 'lucide-react'
-import { useEffect, useState, useSyncExternalStore } from 'react'
-import { AiSettingsPart } from '../ai/AiSettings.js'
+import { HardDrive, ShieldCheck, TriangleAlert } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { lastKeepAnswer } from '../commands.js'
-import { ACCENTS, accentNow, appearanceNow, darkPaperNow, onAppearance, type Accent, type Appearance } from '../theme.js'
-import { library } from './chosen.js'
-import { Dialog } from './Dialog.js'
-import { LibraryPlace } from './LibraryPlace.js'
-
-const LOOKS: [Appearance, string, typeof Sun][] = [
-  ['system', 'System', Monitor],
-  ['light', 'Light', Sun],
-  ['dark', 'Dark', Moon],
-]
-const ACCENT_NAMES: Record<Accent, string> = { graphite: 'Graphite', blue: 'Blue', teal: 'Teal', green: 'Green', amber: 'Amber', rose: 'Rose', red: 'Red' }
+import { library } from '../library/chosen.js'
+import { LibraryPlace } from '../library/LibraryPlace.js'
+import { SettingsPage, SettingsPart } from './Page.js'
 
 /** A size in bytes, in words. */
 function size(bytes: number): string {
@@ -36,11 +24,7 @@ function size(bytes: number): string {
  */
 type Asking = 'not asked' | 'asking' | 'refused'
 
-/** `beforeChange`: what must be kept before the library moves elsewhere, such as the note that is open. */
-export function Settings({ onClose, beforeChange }: { onClose: () => void; beforeChange?: () => Promise<void> }) {
-  const look = useSyncExternalStore(onAppearance, appearanceNow)
-  const accent = useSyncExternalStore(onAppearance, accentNow)
-  const darkPaper = useSyncExternalStore(onAppearance, darkPaperNow)
+export function Storage() {
   const [usage, setUsage] = useState<{ used: number; quota: number }>()
   const [safe, setSafe] = useState<boolean>()
   const [asking, setAsking] = useState<Asking>('not asked')
@@ -58,7 +42,6 @@ export function Settings({ onClose, beforeChange }: { onClose: () => void; befor
     }
   }, [])
 
-  const choose = (next: Appearance): void => commands.tap('settings.theme', { look: next })
   /** settings.keepStorage, and the browser's answer to it. */
   const askToKeep = async (): Promise<void> => {
     setAsking('asking')
@@ -74,46 +57,9 @@ export function Settings({ onClose, beforeChange }: { onClose: () => void; befor
   }
 
   return (
-    <Dialog title="Settings" onClose={onClose}>
-      <section className="settings-part">
-        <h3>Appearance</h3>
-        <div className="segmented" role="radiogroup" aria-label="Appearance">
-          {LOOKS.map(([value, label, Icon]) => (
-            <button key={value} type="button" role="radio" aria-checked={look === value} data-command="settings.theme" onClick={() => choose(value)}>
-              <Icon size={16} aria-hidden />
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="accents" role="radiogroup" aria-label="Colour">
-          {ACCENTS.map((name) => (
-            <button key={name} type="button" role="radio" className="accent-choice" aria-checked={accent === name} aria-label={ACCENT_NAMES[name]} title={ACCENT_NAMES[name]} data-accent={name} data-command="settings.accent" onClick={() => commands.tap('settings.accent', { accent: name })}>
-              <span aria-hidden />
-            </button>
-          ))}
-          <span className="accent-name">{ACCENT_NAMES[accent]}</span>
-        </div>
-        <div className="settings-row">
-          <span className="settings-row-name">Paper in dark</span>
-          <div className="segmented" role="radiogroup" aria-label="Paper in dark">
-            {(
-              [
-                [false, 'White'],
-                [true, 'Dark'],
-              ] as const
-            ).map(([dark, name]) => (
-              <button key={name} type="button" role="radio" aria-checked={darkPaper === dark} data-command="settings.paper" onClick={() => commands.tap('settings.paper', { on: dark })}>
-                {name}
-              </button>
-            ))}
-          </div>
-        </div>
-        <p className="settings-hint">In the dark theme, the paper can be dark too, its ink in colours that read on it. Printing is always on white.</p>
-      </section>
-      <AiSettingsPart />
-      {inWindowsApp() ? <LibraryPlace beforeChange={beforeChange} /> : null}
-      <section className="settings-part">
-        <h3>{app ? 'Storage in the app' : 'Storage in this browser'}</h3>
+    <SettingsPage title="Sync and storage" lead="Where your notes are kept, and how safe that place is.">
+      {inWindowsApp() ? <LibraryPlace /> : null}
+      <SettingsPart title={app ? 'Storage in the app' : 'Storage in this browser'}>
         <p className="settings-line">
           <HardDrive size={16} aria-hidden />
           <span data-testid="storage-used">{usage ? `Your notes and pictures use ${size(usage.used)}${usage.quota ? ` of about ${size(usage.quota)} ${app ? 'the app may use' : 'this browser allows'}` : ''}.` : 'Measuring…'}</span>
@@ -139,7 +85,7 @@ export function Settings({ onClose, beforeChange }: { onClose: () => void; befor
             ? 'Your notes are files in the folder above; this is the copy of each the app keeps on this computer beside them.'
             : `${app ? 'What the app keeps is on this computer only, in its own folder.' : 'A browser can still clear what it keeps, for example when you clear its history.'} The copy that lasts is a .shellnote file: open a note and choose Save.`}
         </p>
-      </section>
-    </Dialog>
+      </SettingsPart>
+    </SettingsPage>
   )
 }

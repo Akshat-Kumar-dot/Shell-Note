@@ -534,3 +534,176 @@ html[data-own-titlebar] .tree[data-at='right'] .tree-head {
   color: var(--ui-text-3);
   pointer-events: none;
 }
+
+/* ----- the looks (Customise): flat is all of the above; islands and dock change only how the frame is drawn ----- */
+
+/* Islands: the library's column and the screen are rounded panels on a deeper ground; the bar for typing, under the
+   tabs, is a pill over the note. */
+.shell[data-look='islands'] {
+  gap: 8px;
+  padding: 8px 8px 8px 0;
+  background: var(--sh-deep);
+}
+.shell[data-look='islands'] > .rail {
+  margin-right: -8px;
+  border: 0;
+}
+.shell[data-look='islands'] > .tree,
+.shell[data-look='islands'] > .shell-main {
+  overflow: hidden;
+  border: 1px solid var(--sh-line);
+  border-radius: 14px;
+}
+.shell[data-look='islands'] > .tree {
+  background: var(--sh-panel);
+}
+.shell[data-look='islands'] .sh-tabs {
+  gap: 4px;
+  height: 46px;
+  padding: 8px 4px 0 10px;
+  border-bottom: 0;
+  background: none;
+}
+.shell[data-look='islands'] .sh-tab {
+  height: 32px;
+  margin: 0;
+  padding: 0 8px 0 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+}
+.shell[data-look='islands'] .sh-tab[aria-selected='true'] {
+  background: var(--sh-chosen);
+  box-shadow: none;
+  clip-path: none;
+  color: var(--sh-chosen-text);
+}
+.shell[data-look='islands'] .nw-bar[data-bar='tools'][data-at='top'] {
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  margin: 6px auto 4px;
+  border: 1px solid var(--sh-line-2);
+  border-radius: 13px;
+  box-shadow: var(--sh-shadow);
+}
+.shell[data-look='islands'] .nw-bar[data-bar='tools'][data-at='top'] .sh-tools {
+  border-radius: 12px;
+}
+.shell[data-look='islands'] .sh-status {
+  border-top: 0;
+  background: none;
+}
+.shell[data-look='islands'] .card,
+.shell[data-look='islands'] .lib-start {
+  border-radius: 14px;
+}
+.shell[data-look='islands'] .tree-row,
+.shell[data-look='islands'] .sh-b {
+  border-radius: 9px;
+}
+
+/* Dock: no rail down the side; its places run across the top of the library's column (the column on either side),
+   and the bar for typing is a pill at the bottom. With the column hidden, the rail stays where it was. */
+@media (min-width: 780px) {
+  .shell[data-look='dock']:has(> .tree) {
+    display: grid;
+    grid-template-columns: 272px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .shell[data-look='dock']:has(> .tree) > .rail {
+    grid-column: 1;
+    grid-row: 1;
+    flex-direction: row;
+    width: auto;
+    height: 48px;
+    padding: 0 10px;
+    overflow: hidden;
+    border-bottom: 1px solid var(--sh-line);
+    background: var(--sh-desk);
+  }
+  .shell[data-look='dock']:has(> .tree) > .rail .rail-mark {
+    display: none;
+  }
+  .shell[data-look='dock']:has(> .tree) > .tree {
+    grid-column: 1;
+    grid-row: 2;
+    width: auto;
+    min-height: 0;
+    background: var(--sh-desk);
+  }
+  .shell[data-look='dock']:has(> .tree) > .shell-main {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+  .shell[data-look='dock']:has(> .tree[data-at='right']) {
+    grid-template-columns: minmax(0, 1fr) 272px;
+  }
+  .shell[data-look='dock']:has(> .tree[data-at='right']) > .rail {
+    grid-column: 2;
+    border-right: 0;
+    border-left: 1px solid var(--sh-line);
+  }
+  .shell[data-look='dock']:has(> .tree[data-at='right']) > .tree {
+    grid-column: 2;
+  }
+  .shell[data-look='dock']:has(> .tree[data-at='right']) > .shell-main {
+    grid-column: 1;
+  }
+}
+.shell[data-look='dock'] .sh-tabs {
+  gap: 2px;
+  height: 44px;
+  padding-left: 14px;
+  border-bottom: 0;
+  background: var(--sh-surface);
+}
+.shell[data-look='dock'] .sh-tab {
+  margin: 8px 0;
+  padding: 0 8px 0 10px;
+  border-radius: 8px;
+}
+.shell[data-look='dock'] .sh-tab[aria-selected='true'] {
+  background: var(--sh-hover);
+  box-shadow: none;
+  clip-path: none;
+}
+.shell[data-look='dock'] .nw-bar[data-bar='tools'][data-at='bottom'] {
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  margin: 0 auto 10px;
+  border: 1px solid var(--sh-line-2);
+  border-radius: 14px;
+  background: var(--sh-surface);
+  box-shadow: var(--sh-shadow);
+}
+.shell[data-look='dock'] .nw-bar[data-bar='tools'][data-at='bottom'] .sh-tools {
+  min-height: 52px;
+  border: 0;
+  border-radius: 13px;
+}
+.shell[data-look='dock'] .sh-status {
+  border-top: 0;
+  background: var(--sh-surface);
+}
+
+/* Settings' own column on a narrow screen, where the library's column gives way: its sections in a row above the page. */
+@media (max-width: 779px) {
+  .tree.set-nav {
+    display: flex;
+    order: 1;
+    width: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--sh-line);
+  }
+  .tree.set-nav .tree-head {
+    display: none;
+  }
+  .tree.set-nav .tree-items {
+    display: flex;
+    gap: 2px;
+    overflow-x: auto;
+    padding: 4px 8px;
+  }
+  .tree.set-nav .tree-row {
+    white-space: nowrap;
+  }
+}

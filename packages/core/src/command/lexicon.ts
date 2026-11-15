@@ -197,6 +197,8 @@ export const VERBS: Readonly<Record<string, readonly string[]>> = {
   'library.search': ['search', 'find', 'look for', 'look up', 'hunt for', 'locate', 'where is', 'query', 'search for', 'seek', 'track down', 'dig up', 'fetch', 'which note'],
   'library.sort': ['sort', 'order', 'arrange', 'rank', 'organize', 'organise', 'reorder', 'list by', 'sort by', 'order by', 'arrange by', 'newest first', 'oldest first', 'latest first', 'recent first', 'reverse the order', 'put first'],
   'library.filter': ['show only', 'only show', 'just show', 'filter by type', 'filter by kind', 'narrow to', 'limit to', 'restrict to', 'only the', 'just the', 'every type', 'all types'],
+  'library.look': ['look', 'grid', 'as cards', 'as a list', 'show as', 'display as', 'view as', 'card view', 'list view'],
+  'library.column': ['column', 'side column', 'folder column', 'folder tree', 'tree', 'move the column', 'hide the column'],
 
   'bin.open': [...SHOW, 'check', 'browse', 'go to', 'list', 'what is in', 'what did i delete', 'look in', 'go into', 'inspect'],
   'bin.restore': ['restore', 'recover', 'bring back', 'undelete', 'get back', 'retrieve', 'put back', 'unarchive', 'rescue', 'revive', 'reinstate', 'salvage', 'regain', 'return', 'pull out', 'take back out', 'save from'],
@@ -245,6 +247,7 @@ export const VERBS: Readonly<Record<string, readonly string[]>> = {
   'settings.penReset': ['reset', 'restore defaults', 'use my defaults', 'use my own settings', 'clear the note settings', 'go back to my settings', 'revert', 'undo the note settings', 'default', 'back to default'],
   'settings.developer': SWITCH,
   'settings.tidyRule': SWITCH,
+  'settings.assistants': ['assistants', 'assistant', 'mcp', 'mcp server', 'other ai apps', 'ai apps', 'connected apps', 'connections', 'let assistants', 'block assistants'],
 
   'select.area': ['select area', 'choose area', 'select an area', 'draw a box', 'box', 'mark an area', 'outline', 'select region', 'pick area', 'frame', 'select a region', 'drag a box', 'select the space', 'grab the area'],
   'select.blocks': ['select', 'choose', 'pick', 'mark', 'grab', 'take', 'tick', 'check', 'highlight', 'pick out', 'single out', 'focus on'],
@@ -260,10 +263,13 @@ export const VERBS: Readonly<Record<string, readonly string[]>> = {
   'panel.show': [...SHOW.filter((word) => word !== 'reveal'), 'reveal', 'unhide', 'switch to', 'go to', 'expand the side'],
   'panel.hide': [...HIDE, 'get rid of', 'remove', 'close the side'],
   'panel.full': ['full view', 'focus', 'focus on', 'fill', 'fill the window', 'take over', 'full window', 'only', 'alone', 'spotlight', 'zoom in on', 'maximize', 'maximise', 'expand', 'enlarge the panel', 'leave full view', 'exit full view', 'one panel'],
+  'panel.dock': ['dock', 'move', 'put', 'place', 'switch sides', 'other side', 'move over', 'swap sides', 'swap'],
 
   'bar.place': ['dock', 'place', 'put', 'move', 'pin', 'attach', 'snap', 'position', 'stick', 'send to', 'park'],
   'bar.float': ['float', 'undock', 'detach', 'unpin', 'free', 'pop out', 'loose', 'let it float', 'make it float'],
   'bar.turn': ['turn', 'rotate', 'flip', 'vertical', 'horizontal', 'sideways', 'upright', 'stand up', 'lay down', 'change direction'],
+  'bar.button': ['button', 'buttons', 'add', 'remove', 'take out', 'put in', 'add to', 'take off', 'customise', 'customize', 'more menu'],
+  'layout.look': ['look', 'style', 'skin', 'design', 'change the look', 'switch the look', 'use the look'],
   'layout.reset': ['reset', 'restore', 'default', 'put back', 'back to normal', 'start over', 'rearrange', 'fix', 'undo the layout', 'tidy up', 'clean up', 'reset the layout', 'original'],
 
   'video.add': ['add', 'insert', 'attach', 'embed', 'put in', 'link', 'paste a link', 'load', 'bring in', 'include', 'open a link', 'add a video', 'put a video'],

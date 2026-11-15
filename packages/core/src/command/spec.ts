@@ -49,6 +49,15 @@ export interface Limit {
 
 const name = z.string().min(1).max(200)
 
+/** The buttons the bar for typing can hold, in the order they are offered; the first twelve are in it as it starts, the rest under its More. */
+export const TYPING_BUTTONS = ['undo', 'redo', 'style', 'font', 'bold', 'italic', 'underline', 'colour', 'align', 'link', 'picture', 'table', 'strike', 'highlight', 'code', 'sub', 'sup', 'todo', 'diagram', 'select'] as const
+export type TypingButton = (typeof TYPING_BUTTONS)[number]
+/** The bar for typing as it starts. */
+export const TYPING_START: readonly TypingButton[] = TYPING_BUTTONS.slice(0, 12)
+/** The sections of Settings, in the order its column lists them. */
+export const SETTINGS_SECTIONS = ['general', 'appearance', 'customise', 'pen', 'ai', 'assistants', 'storage', 'about'] as const
+export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]
+
 /**
  * The input vocabulary: every command's fields come from here, so each name has
  * one meaning. Values are the words people use (a pen's width is "fine", not
@@ -79,6 +88,13 @@ export const FIELDS = {
   place: z.enum(['top', 'bottom', 'left', 'right']).describe('Where a bar is docked'),
   by: z.enum(['edited', 'created']).describe('Sort by the date last edited, or created'),
   order: z.enum(['newest', 'oldest']).describe('Which come first'),
+  section: z.enum(SETTINGS_SECTIONS).describe('A section of Settings: general (the keys), appearance, customise, pen, ai, assistants, storage (sync and storage) or about'),
+  shell: z.enum(['flat', 'islands', 'dock']).describe("The app's look: flat (one row of tools under the tabs, thin lines), islands (rounded panels, the tools floating over the note) or dock (no rail, the tools at the bottom)"),
+  button: z.enum(TYPING_BUTTONS).describe('A button of the bar for typing: undo, redo, style, font (font and size), bold, italic, underline, colour, align, link, picture, table, strike (strikethrough), highlight, code, sub (subscript), sup (superscript), todo (to-do list), diagram, select (select with a box)'),
+  position: z.int().min(1).max(TYPING_BUTTONS.length).describe('A place in the bar for typing, counted from 1 at its start'),
+  side: z.enum(['left', 'right', 'hidden']).describe('Which side of the window something sits on, left or right, or hidden'),
+  view: z.enum(['cards', 'list']).describe("How the library shows its folders and notes: as cards or as a list"),
+  part: z.enum(['all', 'look', 'tools', 'places']).describe("What goes back as it started: the places of the panels, the bars and the library's column (places), the app's look (look), the bar for typing's buttons (tools), or all of it (all)"),
   show: z.enum(['all', 'text', 'sketch', 'mixed']).describe('Which notes the library shows: all of them, or only the text notes, the sketches or the mixed notes'),
   look: z.enum(['system', 'light', 'dark']).describe("The app's appearance; system follows Windows"),
   accent: z.enum(['graphite', 'blue', 'teal', 'green', 'amber', 'rose', 'red']).describe("The app's own colour, on its buttons and what is chosen; graphite is no colour"),

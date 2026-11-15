@@ -26,7 +26,7 @@ import { holdsWords, noteSnip, noteWords } from './words.js'
 import { KEPT_DAYS, type Exchanged, type ExchangedNote, type FileState, type FolderEntry, type ItemRef, type Library, type LibraryStore, type NoteEntry, type OpenedNote, type OutsideChange, type SavingNote } from './store.js'
 import { canMove, contents, onlyUsedBy, uniqueName } from './tree.js'
 import type { FileInfo, Files } from './files.js'
-import { BIN, binned, folderId, folderOf, freeName, HIDDEN, inBin, isClutter, isHidden, isNote, join, MARK, namedFor, nameOf, PEN_PROFILE, previewPath, recordPath, safeName, stem, titleStem } from './layout.js'
+import { ASSISTANTS, assistantsAllowed, BIN, binned, folderId, folderOf, freeName, HIDDEN, inBin, isClutter, isHidden, isNote, join, MARK, namedFor, nameOf, PEN_PROFILE, previewPath, recordPath, safeName, stem, titleStem } from './layout.js'
 
 /** What this device knows of one note: where its file is, what its own copy holds, and what that copy has seen. */
 interface NoteState {
@@ -1140,6 +1140,19 @@ export class FolderLibrary implements LibraryStore {
     return this.#run(async () => {
       if (profile) await this.#writeJson(this.#shared, PEN_PROFILE, PenProfile.parse(profile))
       else await this.#shared.remove(PEN_PROFILE)
+    })
+  }
+
+  assistants(): Promise<boolean> {
+    // No file: as a library starts, they may. A file: only one that plainly says on lets them in.
+    return this.#run(async () => !(await this.#shared.info(ASSISTANTS)) || assistantsAllowed(await this.#readJson(this.#shared, ASSISTANTS)))
+  }
+
+  setAssistants(on: boolean): Promise<void> {
+    return this.#run(async () => {
+      // On is how a library starts: no file says it.
+      if (on) await this.#shared.remove(ASSISTANTS)
+      else await this.#writeJson(this.#shared, ASSISTANTS, { on: false })
     })
   }
 }

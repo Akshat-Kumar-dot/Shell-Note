@@ -50,7 +50,7 @@ describe('the view and choosing blocks as commands', () => {
     const set: number[] = []
     let zoom = start
     const fail = async (): Promise<never> => Promise.reject(new Error('not in this test'))
-    const place: WorkspacePlace = { zoom: () => zoom, setZoom: (next) => void set.push((zoom = next)), close: fail, save: fail, openFile: fail, newNote: fail, rename: () => undefined, editing: () => true, entry: () => undefined, ready: () => true, openSettings: () => undefined, undoAi: () => '', editHere: () => '', print: () => '' }
+    const place: WorkspacePlace = { zoom: () => zoom, setZoom: (next) => void set.push((zoom = next)), close: fail, save: fail, openFile: fail, newNote: fail, rename: () => undefined, editing: () => true, entry: () => undefined, ready: () => true, undoAi: () => '', editHere: () => '', print: () => '' }
     return { zoom: () => zoom, set, place }
   }
 
@@ -140,7 +140,7 @@ describe('the timer and the video as commands', () => {
   it("show one of the note's videos by id or name, refusing a name it does not have, and list them in the state", async () => {
     const store = new EditorStore(PHYSICS)
     store.apply([{ op: 'update', id: store.doc.id, set: { media: [{ id: 'vid00001', kind: 'youtube', video: 'aircAruvnKk', title: 'Neural networks' }] } }])
-    const { place } = { place: { zoom: () => 1, setZoom: () => undefined, close: async () => undefined, save: async () => '', openFile: async () => '', newNote: async () => ({ id: '', title: '' }), rename: () => undefined, editing: () => true, entry: () => undefined, ready: () => true, openSettings: () => undefined, undoAi: () => '', editHere: () => '', print: () => '' } satisfies WorkspacePlace }
+    const { place } = { place: { zoom: () => 1, setZoom: () => undefined, close: async () => undefined, save: async () => '', openFile: async () => '', newNote: async () => ({ id: '', title: '' }), rename: () => undefined, editing: () => true, entry: () => undefined, ready: () => true, undoAi: () => '', editHere: () => '', print: () => '' } satisfies WorkspacePlace }
     const stops = [commands.provide('note', { store }), commands.provide('workspace', place)]
     try {
       expect(commands.do('video.show', { video: 'neural networks' })).toBe('video "Neural networks" (vid00001) shown')
@@ -243,7 +243,7 @@ describe("the agent's call", () => {
     const store = new EditorStore(PHYSICS)
     store.apply([{ op: 'update', id: store.doc.id, set: { title: 'Changed' } }])
     const changed = store.doc
-    const readOnly: WorkspacePlace = { zoom: () => 1, setZoom: () => undefined, close: async () => undefined, save: async () => '', openFile: async () => '', newNote: async () => ({ id: '', title: '' }), rename: () => undefined, editing: () => false, entry: () => undefined, ready: () => true, openSettings: () => undefined, undoAi: () => '', editHere: () => '', print: () => '' }
+    const readOnly: WorkspacePlace = { zoom: () => 1, setZoom: () => undefined, close: async () => undefined, save: async () => '', openFile: async () => '', newNote: async () => ({ id: '', title: '' }), rename: () => undefined, editing: () => false, entry: () => undefined, ready: () => true, undoAi: () => '', editHere: () => '', print: () => '' }
     const stops = [commands.provide('note', { store }), commands.provide('workspace', readOnly)]
     try {
       for (const name of ['edit.undo', 'edit.redo', 'video.mark']) {

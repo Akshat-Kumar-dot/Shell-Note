@@ -17,7 +17,6 @@ import { loadSettings, missing, modelFrom, savedKey } from './ai/settings.js'
 import { keepWhenClosing } from './desktop.js'
 import { importNote } from './library/importing.js'
 import { libraryPictures } from './library/pictures.js'
-import { Settings } from './library/Settings.js'
 import { NoteMenu } from './shell/NoteMenu.js'
 import { noteScreen, tabsAt, tabsEnd } from './shell/state.js'
 import type { LibraryStore } from '@shellnote/library'
@@ -181,7 +180,6 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
   const noteRef = useRef(note)
   noteRef.current = note
   const takeAssistants = useRef<() => void>(() => undefined)
-  const [settings, setSettings] = useState(false)
   // The print window's pages, drawn while it is open (note.print).
   const [printing, setPrinting] = useState(false)
   const printed = useCallback(() => setPrinting(false), [])
@@ -458,7 +456,7 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
         const key = savedKey()
         return modelFrom(chosen, key) ?? missing(chosen, key)!
       },
-      openSettings: () => setSettings(true),
+      openSettings: () => commands.tap('settings.open', { section: 'ai' }),
       logged: (entry, undo) => keepLog([...logRef.current, { entry, ...(undo ? { undo } : {}) }]),
       answered: (asked) => {
         setAnswer((now) => ({ n: (now?.n ?? 0) + 1, answer: asked }))
@@ -594,7 +592,6 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
         editing: () => editingNow.current,
         entry: () => note,
         ready: () => modeRef.current !== 'checking',
-        openSettings: () => setSettings(true),
         undoAi: () => own.current.undoAi(),
         editHere: () => own.current.takeOver(),
         print: () => {
@@ -878,7 +875,6 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
           )
         : null}
       {editing ? <AiLayer key={session.key} store={store} host={host} enabled={editing} /> : null}
-      {settings ? <Settings onClose={() => setSettings(false)} beforeChange={flush} /> : null}
       {printing ? <PrintView doc={store.doc} assets={store.assets.snapshot()} onDone={printed} heading={heading} /> : null}
     </div>
   )
