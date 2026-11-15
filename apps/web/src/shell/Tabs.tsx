@@ -5,7 +5,7 @@
 // tabs are each person's own, kept in their browser.
 import type { NoteKind } from '@shellnote/core'
 import { commands } from '@shellnote/editor'
-import { House, PanelLeft, Plus, Settings, X } from 'lucide-react'
+import { House, PanelLeft, PanelRight, Plus, Settings, X } from 'lucide-react'
 import { useEffect, useSyncExternalStore } from 'react'
 import { KIND_ICON } from '../library/kinds.js'
 import { closeTab, keepSettingsTab, lastElsewhere, noteScreen, openNotes, openTab, settingsTab, tabsEnd, treeAt, treeShown } from './state.js'
@@ -28,6 +28,7 @@ export function Tabs({ library, settings }: { library: boolean; settings: boolea
   const settingsOpen = useSyncExternalStore(settingsTab.subscribe, settingsTab.snapshot)
   const now = useSyncExternalStore(noteScreen.subscribe, noteScreen.snapshot)
   const tree = useSyncExternalStore(treeShown.subscribe, treeShown.snapshot)
+  const side = useSyncExternalStore(treeAt.subscribe, treeAt.snapshot)
 
   // The note on screen has its tab, under the title and with the kind it has now.
   useEffect(() => {
@@ -53,11 +54,17 @@ export function Tabs({ library, settings }: { library: boolean; settings: boolea
 
   return (
     <header className="sh-tabs" data-tauri-drag-region="deep">
-      {tree ? null : (
-        <button type="button" className="sh-b sh-tabs-tree" aria-label="Show the library" title="Show the library column: your folders and notes" data-command="library.column" onClick={() => commands.tap('library.column', { side: treeAt.value })}>
-          <PanelLeft {...ICON} />
-        </button>
-      )}
+      {/* The library's column shown or hidden from here, one press each way. */}
+      <button
+        type="button"
+        className="sh-b sh-tabs-tree"
+        aria-label={tree ? 'Hide the library' : 'Show the library'}
+        title={tree ? 'Hide the library column' : 'Show the library column: your folders and notes'}
+        data-command="library.column"
+        onClick={() => commands.tap('library.column', { side: tree ? 'hidden' : side })}
+      >
+        {side === 'right' ? <PanelRight {...ICON} /> : <PanelLeft {...ICON} />}
+      </button>
       <div className="sh-tablist" role="tablist" aria-label="Open notes">
         <button type="button" role="tab" className="sh-tab" aria-selected={library} title="Library: your folders and notes" data-command="library.open" onClick={() => commands.press('library.open', now?.folder ? { folder: now.folder } : {})}>
           <House {...ICON} />

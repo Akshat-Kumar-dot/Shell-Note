@@ -72,6 +72,11 @@ test('the library column opens a note in one click, makes and names a folder, fi
   await page.getByRole('button', { name: 'Show the library' }).click()
   await page.reload()
   await expect(side.getByRole('button', { name: 'Physics: 1 note' })).toHaveAttribute('aria-expanded', 'true')
+  // The same button of the tabs' row hides it, one press each way.
+  await page.getByRole('button', { name: 'Hide the library', exact: true }).click()
+  await expect(side).toHaveCount(0)
+  await page.getByRole('button', { name: 'Show the library', exact: true }).click()
+  await expect(side).toBeVisible()
 })
 
 test("the rail's search opens search in every note in the column, the caret in its box, the column shown for it if it was hidden", async ({ page }) => {
