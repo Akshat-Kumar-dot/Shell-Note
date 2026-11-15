@@ -258,12 +258,22 @@ a {
   font: 500 13px/1 var(--ui-font);
   cursor: pointer;
 }
-.lib-f:hover {
+.lib-f:hover:not(:disabled) {
   background: var(--sh-hover);
 }
 .lib-f[aria-pressed='true'] {
   background: var(--sh-chosen);
   color: var(--sh-chosen-text);
+}
+/* A kind still to come: greyed, with its "later", as in the New menu. */
+.lib-f:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.lib-f em {
+  color: inherit;
+  font: 11px/1 var(--ui-font);
+  font-style: normal;
 }
 .lib-sort {
   display: inline-flex;

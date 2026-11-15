@@ -835,6 +835,10 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
                       {word}
                     </button>
                   ))}
+                  <button type="button" className="lib-f" aria-pressed={false} disabled title="Boards, cards joined by arrows, come later">
+                    <Workflow size={15} aria-hidden />
+                    Boards<em>later</em>
+                  </button>
                 </div>
                 <label className="lib-sort">
                   <ArrowUpDown size={15} aria-hidden />
