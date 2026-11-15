@@ -400,7 +400,7 @@ function TextRow({ store }: { store: EditorStore }) {
         )
       case 'diagram':
         return (
-          <button type="button" className="sh-b" aria-label="Diagram" title="A flowchart under the line the caret is on, to change as you like (Mermaid)" data-command="diagram.add" onMouseDown={keepFocus} onClick={addDiagram}>
+          <button type="button" className="sh-b" aria-label="Diagram" title="A flowchart under the line the caret is on, to change as you like (Mermaid)" onMouseDown={keepFocus} onClick={addDiagram}>
             <Workflow size={ICON} aria-hidden />
           </button>
         )
@@ -552,7 +552,6 @@ function TextRow({ store }: { store: EditorStore }) {
           <MenuItem
             label="Diagram"
             title="A flowchart under the line the caret is on, to change as you like (Mermaid)"
-            command="diagram.add"
             onChoose={() => {
               close()
               addDiagram()

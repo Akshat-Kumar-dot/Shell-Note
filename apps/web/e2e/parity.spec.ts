@@ -81,9 +81,32 @@ async function walk(page: Page): Promise<void> {
   await page.getByRole('menuitem', { name: 'Move to…' }).click()
   await look(page, 'library, move dialog')
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: 'Settings' }).click()
-  await look(page, 'library, Settings')
+  // Settings, a tab of its own: each of its sections.
+  await page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Settings', exact: true }).click()
+  for (const section of ['General', 'Appearance', 'Customise', 'Pen', 'AI', 'Assistants', 'Sync and storage', 'About']) {
+    await page.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: section, exact: true }).click()
+    await expect(page.getByRole('heading', { name: section, level: 1 })).toBeVisible()
+    await look(page, `Settings, ${section}`)
+  }
+  await page.getByRole('button', { name: 'Close Settings' }).click()
+  await expect(page.locator('.home')).toBeVisible()
+  // The command box (Ctrl+P), and a command's choices in it.
+  await page.keyboard.press('Control+p')
+  const box = page.getByRole('combobox', { name: 'Open a note, or run a command' })
+  await expect(box).toBeFocused()
+  await look(page, 'the command box')
+  await box.fill('app look')
+  await box.press('Enter')
+  await expect(page.getByRole('option', { name: 'Islands' })).toBeVisible()
+  await look(page, 'the command box, a choice')
   await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.cmd')).toHaveCount(0)
+  // Search in every note, in the column.
+  await page.keyboard.press('Control+Shift+F')
+  await page.getByRole('searchbox', { name: 'Search in every note' }).fill('Physics')
+  await look(page, 'search in every note')
+  await page.getByRole('button', { name: 'Close the search' }).click()
   // Recently deleted: a card's menu, the question before deleting for good, the toast's Undo.
   await terminal(page, 'folder.delete folder=Maths', 'bin.open')
   await look(page, 'Recently deleted')
@@ -187,11 +210,17 @@ async function walk(page: Page): Promise<void> {
 const PERSON: { why: string; name?: RegExp; cls?: RegExp; within?: RegExp }[] = [
   { why: "Note control: what is inside the note, the row for words' and the page's own", name: /^(Bold|Italic|Underline|Strikethrough|Code|Highlight|Subscript|Superscript|Link|Small|Normal size|Large|Extra large|Align left|Centre|Align right|Indent less|Indent more|Ticked|Picture|Table|Paragraph|Heading [123]|Bullet list|Numbered list|To-do list|Quote|Sans|Serif|Mono|Handwriting|More fonts…|Blank|Lines|Squares|Dots|All pages|This page|Diagram)$/u },
   { why: 'Note control: adding and deleting pages is what is inside the note', cls: /nw-add-page|nw-page-insert|nw-page-delete/u },
-  { why: 'Where the person looks: the library column shown or hidden, on either side, sorted, its folders opened, its search (the rail’s too); its notes open with note.open', cls: /tree-(folder|clear)|sh-tabs-tree|rail-find/u },
-  { why: 'Where the person looks: the library column’s search box, and its sort and place', name: /^(Search the library|Name|Last edited, newest first|Move the library to the (left|right)|Hide the library)$/u },
-  { why: 'Where the person looks: a tab of a note not on screen closed, the note itself untouched', name: /^Close the tab of /u },
+  { why: 'Where the person looks: the library column’s folders opened, and the rail’s search in every note (its box runs library.findWords); its notes open with note.open', cls: /tree-folder|rail-find/u },
+  { why: 'Where the person looks: the library column’s sort', name: /^(Name|Last edited, newest first)$/u },
+  { why: 'Where the person looks: a tab closed (a note not on screen, or Settings), the note itself untouched', name: /^(Close the tab of .*|Close Settings)$/u },
+  { why: 'Where the person looks: search in every note put away, the library’s folders back', name: /^Close the search$/u },
+  { why: "The command box is the person's way to open or run anything: each note, folder and command it offers runs its own command", cls: /tree-open/u },
+  { why: "The command box's own field: what it offers runs its command", within: /^the command box/u },
+  { why: "The person's own: a line copied, for their AI app's settings", name: /^Copy the line$/u },
+  { why: 'Reading: pages about ShellNote, opened in the browser', name: /^(The source code, on GitHub|The other projects ShellNote is built with.*|The fonts, and their licences|the guide to the MCP server)$/u },
+  { why: "Still to come, greyed with its later: boards, and the library's Home", name: /^(Boards, cards joined by arrows, come later|Home: later)$/u },
   { why: 'Where the person looks: both rows of tools at once, or the one in hand', name: /^Show both rows$/u },
-  { why: "Opens a menu, a field or a dialog, whose own controls carry the commands (the pen's colours, a bar's places, a card's actions, the name typed, the folder chosen)", name: /^(Actions for .*|Pen settings|Video|Move the tool bar|Colour|More colours|Move to…|Rename|Paste again|Style|Font and size|Align and indent|More|Width|This note|Zoom|Sort and place|Where the video sits|Description|Kind|Page|Paper|Back to This note)$/u },
+  { why: "Opens a menu, a field or a dialog, whose own controls carry the commands (the pen's colours, a bar's places, a card's actions, the name typed, the folder chosen)", name: /^(New|Actions for .*|Pen settings|Video|Move the tool bar|Colour|More colours|Move to…|Rename|Paste again|Style|Font and size|Align and indent|More|Width|This note|Zoom|Sort and place|Where the video sits|Description|Kind|Page|Paper|Back to This note)$/u },
   { why: "The pen and the eraser: a press takes it in hand (tool.choose, from the words' row's Pen); in hand, a press opens its kinds or its ways", name: /^(Pen|Eraser)$/u, within: /Pen|Highlighter|Eraser/u },
   { why: "In Recently deleted a card's click opens its menu, whose Restore and Delete for good carry the commands", name: /^(Folder|Note): .*Deleted /u },
   { why: "The terminal is where the agent's lines run: the person opens and closes it, from the rail or with Ctrl+Shift+P", cls: /rail-terminal/u },

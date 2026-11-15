@@ -46,11 +46,14 @@ test('the library column opens a note in one click, makes and names a folder, fi
   await expect(page).toHaveURL(waves)
   await expect(title).toHaveValue('Waves')
 
-  // Found by name, with where it is; Escape empties the search.
-  const search = side.getByRole('searchbox', { name: 'Search the library' })
-  await search.fill('untit')
-  await expect(side.getByRole('button', { name: 'Untitled, in Physics' })).toBeVisible()
-  await search.press('Escape')
+  // Found by name in the command box ("Open or run…" at the column's top), with where it is; Escape closes it.
+  await side.getByRole('button', { name: /^Open or run/u }).click()
+  const box = page.getByRole('combobox', { name: 'Open a note, or run a command' })
+  await expect(box).toBeFocused()
+  await box.fill('untit')
+  await expect(page.getByRole('option', { name: /Untitled.*Physics/u })).toBeVisible()
+  await box.press('Escape')
+  await expect(box).toHaveCount(0)
   await expect(side.getByRole('button', { name: 'Physics: 1 note' })).toBeVisible()
 
   // Moved to the right, it stays there after a reload, and comes back.
@@ -71,16 +74,22 @@ test('the library column opens a note in one click, makes and names a folder, fi
   await expect(side.getByRole('button', { name: 'Physics: 1 note' })).toHaveAttribute('aria-expanded', 'true')
 })
 
-test("the rail's search puts the caret in the library's search, the column shown for it if it was hidden", async ({ page }) => {
+test("the rail's search opens search in every note in the column, the caret in its box, the column shown for it if it was hidden", async ({ page }) => {
   await page.goto('/#/new')
   await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
   const rail = page.getByRole('navigation', { name: 'Places' })
   const side = page.getByRole('navigation', { name: 'Library' })
+  const search = page.getByRole('navigation', { name: 'Search in every note' })
   await rail.getByRole('button', { name: 'Search', exact: true }).click()
-  await expect(side.getByRole('searchbox', { name: 'Search the library' })).toBeFocused()
+  await expect(search.getByRole('searchbox', { name: 'Search in every note' })).toBeFocused()
+  await expect(rail.getByRole('button', { name: 'Search', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  // Escape with no words: the library's column is back.
+  await page.keyboard.press('Escape')
+  await expect(side).toBeVisible()
   await side.getByRole('button', { name: 'Sort and place' }).click()
   await page.getByRole('menuitem', { name: 'Hide the library', exact: true }).click()
   await expect(side).toHaveCount(0)
-  await rail.getByRole('button', { name: 'Search', exact: true }).click()
-  await expect(side.getByRole('searchbox', { name: 'Search the library' })).toBeFocused()
+  // Hidden, the column shows for the search, as Ctrl+Shift+F asks.
+  await page.keyboard.press('Control+Shift+F')
+  await expect(search.getByRole('searchbox', { name: 'Search in every note' })).toBeFocused()
 })

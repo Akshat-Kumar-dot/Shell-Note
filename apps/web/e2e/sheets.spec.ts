@@ -5,6 +5,20 @@ import { expect, test, type Page } from './fixtures.js'
 import { chooseTool, penRow } from './shell.js'
 
 /** A choice of the note's menu: a line of its first level, then one of the choices it opens. */
+/** Lines typed into the terminal, each answered, then the terminal closed. */
+async function terminal(page: Page, ...lines: string[]): Promise<void> {
+  await page.keyboard.press('Control+Shift+P')
+  const box = page.getByRole('textbox', { name: 'Terminal line' })
+  const outputs = page.locator('.nw-terminal-out')
+  for (const line of lines) {
+    const before = await outputs.count()
+    await box.fill(line)
+    await box.press('Enter')
+    await expect(outputs).toHaveCount(before + 1)
+  }
+  await box.press('Escape')
+}
+
 async function choose(page: Page, line: 'Kind' | 'Page' | 'Paper', choice: string): Promise<void> {
   await page.getByRole('button', { name: 'This note', exact: true }).click()
   await page.getByRole('menuitem', { name: line, exact: true }).click()
@@ -91,11 +105,10 @@ test('a text note shown seamless has no paper; dark paper is a choice in the dar
   await choose(page, 'Kind', 'Mixed note')
   await expect(page.locator('html')).not.toHaveAttribute('data-paperless', '')
 
-  await page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Settings', exact: true }).click()
-  await page.getByRole('radiogroup', { name: 'Appearance' }).getByRole('radio', { name: 'Dark', exact: true }).click()
-  await page.getByRole('radiogroup', { name: 'Paper in dark' }).getByRole('radio', { name: 'Dark', exact: true }).click()
+  // The dark theme and dark paper, by the commands Settings' own buttons call: a sample note is left behind by going to
+  // another screen, Settings' tab too, so it is asked for here (Appearance's buttons are the library tests').
+  await terminal(page, 'settings.theme look=dark', 'settings.paper on=true')
   await expect(page.locator('html')).toHaveAttribute('data-paper', 'dark')
-  await page.keyboard.press('Escape')
   expect(await page.locator('.nw-page').first().evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgb(26, 26, 27)')
   // The print window's pages, all of them, are white whatever the screen shows; they go when it closes.
   await page.evaluate(() => {

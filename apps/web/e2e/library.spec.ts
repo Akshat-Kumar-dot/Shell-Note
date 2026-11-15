@@ -25,6 +25,20 @@ function names(page: Page): Promise<string[]> {
   return page.locator('.card .card-name').allInnerTexts()
 }
 
+/** A new item from the library's New menu: a note of a kind (Mixed: pages, as a new note always had), or a folder. */
+async function newFrom(page: Page, item: 'Mixed' | 'Text note' | 'Sketch' | 'Folder'): Promise<void> {
+  await page.getByRole('button', { name: 'New', exact: true }).click()
+  await page.getByRole('menuitem', { name: new RegExp(`^${item}`, 'u') }).click()
+}
+
+/** Settings, a tab of its own, opened from the rail at one of its sections. */
+async function settingsAt(page: Page, section: string): Promise<Locator> {
+  await page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: section, exact: true }).click()
+  await expect(page.getByRole('heading', { name: section, level: 1 })).toBeVisible()
+  return page.locator('.set')
+}
+
 async function menu(page: Page, name: string, action: string): Promise<void> {
   await card(page, name).locator('.card-more').click()
   await page.getByRole('menuitem', { name: action, exact: true }).click()
@@ -42,7 +56,7 @@ async function renameWithF2(page: Page, from: string, to: string): Promise<void>
 }
 
 async function newNoteHere(page: Page, title: string): Promise<void> {
-  await page.locator('.home-actions').getByRole('button', { name: 'New note', exact: true }).click()
+  await newFrom(page, 'Mixed')
   await expect(page.locator('.nw-page').first()).toBeVisible()
   const field = page.getByRole('textbox', { name: 'Title' })
   await field.fill(title)
@@ -58,7 +72,7 @@ test('a new library is friendly and empty; New note opens a note, and back home 
   await home(page)
   await expect(page.getByRole('heading', { name: 'Your library is empty' })).toBeVisible()
   await newNoteHere(page, 'Waves')
-  await expect(card(page, 'Waves').locator('.card-meta')).toContainText('Edited just now')
+  await expect(card(page, 'Waves').locator('.card-meta')).toContainText('just now')
   // Changes not yet in a file: a dot.
   await expect(card(page, 'Waves').locator('.card-dot')).toHaveCount(1)
   const thumb = card(page, 'Waves').locator('img.card-thumb')
@@ -68,23 +82,24 @@ test('a new library is friendly and empty; New note opens a note, and back home 
 
 test('folders hold folders and notes; a path leads back up; rename by F2 or the menu; a reload keeps everything', async ({ page }) => {
   await home(page)
-  await page.getByRole('button', { name: 'New folder' }).click()
+  await newFrom(page, 'Folder')
   // A new folder's name is ready to type.
   const field = page.getByRole('textbox', { name: 'New name for Untitled folder' })
   await expect(field).toBeFocused()
   await field.fill('Physics')
   await field.press('Enter')
   await card(page, 'Physics').locator('.card-open').click()
-  await expect(page.getByRole('navigation', { name: 'Folder path' })).toContainText('Physics')
+  await expect(page.getByRole('heading', { name: 'Physics', level: 1 })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'This folder is empty' })).toBeVisible()
 
   // A folder inside it, and a note inside that.
-  await page.getByRole('button', { name: 'New folder' }).click()
+  await newFrom(page, 'Folder')
   await page.getByRole('textbox', { name: 'New name for Untitled folder' }).press('Enter')
   await renameWithF2(page, 'Untitled folder', 'Lab')
   await card(page, 'Lab').locator('.card-open').click()
   await newNoteHere(page, 'Pendulum')
-  await expect(page.getByRole('navigation', { name: 'Folder path' })).toHaveText(/Notes.*Physics.*Lab/u)
+  await expect(page.getByRole('navigation', { name: 'Folder path' })).toHaveText(/Library.*Physics/u)
+  await expect(page.getByRole('heading', { name: 'Lab', level: 1 })).toBeVisible()
 
   // Up the path, and the folder says what it holds.
   await page.getByRole('navigation', { name: 'Folder path' }).getByRole('link', { name: 'Physics' }).click()
@@ -96,7 +111,7 @@ test('folders hold folders and notes; a path leads back up; rename by F2 or the 
   await expect(card(page, 'Lab work')).toBeVisible()
 
   // New items get "Untitled", then "Untitled 2", even beside each other.
-  await page.locator('.home-actions').getByRole('button', { name: 'New note', exact: true }).click()
+  await newFrom(page, 'Mixed')
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Untitled')
   await page.getByRole('button', { name: 'New tab' }).click()
   await expect(page.getByRole('textbox', { name: 'Title' })).toHaveValue('Untitled 2')
@@ -112,14 +127,14 @@ test('folders hold folders and notes; a path leads back up; rename by F2 or the 
 test('a folder cannot move into itself or one of its own folders; notes and folders move anywhere else', async ({ page }) => {
   await home(page)
   for (const name of ['Physics', 'Maths']) {
-    await page.getByRole('button', { name: 'New folder' }).click()
+    await newFrom(page, 'Folder')
     const field = page.getByRole('textbox', { name: /New name for Untitled folder/u })
     await field.fill(name)
     await field.press('Enter')
     await expect(card(page, name)).toBeVisible()
   }
   await card(page, 'Physics').locator('.card-open').click()
-  await page.getByRole('button', { name: 'New folder' }).click()
+  await newFrom(page, 'Folder')
   await page.getByRole('textbox', { name: 'New name for Untitled folder' }).fill('Waves')
   await page.keyboard.press('Enter')
   await page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Library', exact: true }).click()
@@ -189,7 +204,7 @@ test('Delete goes to Recently deleted with Undo; restore brings it back; delete 
 test('search finds titles anywhere in the library, and sorting puts the oldest or newest first', async ({ page }) => {
   await home(page)
   await newNoteHere(page, 'Résumé of waves')
-  await page.getByRole('button', { name: 'New folder' }).click()
+  await newFrom(page, 'Folder')
   await page.getByRole('textbox', { name: 'New name for Untitled folder' }).fill('Physics')
   await page.keyboard.press('Enter')
   await card(page, 'Physics').locator('.card-open').click()
@@ -198,10 +213,10 @@ test('search finds titles anywhere in the library, and sorting puts the oldest o
   // The top level is a view of its own, made afresh once the address has changed: typed into before, the old one's search box is gone.
   await expect(card(page, 'Physics')).toBeVisible()
 
-  const search = page.getByRole('searchbox', { name: 'Search notes by title' })
+  const search = page.getByRole('searchbox', { name: 'Search notes' })
   await search.fill('NEWTON')
   await expect.poll(() => names(page)).toEqual(['Newton'])
-  await expect(card(page, 'Newton').locator('.card-meta')).toHaveText('In Notes › Physics')
+  await expect(card(page, 'Newton').locator('.card-meta')).toHaveText('In Library › Physics')
   await search.fill('resume')
   await expect.poll(() => names(page)).toEqual(['Résumé of waves'])
   await search.fill('nothing like it')
@@ -353,9 +368,9 @@ test("the app's own links open apart with Ctrl+click: a tab of their own in a br
 
 test('the settings show the storage used and change between light and dark, the paper staying white unless chosen dark', async ({ page }) => {
   await home(page)
-  await page.getByRole('button', { name: 'Settings' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Settings' })
+  const dialog = await settingsAt(page, 'Sync and storage')
   await expect(dialog.getByTestId('storage-used')).toContainText('Your notes and pictures use')
+  await page.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: 'Appearance', exact: true }).click()
   await dialog.getByRole('radiogroup', { name: 'Appearance' }).getByRole('radio', { name: 'Dark' }).click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   await expect(dialog.getByRole('radiogroup', { name: 'Paper in dark' }).getByRole('radio', { name: 'White' })).toHaveAttribute('aria-checked', 'true')
@@ -364,9 +379,11 @@ test('the settings show the storage used and change between light and dark, the 
   await expect(dialog.getByRole('radio', { name: 'Graphite' })).toHaveAttribute('aria-checked', 'true')
   await dialog.getByRole('radio', { name: 'Blue' }).click()
   await expect(page.locator('html')).toHaveAttribute('data-accent', 'blue')
-  await page.keyboard.press('Escape')
+  // Its tab closed, the screen it was opened from shows again.
+  await page.getByRole('button', { name: 'Close Settings' }).click()
   await expect(dialog).toHaveCount(0)
-  await page.locator('.home-actions').getByRole('button', { name: 'New note', exact: true }).click()
+  await expect(page.locator('.home')).toBeVisible()
+  await newFrom(page, 'Mixed')
   await expect(page.locator('.nw-page').first()).toHaveCSS('background-color', 'rgb(255, 255, 255)')
   // Remembered in this browser.
   await page.reload()
@@ -383,8 +400,7 @@ test('asking the browser to keep the notes always shows its answer, a silent no 
     Object.defineProperty(navigator.storage, 'persist', { configurable: true, value: async () => answer.keep })
   })
   await home(page)
-  await page.getByRole('button', { name: 'Settings' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Settings' })
+  const dialog = await settingsAt(page, 'Sync and storage')
   // Inside the app, WebView2 keeps the notes, and the settings say so.
   const keeper = inApp ? 'WebView2, which the app runs in,' : 'The browser'
   await expect(dialog).toContainText(`${keeper} may clear them by itself when space runs low.`)

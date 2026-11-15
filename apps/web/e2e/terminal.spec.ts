@@ -162,8 +162,11 @@ test('the library answers the terminal as its buttons do: folders and notes by n
   // The library's controls are marked with their commands.
   await page.keyboard.press('Escape')
   await page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Library', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'New folder' })).toHaveAttribute('data-command', 'folder.new')
-  await expect(page.getByRole('searchbox', { name: 'Search notes by title' })).toHaveAttribute('data-command', 'library.search')
+  // New is a menu: its Folder carries folder.new.
+  await page.getByRole('button', { name: 'New', exact: true }).click()
+  await expect(page.getByRole('menuitem', { name: /^Folder/u })).toHaveAttribute('data-command', 'folder.new')
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('searchbox', { name: 'Search notes' })).toHaveAttribute('data-command', 'library.search')
   await expect(page.getByRole('combobox', { name: 'Sort' })).toHaveAttribute('data-command', 'library.sort')
   await expect(card('Physics').first().locator('.card-open')).toHaveAttribute('data-command', 'library.open')
 })
@@ -273,8 +276,9 @@ test('the bars, Settings, the AI box and the recorder answer the terminal as the
   await run('layout.reset', '✓')
   await run('settings.theme look=dark', '✓ the appearance is dark')
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-  await run('settings.open', '✓ Settings open')
-  const settings = page.getByRole('dialog', { name: 'Settings' })
+  // Settings is a tab of its own, at a section: the note on screen is kept first.
+  await run('settings.open section=appearance', '✓ Settings open, at Appearance')
+  const settings = page.locator('.set')
   await expect(settings.getByRole('radiogroup', { name: 'Appearance' }).getByRole('radio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'true')
   // Chosen while Settings is open, it shows there too.
   await run('settings.theme look=system', '✓ the appearance follows Windows')
@@ -285,7 +289,9 @@ test('the bars, Settings, the AI box and the recorder answer the terminal as the
   await run('settings.accent accent=graphite', "✓ the app's colour is graphite")
   await expect(page.locator('html')).not.toHaveAttribute('data-accent')
   await run('settings.keepStorage', /✓ (The browser|WebView2) has agreed not to clear the notes by itself/u)
-  await settings.getByRole('button', { name: 'Close' }).first().click()
+  // Its tab closed, the note is back, and its AI box answers.
+  await page.getByRole('button', { name: 'Close Settings' }).click()
+  await expect(page.locator('.nw-desk[data-tool]')).toBeVisible()
   await run('ai.open mode=ask', '✓ AI box open, to ask')
   await expect(page.getByRole('dialog', { name: 'AI' }).getByRole('radio', { name: 'Ask' })).toHaveAttribute('aria-checked', 'true')
   await run('look', 'AI box open, to ask')

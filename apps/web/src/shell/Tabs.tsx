@@ -99,7 +99,7 @@ export function Tabs({ library, settings }: { library: boolean; settings: boolea
           ),
         )}
         {settings ? (
-          <div role="tab" className="sh-tab" aria-selected aria-label="Settings" data-tab="settings">
+          <div role="tab" className="sh-tab" aria-selected aria-label="Settings" data-tab="settings" data-command="settings.open">
             <Settings {...ICON} />
             <span>Settings</span>
             <button type="button" className="sh-tab-x" aria-label="Close Settings" title="Close Settings" onClick={closeSettings}>

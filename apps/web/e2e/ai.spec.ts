@@ -633,8 +633,13 @@ test('undo from the log is refused once the edit is no longer the latest change 
 test('Settings keep an OpenRouter key on this device without ever showing it, until Forget key', async ({ page }) => {
   await serve(page, OPENROUTER, { data: [{ id: 'anthropic/claude-haiku-5.5', name: 'Anthropic: Claude Haiku 5.5', pricing: { prompt: '0.0000001', completion: '0.0000005' }, supported_parameters: ['structured_outputs', 'reasoning'] }] }, () => '')
   await page.goto('/')
-  await page.getByRole('button', { name: 'Settings' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Settings' })
+  // Settings, a tab of its own: its AI section.
+  const openAi = async (): Promise<void> => {
+    await page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Settings', exact: true }).click()
+    await page.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: 'AI', exact: true }).click()
+  }
+  await openAi()
+  const dialog = page.locator('.set')
   await dialog.getByRole('radio', { name: 'OpenRouter, hosted' }).click()
   await dialog.getByLabel('OpenRouter key').fill(KEY)
   await dialog.getByRole('button', { name: 'Keep key' }).click()
@@ -643,7 +648,7 @@ test('Settings keep an OpenRouter key on this device without ever showing it, un
   expect(await page.content()).not.toContain(KEY)
 
   await page.reload()
-  await page.getByRole('button', { name: 'Settings' }).click()
+  await openAi()
   await expect(dialog).toContainText('A key is kept on this device.')
   await expect(dialog.getByRole('combobox', { name: 'Model' })).toHaveValue('anthropic/claude-haiku-5.5')
   expect(await page.content()).not.toContain(KEY)

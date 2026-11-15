@@ -116,6 +116,18 @@ describe('a change a server makes', () => {
     expect(words((await app.library.open(note)).doc, 't1')).toBe("Newton's laws")
   })
 
+  it("reads and changes nothing while the person has switched assistants off, and works again once they switch them on", async () => {
+    const { app, host, note } = await together()
+    // The person's switch, from the app: kept in the library's own hidden folder, read by the server before each call.
+    await app.library.setAssistants(false)
+    expect(await app.library.assistants()).toBe(false)
+    await expect(host.list()).rejects.toMatchObject({ code: 'switched_off' })
+    await expect(host.read(note)).rejects.toMatchObject({ code: 'switched_off' })
+    await expect(host.change(note, (doc) => apply(doc, [{ op: 'update', id: 't1', set: { md: 'x' } }]))).rejects.toMatchObject({ code: 'switched_off' })
+    await app.library.setAssistants(true)
+    expect(words(await host.read(note), 't1')).toBe("Newton's laws")
+  })
+
   it('is refused in plain words while the folder cannot be reached', async () => {
     const { app, host, note } = await together()
     app.folder.unreachable = true
