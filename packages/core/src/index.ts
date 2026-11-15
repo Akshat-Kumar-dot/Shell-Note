@@ -110,7 +110,7 @@ export { FIRST_WORDS, kindOf, pageFacts, pagePicture, quoted, type Drawn, type P
 export { changeReport } from './note/report.js'
 export { route, ROUTE_RULES, type Routed, type RouteRules } from './command/router.js'
 export { CLEAR_GAP, Finder, MEANING_CUTOFF, MEANING_GAP, OVERLAP_CUTOFF, type By, type Candidate, type Embedder, type FindResult, type Found, type Impossible, type Meaning, type Unclear } from './command/finder.js'
-export { checkInput, COMMAND_NAME, describe as describeCommand, FIELDS, inputs, PEN_BUTTONS, PEN_KEPT, PEN_START, SETTINGS_SECTIONS, TYPING_BUTTONS, TYPING_START, valuesOf, type CommandInput, type CommandSpec, type Field, type Limit, type PenButton, type SettingsSection, type TypingButton } from './command/spec.js'
+export { asksOf, checkInput, COMMAND_NAME, describe as describeCommand, FIELDS, inputs, PEN_BUTTONS, PEN_KEPT, PEN_START, SETTINGS_SECTIONS, TYPING_BUTTONS, TYPING_START, valuesOf, type CommandInput, type CommandSpec, type Field, type InputAsk, type Limit, type PenButton, type SettingsSection, type TypingButton } from './command/spec.js'
 export { blockDetail, blockOf, blocksList } from './command/page.js'
 export { areaLine, areaNames, argsOf, blocksOf, commandLine, exampleLine, FENCE, linesOf, parseLine, POSITIONAL, stepsOf, terminalGuide, typed, WORD_AREAS, type Line, type TerminalStep } from './command/terminal.js'
 export { editById, MAX_EDIT_CONTENT, MAX_EDIT_OPS, type IdEdit, type IdEdited } from './ai/byId.js'

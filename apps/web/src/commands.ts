@@ -14,7 +14,8 @@ import type { Library, LibraryStore } from '@shellnote/library'
 import { deletedItems, folderPath, hidden } from '@shellnote/library/tree'
 import { loadSettings, modelsNow, saveSettings, withModel } from './ai/settings.js'
 import { setLibraryLook, type LibraryLook } from './library/look.js'
-import { lastSection, moveTree, resetTree, showTree } from './shell/state.js'
+import { found, foundLine, searchAll } from './library/searchAll.js'
+import { lastSection, moveTree, openSearch, resetTree, searchAsked, showTree } from './shell/state.js'
 import { applyAccent, applyAppearance, applyDarkPaper, type Accent, type Appearance } from './theme.js'
 
 /** Each section of Settings, as a sentence names it. */
@@ -339,6 +340,16 @@ export function defineAppCommands(store: LibraryStore): void {
     moveTree(side as 'left' | 'right')
     showTree(true)
     return `the library's column on the ${String(side)}`
+  })
+  commands.define('library.findWords', [], async ({ text }) => {
+    const words = String(text).trim()
+    // In the column, for the person to see; the caret stays where it is (the column's own box, or the terminal).
+    openSearch(false, words)
+    found.set({ words, hits: found.value?.words === words ? found.value.hits : [], more: 0, busy: true })
+    const result = await searchAll(store, await store.list(), words)
+    // A later search may have begun meanwhile: only the latest is shown.
+    if (searchAsked.value.words.trim() === words) found.set({ ...result, busy: false })
+    return foundLine(result)
   })
   commands.define('library.look', [], ({ view }) => {
     setLibraryLook(view as LibraryLook)

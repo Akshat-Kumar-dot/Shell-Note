@@ -263,6 +263,21 @@ export class Finder {
     return this.#decide(request, this.#quickScores(request))
   }
 
+  /**
+   * The commands nearest some words, best first, with the inputs the words give each: steps 1 and 2, no model. For a
+   * list a person chooses from (the command box), so it gives what is near, not only what is clear.
+   */
+  nearest(request: string, most = 6, least = OVERLAP_CUTOFF / 2): { command: string; input: Record<string, unknown>; score: number }[] {
+    return this.#quickScores(request)
+      .filter((one) => this.#entries[one.entry]!.spec !== undefined && one.score >= least)
+      .sort(byScore)
+      .slice(0, most)
+      .map((one) => {
+        const spec = this.#entries[one.entry]!.spec!
+        return { command: spec.name, input: this.#read(request, spec), score: one.score }
+      })
+  }
+
   /** How near in meaning a request is to each command: its nearest way of being said, or what it does. */
   async #meaningScores(request: string, meaning: Embedder): Promise<Map<number, number>> {
     if (this.#vectors?.embedder !== meaning) {

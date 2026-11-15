@@ -1,15 +1,16 @@
 // The tree: the library's column beside every screen. The folders, what each holds and the notes, to open one with a
-// click; a search over their names; a new note or folder; Recently deleted at its foot. Its menu sorts it, moves it to
+// click; "Open or run…", the command box, which finds a note or a folder by its name; a new note or folder; Recently
+// deleted at its foot. Its menu sorts it, moves it to
 // the window's other side and hides it. Which folders are open, the order, its side and whether it shows are kept in
 // this browser; the open note's folders open on their own.
 import { BarMenu, commands, MenuItem } from '@shellnote/editor'
 import type { FolderEntry, Library, LibraryStore, NoteEntry } from '@shellnote/library'
-import { contents, deletedItems, folderPath, hidden, search } from '@shellnote/library/tree'
-import { ArrowUpDown, ChevronDown, ChevronRight, FilePlus, Folder, FolderOpen, FolderPlus, PanelLeft, PanelLeftClose, PanelRight, Plus, Search, Trash2, X } from 'lucide-react'
+import { contents, deletedItems, folderPath, hidden } from '@shellnote/library/tree'
+import { ArrowUpDown, ChevronDown, ChevronRight, FilePlus, Folder, FolderOpen, FolderPlus, PanelLeft, PanelLeftClose, PanelRight, Plus, Search, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import type { Tabs } from '../library/tabs.js'
 import { KIND_ICON, kindOf } from '../library/kinds.js'
-import { findWanted, noteScreen, showTree, tabsFollow, treeAt, treeShown } from './state.js'
+import { commandBox, noteScreen, tabsFollow, treeAt, treeShown } from './state.js'
 
 const OPENED = 'shellnote:library-side-open'
 const SORT = 'shellnote:tree-sort'
@@ -65,13 +66,11 @@ export function Tree({ store, tabs, bin, ready }: TreeProps) {
   }, [])
   const [opened, setOpened] = useState(() => new Set(kept<string[]>(OPENED, [])))
   const [sort, setSort] = useState<'name' | 'edited'>(() => (kept<unknown>(SORT, 'name') === 'edited' ? 'edited' : 'name'))
-  const [query, setQuery] = useState('')
   const [naming, setNaming] = useState<{ id: string; name: string }>()
   const namingNow = useRef(naming)
   namingNow.current = naming
   const [problem, setProblem] = useState<string>()
   const list = useRef<HTMLDivElement>(null)
-  const searchBox = useRef<HTMLInputElement>(null)
 
   const refresh = useCallback(() => {
     store.list().then(setLibrary, (error: unknown) => setProblem((error as Error).message))
@@ -101,18 +100,6 @@ export function Tree({ store, tabs, bin, ready }: TreeProps) {
   useEffect(() => {
     if (shown && library) list.current?.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest' })
   }, [shown, library, note])
-
-  // The rail's Search: the tree shown, and the caret in its search box.
-  useEffect(() => {
-    const take = (): void => {
-      if (!findWanted.value) return
-      if (!searchBox.current) return showTree(true)
-      findWanted.set(false)
-      searchBox.current.focus()
-    }
-    take()
-    return findWanted.subscribe(take)
-  }, [shown])
 
   // How many notes each folder holds, at any depth.
   const counts = useMemo(() => {
@@ -145,21 +132,12 @@ export function Tree({ store, tabs, bin, ready }: TreeProps) {
   const openNote = (id: string): void => {
     if (id !== note) commands.press('note.open', { note: id })
   }
-  /** A folder found by a search: shown in its place, its own folders open. */
-  const reveal = (id: string): void => {
-    if (!library) return
-    const path = folderPath(library, id).map((f) => f.id)
-    setOpened((was) => new Set([...was, ...path]))
-    setQuery('')
-    requestAnimationFrame(() => list.current?.querySelector(`[data-folder="${id}"]`)?.scrollIntoView({ block: 'nearest' }))
-  }
   /** A new folder at the top level, its name typed in place. */
   const addFolder = async (): Promise<void> => {
     setProblem(undefined)
     try {
       const made = await store.newFolder(null)
       tabs.libraryChanged()
-      setQuery('')
       setLibrary(await store.list())
       setNaming({ id: made.id, name: made.name })
     } catch (error) {
@@ -262,31 +240,9 @@ export function Tree({ store, tabs, bin, ready }: TreeProps) {
     return [...[...folders].sort((a, b) => byName(a.name, b.name)).map((f) => folderLine(f, depth)), ...[...notes].sort(noteOrder).map((n) => noteLine(n, depth))]
   }
 
-  const words = query.trim()
   let body: ReactNode
   if (!library) body = <p className="tree-quiet">Opening the library…</p>
-  else if (words !== '') {
-    const found = search(library, words)
-    body =
-      found.folders.length + found.notes.length === 0 ? (
-        <p className="tree-quiet">Nothing is called “{words}”.</p>
-      ) : (
-        <ul className="tree-items">
-          {[...found.folders]
-            .sort((a, b) => byName(a.name, b.name))
-            .map((f) => (
-              <li key={f.id}>
-                <button type="button" className="tree-row tree-folder" aria-label={`${f.name}, in ${placeOf(f.parent)}`} title={`${f.name}, in ${placeOf(f.parent)}`} onClick={() => reveal(f.id)}>
-                  <Folder {...ICON} />
-                  <span className="tree-name">{f.name}</span>
-                  <span className="tree-where">{placeOf(f.parent)}</span>
-                </button>
-              </li>
-            ))}
-          {[...found.notes].sort(noteOrder).map((n) => noteLine(n, 0, placeOf(n.folder)))}
-        </ul>
-      )
-  } else {
+  else {
     const all = branch(null, 0)
     body = all.length === 0 ? <p className="tree-quiet">No notes yet.</p> : <ul className="tree-items">{all}</ul>
   }
@@ -346,26 +302,11 @@ export function Tree({ store, tabs, bin, ready }: TreeProps) {
           )}
         </BarMenu>
       </div>
-      <label className="tree-find">
+      <button type="button" className="tree-find tree-open" title="Open a note or a folder by its name, or run a command (Ctrl+P)" onClick={() => commandBox.set(true)}>
         <Search size={15} strokeWidth={1.75} aria-hidden />
-        <input
-          ref={searchBox}
-          type="search"
-          aria-label="Search the library"
-          placeholder="Search notes and folders"
-          spellCheck={false}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') setQuery('')
-          }}
-        />
-        {query === '' ? null : (
-          <button type="button" className="tree-clear" aria-label="Clear the search" onClick={() => setQuery('')}>
-            <X size={14} aria-hidden />
-          </button>
-        )}
-      </label>
+        <span>Open or run…</span>
+        <kbd>Ctrl P</kbd>
+      </button>
       <div className="tree-list" ref={list}>
         {body}
       </div>

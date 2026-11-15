@@ -6,7 +6,7 @@ import { AI_TABS, besideTab, commands, inDesktopApp, openTerminal, showSideTab, 
 import type { LibraryStore } from '@shellnote/library'
 import { CloudCheck, HardDrive, Library, MonitorPlay, Search, Settings, Sparkles, SquareTerminal } from 'lucide-react'
 import { useSyncExternalStore, type MouseEvent } from 'react'
-import { findWanted, noteScreen } from './state.js'
+import { closeSearch, columnMode, noteScreen, openSearch } from './state.js'
 
 /** A press on the rail leaves the caret in the note where it was. */
 const keepFocus = (event: MouseEvent): void => event.preventDefault()
@@ -32,12 +32,8 @@ export function Rail({ store, screen }: RailProps) {
   const beside = editing && side && !AI_TABS.includes(tab)
   const needsNote = editing ? '' : ' (open a note to edit first)'
 
-  /** The caret into the library's search box: beside a note, or on the library's own screen. */
-  const find = (): void => {
-    findWanted.set(true)
-    // Recently deleted and Settings have no search: the library's top has.
-    if (screen === 'bin' || screen === 'settings') commands.press('library.open')
-  }
+  // Search in every note: in the left column, on any screen.
+  const column = useSyncExternalStore(columnMode.subscribe, columnMode.snapshot)
 
   const folder = store.place?.()
   const kept = folder !== undefined ? `Your notes are kept in the folder ${folder}` : inDesktopApp() ? 'Your notes are kept by the app, on this computer' : 'Your notes are kept in this browser'
@@ -49,7 +45,7 @@ export function Rail({ store, screen }: RailProps) {
       <button type="button" className="sh-b" aria-label="Library" aria-pressed={screen === 'library' || screen === 'bin'} title="Library: your folders and notes" data-command="library.open" onClick={() => commands.press('library.open')}>
         <Library {...ICON} />
       </button>
-      <button type="button" className="sh-b rail-find" aria-label="Search" title="Search the titles and the words inside your notes" onClick={find}>
+      <button type="button" className="sh-b rail-find" aria-label="Search" aria-pressed={column === 'search' && screen !== 'settings'} title="Search in every note (Ctrl+Shift+F)" onClick={() => (column === 'search' && screen !== 'settings' ? closeSearch() : openSearch())}>
         <Search {...ICON} />
       </button>
       <button

@@ -91,6 +91,12 @@ export class BrowserLibrary implements LibraryStore {
     return transact(['notes', 'folders'], read)
   }
 
+  async read(id: string): Promise<Doc> {
+    const kept = await get<DocRecord>('docs', id)
+    if (!kept) throw new Error('This note is not in the library any more.')
+    return parseDoc(kept.doc)
+  }
+
   async open(id: string): Promise<OpenedNote> {
     const kept = await get<DocRecord>('docs', id)
     const entry = await get<NoteEntry>('notes', id)

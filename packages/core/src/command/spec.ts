@@ -193,6 +193,30 @@ export function isNumber(schema: z.ZodType): boolean {
   return bare(schema) instanceof z.ZodNumber
 }
 
+/** How a person is asked for one of a command's inputs in the command box: a choice of words, on or off, a number, or a few words typed. */
+export type InputAsk = { field: string; kind: 'choice'; values: readonly string[] } | { field: string; kind: 'switch' } | { field: string; kind: 'number' } | { field: string; kind: 'words' }
+
+/** The inputs of words a person may type in the command box: a name, or words to look for. */
+const TYPED: ReadonlySet<string> = new Set(['name', 'text'])
+
+/**
+ * The inputs a command cannot do without, as the command box asks a person for them, in order; undefined when one of
+ * them cannot be asked there (blocks of a note, a place on a page, a long text: the terminal's and the AI's).
+ */
+export function asksOf(spec: CommandSpec): InputAsk[] | undefined {
+  const asks: InputAsk[] = []
+  for (const [field, schema] of Object.entries(spec.input.shape as Record<string, z.ZodType>)) {
+    if (schema instanceof z.ZodOptional) continue
+    const inner = bare(schema)
+    if (inner instanceof z.ZodEnum) asks.push({ field, kind: 'choice', values: inner.options as string[] })
+    else if (inner instanceof z.ZodBoolean) asks.push({ field, kind: 'switch' })
+    else if (inner instanceof z.ZodNumber) asks.push({ field, kind: 'number' })
+    else if (TYPED.has(field)) asks.push({ field, kind: 'words' })
+    else return undefined
+  }
+  return asks
+}
+
 /** A command as the model is shown it once found: what it does, its inputs (JSON Schema), an example, and whether it asks first. */
 export function describe(spec: CommandSpec): { command: string; does: string; input: Record<string, unknown>; example: Record<string, unknown>; asks?: string } {
   return {

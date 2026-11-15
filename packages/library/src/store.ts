@@ -117,6 +117,8 @@ export interface LibraryStore {
   list(): Promise<Library>
   /** A note, with its pictures. */
   open(id: string): Promise<OpenedNote>
+  /** A note's document alone, without its pictures: to read its words, as search in every note does. */
+  read?(id: string): Promise<Doc>
   /** Keep a note as it is now. Its folder, and whether it is deleted, stay as the library has them. */
   save(note: SavingNote): Promise<NoteEntry>
   /**

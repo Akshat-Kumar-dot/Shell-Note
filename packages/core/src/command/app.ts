@@ -40,6 +40,13 @@ export const APP_COMMANDS: readonly CommandSpec[] = [
     example: { show: 'sketch' },
   },
   {
+    name: 'library.findWords',
+    does: 'Search the words inside every note, in the column beside the screen: every word, in any order, anywhere in a word ("photo" finds "photosynthesis"), and words in "quotes" side by side as written. Says each note that holds them, with its lines',
+    says: ['search in every note', 'search inside all my notes', 'find words inside the notes', 'look inside every note'],
+    input: inputs(['text']),
+    example: { text: 'newton law' },
+  },
+  {
     name: 'library.look',
     does: 'Show the library as cards or as a list; it opens that way from then on, on this device',
     says: ['show the library as {view}', 'show my notes as a list', 'show the notes as cards', 'switch the library to the list look'],

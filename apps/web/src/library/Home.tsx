@@ -17,7 +17,6 @@ import type { FolderEntry, ItemRef, Library, LibraryStore, NoteEntry } from '@sh
 import type { Tabs } from './tabs.js'
 import { contents, counts, daysLeft, deletedItems, folderPath, hidden, inside, isOpenFolder, search, sorted, type SortKey, type SortOrder } from '@shellnote/library/tree'
 import { drawThumbnail } from './thumbnail.js'
-import { findWanted } from '../shell/state.js'
 
 export type Place = { folder: string | null } | 'bin'
 
@@ -165,17 +164,7 @@ export function Home({ store, tabs, place, problem, onOpen }: HomeProps) {
   const [coverRound, setCoverRound] = useState(0)
   const urls = useRef(new Map<string, string>())
   const list = useRef<HTMLDivElement>(null)
-  // The rail's Search puts the caret in the search box, here or once this screen shows.
   const searchBox = useRef<HTMLInputElement>(null)
-  useEffect(() => {
-    const take = (): void => {
-      if (!findWanted.value || !searchBox.current) return
-      findWanted.set(false)
-      searchBox.current.focus()
-    }
-    take()
-    return findWanted.subscribe(take)
-  }, [])
   const searchText = query.trim()
   const within = found.query === searchText ? found.ids : NONE
   // What the commands read: set with the state, so a command's next line sees it before the screen is drawn again.

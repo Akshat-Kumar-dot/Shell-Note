@@ -15,9 +15,6 @@ export interface NoteNow {
 /** The note on screen; none on the library's screens, or while a note is still opening. */
 export const noteScreen = new Shared<NoteNow | undefined>(undefined)
 
-/** The rail's Search was pressed: the library's search box, on whichever screen has one, takes the caret and sets this back. */
-export const findWanted = new Shared(false)
-
 /** The end of the tab row, where the note on screen puts its own menu. */
 export const tabsEnd = new Shared<HTMLElement | null>(null)
 
@@ -196,3 +193,32 @@ export const rememberElsewhere = (hash: string): void => {
   elsewhere = hash === '' ? '#/' : hash
 }
 export const lastElsewhere = (): string => elsewhere
+
+// ----- the command box (Ctrl+P), and search in every note in the left column (Ctrl+Shift+F) -----
+
+/** The command box is open. */
+export const commandBox = new Shared(false)
+
+/** What the left column shows: the library's tree, or search in every note. */
+export const columnMode = new Shared<'tree' | 'search'>('tree')
+
+/** The words search in every note looks for, and a count that grows each time its box is to take the caret. */
+export const searchAsked = new Shared<{ words: string; focus: number }>({ words: '', focus: 0 })
+
+/**
+ * Search in every note in the left column, the column shown if it was hidden; with `words`, those looked for. With
+ * `focus`, the caret goes into its box (the key, the rail); a search asked from elsewhere (the terminal, the box's own
+ * typing) leaves the caret where it is.
+ */
+export function openSearch(focus = true, words?: string): void {
+  if (!treeShown.value) showTree(true)
+  columnMode.set('search')
+  const now = searchAsked.value
+  if (words === undefined && !focus) return
+  searchAsked.set({ words: words ?? now.words, focus: focus ? now.focus + 1 : now.focus })
+}
+
+/** Back to the library's tree in the left column. */
+export function closeSearch(): void {
+  columnMode.set('tree')
+}

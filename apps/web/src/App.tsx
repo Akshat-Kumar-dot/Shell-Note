@@ -22,7 +22,9 @@ import { SettingsNav } from './settings/SettingsNav.js'
 import { SettingsScreen } from './settings/SettingsScreen.js'
 import { sampleDoc } from './samples.js'
 import { Rail } from './shell/Rail.js'
-import { keepSettingsTab, lastSection, rememberElsewhere, rememberSection, rememberShown, shownLast, tabsPlace } from './shell/state.js'
+import { CommandBox } from './shell/CommandBox.js'
+import { SearchColumn } from './shell/SearchColumn.js'
+import { columnMode, commandBox, keepSettingsTab, lastSection, openSearch, rememberElsewhere, rememberSection, rememberShown, shownLast, tabsPlace } from './shell/state.js'
 import { Tabs as TabRow } from './shell/Tabs.js'
 import { Tree } from './shell/Tree.js'
 import { askToKeep } from './storage/cache.js'
@@ -117,6 +119,25 @@ export function App() {
     } else rememberElsewhere(location.hash)
   }, [where])
   const look = useSyncExternalStore(appLook.subscribe, appLook.snapshot)
+  const boxOpen = useSyncExternalStore(commandBox.subscribe, commandBox.snapshot)
+  const column = useSyncExternalStore(columnMode.subscribe, columnMode.snapshot)
+  // Ctrl+P, the command box (the browser's printing key: a note prints from its menu); Ctrl+Shift+F, search in every
+  // note. ⌘ on a Mac.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) return
+      const key = event.key.toLowerCase()
+      if (key === 'p' && !event.shiftKey) {
+        event.preventDefault()
+        commandBox.set(!commandBox.value)
+      } else if (key === 'f' && event.shiftKey) {
+        event.preventDefault()
+        openSearch()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   // The app at the commands' disposal on every screen (app control): where it is, and the way elsewhere.
   useEffect(() => commands.provide('app', { where: () => whereLine(route(), sample !== undefined, recording), go, reloads: () => location.search !== '' }), [sample, recording])
@@ -162,11 +183,12 @@ export function App() {
     <div className="shell" data-look={look}>
       <Rail store={library} screen={at} />
       {/* Drawn from the start, so nothing beside it moves when the library has started (a sample note shows first). In Settings, its sections take the column's place. */}
-      {at === 'settings' && where.to === 'settings' ? <SettingsNav section={where.section} /> : <Tree store={library} tabs={tabs} bin={at === 'bin'} ready={ready} />}
+      {at === 'settings' && where.to === 'settings' ? <SettingsNav section={where.section} /> : column === 'search' ? <SearchColumn /> : <Tree store={library} tabs={tabs} bin={at === 'bin'} ready={ready} />}
       <section className="shell-main">
         {place ? createPortal(row, place) : row}
         <div className="shell-screen">{shown()}</div>
       </section>
+      {boxOpen ? <CommandBox store={library} /> : null}
     </div>
   )
 }

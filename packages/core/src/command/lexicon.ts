@@ -198,6 +198,7 @@ export const VERBS: Readonly<Record<string, readonly string[]>> = {
   'library.sort': ['sort', 'order', 'arrange', 'rank', 'organize', 'organise', 'reorder', 'list by', 'sort by', 'order by', 'arrange by', 'newest first', 'oldest first', 'latest first', 'recent first', 'reverse the order', 'put first'],
   'library.filter': ['show only', 'only show', 'just show', 'filter by type', 'filter by kind', 'narrow to', 'limit to', 'restrict to', 'only the', 'just the', 'every type', 'all types'],
   'library.look': ['look', 'grid', 'as cards', 'as a list', 'show as', 'display as', 'view as', 'card view', 'list view'],
+  'library.findWords': ['find words', 'search inside', 'look inside', 'search within', 'search everywhere', 'full text', 'words inside'],
   'library.column': ['column', 'side column', 'folder column', 'folder tree', 'tree', 'move the column', 'hide the column'],
 
   'bin.open': [...SHOW, 'check', 'browse', 'go to', 'list', 'what is in', 'what did i delete', 'look in', 'go into', 'inspect'],

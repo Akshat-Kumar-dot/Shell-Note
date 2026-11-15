@@ -20,6 +20,8 @@ export const REDO_KEY = 'Ctrl+Y'
 export interface KeyLine {
   readonly keys: string
   readonly does: string
+  /** The command the keys run, when they run one: the command box shows the keys beside it. */
+  readonly command?: string
 }
 export interface KeyGroup {
   readonly name: string
@@ -41,18 +43,20 @@ export const KEYS: readonly KeyGroup[] = [
   {
     name: 'Anywhere',
     keys: [
-      { keys: 'Ctrl+O', does: 'Open a .shellnote file into the library' },
+      { keys: 'Ctrl+P', does: 'Open a note, or run a command: the command box' },
+      { keys: 'Ctrl+Shift+F', does: 'Search in every note', command: 'library.findWords' },
+      { keys: 'Ctrl+O', does: 'Open a .shellnote file into the library', command: 'file.open' },
       { keys: 'Ctrl+Shift+P', does: 'The terminal: type a command, or ask the model' },
     ],
   },
   {
     name: 'In a note',
     keys: [
-      { keys: UNDO_KEY, does: 'Undo' },
-      { keys: `${REDO_KEY} or Ctrl+Shift+Z`, does: 'Redo' },
-      { keys: 'Ctrl+S', does: "Save the note to its file" },
-      { keys: 'Ctrl+Shift+S', does: 'Save the note to a new file' },
-      { keys: 'Ctrl+K', does: 'The AI box, on what is chosen' },
+      { keys: UNDO_KEY, does: 'Undo', command: 'edit.undo' },
+      { keys: `${REDO_KEY} or Ctrl+Shift+Z`, does: 'Redo', command: 'edit.redo' },
+      { keys: 'Ctrl+S', does: 'Save the note to its file', command: 'file.save' },
+      { keys: 'Ctrl+Shift+S', does: 'Save the note to a new file', command: 'file.saveAs' },
+      { keys: 'Ctrl+K', does: 'The AI box, on what is chosen', command: 'ai.open' },
       { keys: 'Ctrl+Shift+Space', does: 'Show or hide the video' },
       { keys: 'Ctrl+mouse wheel', does: 'Zoom in or out' },
       { keys: 'Delete', does: 'Remove what a Select box has chosen' },
