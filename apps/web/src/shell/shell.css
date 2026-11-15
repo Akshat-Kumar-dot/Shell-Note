@@ -520,3 +520,17 @@ html[data-own-titlebar] .tree[data-at='right'] .tree-head {
     display: none;
   }
 }
+
+/* A sketch shown seamless: at the foot of the window, that its sheet grows as you write near its edge. */
+.sh-grows {
+  position: absolute;
+  /* Clear of the round button in the corner. */
+  right: 72px;
+  bottom: 22px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--ui-text-3);
+  pointer-events: none;
+}

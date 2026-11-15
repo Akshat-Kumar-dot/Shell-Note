@@ -178,6 +178,15 @@
   -webkit-user-select: none;
   user-select: none;
 }
+/* With the Hand, the sheet is taken and moved: nothing under it takes the press. */
+.nw-desk[data-tool='hand'],
+.nw-desk[data-tool='hand'] * {
+  cursor: grab !important;
+}
+.nw-desk[data-tool='hand'][data-grabbing],
+.nw-desk[data-tool='hand'][data-grabbing] * {
+  cursor: grabbing !important;
+}
 /* With the Free cursor, a click on empty paper starts writing there. */
 .nw-desk[data-tool='free'] .nw-page {
   cursor: text;
@@ -367,6 +376,11 @@
   --nw-paper: #fff;
   --nw-rule: #c9d7e8;
   --nw-highlight: #fff1a1;
+  /* How the highlighter lies under the ink: multiplied on white paper, lightening on dark. */
+  --nw-under-blend: multiply;
+  --nw-page-shadow:
+    0 1px 3px rgb(0 0 0 / 0.16),
+    0 6px 18px rgb(0 0 0 / 0.07);
   /* The highlighter's named colours: bright and light, as highlighter ink is, where the text colours are dark. */
   --nw-hl-ink: #a7adb5;
   --nw-hl-gray: #c9ccd1;
@@ -382,13 +396,50 @@
   --nw-hand: 'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive;
 }
 
+/*
+ * Dark paper, the sketch's own colours, in the dark theme when the person chooses it (Settings, Appearance), and for a
+ * text note shown seamless, whose words sit on the app's own surface. Printing is always on white (.nw-print).
+ */
+:root[data-theme='dark'][data-paper='dark'],
+:root[data-theme='dark'][data-paperless] {
+  --nw-paper: #1a1a1b;
+  --nw-ink: #ececee;
+  --nw-gray: #a3a3a9;
+  --nw-red: #ff7b80;
+  --nw-orange: #ffa25c;
+  --nw-yellow: #f5d061;
+  --nw-green: #6fd58c;
+  --nw-blue: #7fb2ff;
+  --nw-purple: #c49bff;
+  --nw-rule: rgb(255 255 255 / 0.17);
+  --nw-highlight: rgb(255 214 10 / 0.32);
+  --nw-under-blend: screen;
+  --nw-page-shadow: 0 0 0 1px rgb(255 255 255 / 0.07);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light'])[data-paper='dark'],
+  :root:not([data-theme='light'])[data-paperless] {
+    --nw-paper: #1a1a1b;
+    --nw-ink: #ececee;
+    --nw-gray: #a3a3a9;
+    --nw-red: #ff7b80;
+    --nw-orange: #ffa25c;
+    --nw-yellow: #f5d061;
+    --nw-green: #6fd58c;
+    --nw-blue: #7fb2ff;
+    --nw-purple: #c49bff;
+    --nw-rule: rgb(255 255 255 / 0.17);
+    --nw-highlight: rgb(255 214 10 / 0.32);
+    --nw-under-blend: screen;
+    --nw-page-shadow: 0 0 0 1px rgb(255 255 255 / 0.07);
+  }
+}
+
 .nw-page {
   position: relative;
   overflow: hidden;
   background-color: var(--nw-paper);
-  box-shadow:
-    0 1px 3px rgb(0 0 0 / 0.16),
-    0 6px 18px rgb(0 0 0 / 0.07);
+  box-shadow: var(--nw-page-shadow);
   color: var(--nw-ink);
   font-family: var(--nw-sans);
   font-size: 11pt;
@@ -399,6 +450,9 @@
 .nw-page[data-bg='ruled'] {
   background-image: repeating-linear-gradient(to bottom, transparent 0 7.75mm, var(--nw-rule) 7.75mm 8mm);
 }
+.nw-spare[data-bg='ruled'] {
+  background-image: repeating-linear-gradient(to bottom, transparent 0 calc(7.75mm * var(--nw-zoom, 1)), var(--nw-rule) calc(7.75mm * var(--nw-zoom, 1)) calc(8mm * var(--nw-zoom, 1)));
+}
 .nw-page[data-bg='grid'] {
   background-image:
     linear-gradient(var(--nw-rule) 0.2mm, transparent 0.2mm),
@@ -408,6 +462,82 @@
 .nw-page[data-bg='dots'] {
   background-image: radial-gradient(circle, var(--nw-rule) 0.35mm, transparent 0.45mm);
   background-size: 5mm 5mm;
+}
+.nw-spare[data-bg='grid'] {
+  background-image:
+    linear-gradient(var(--nw-rule) 0.2mm, transparent 0.2mm),
+    linear-gradient(90deg, var(--nw-rule) 0.2mm, transparent 0.2mm);
+  background-size: calc(5mm * var(--nw-zoom, 1)) calc(5mm * var(--nw-zoom, 1));
+}
+.nw-spare[data-bg='dots'] {
+  background-image: radial-gradient(circle, var(--nw-rule) calc(0.35mm * var(--nw-zoom, 1)), transparent calc(0.45mm * var(--nw-zoom, 1)));
+  background-size: calc(5mm * var(--nw-zoom, 1)) calc(5mm * var(--nw-zoom, 1));
+}
+
+/*
+ * The seamless view: the same pages as one sheet. No gaps and no shadows; each slot shows only what is not folded away,
+ * and a faint tick at the sheet's side marks where a page ends. Under the last page, room to write on, of the same paper.
+ */
+.nw-pages[data-view='seamless'] .nw-page-slot {
+  overflow: hidden;
+}
+/* One strip of paper behind the whole sheet, so where two pages meet between screen pixels the desk never shows. */
+.nw-pages[data-view='seamless']:not([data-paperless]) {
+  background: linear-gradient(var(--nw-paper), var(--nw-paper)) center top / var(--nw-sheet-w, 0px) 100% no-repeat content-box;
+}
+.nw-pages[data-view='seamless'] .nw-page {
+  box-shadow: none;
+}
+.nw-pages[data-view='seamless'] .nw-page-slot + .nw-page-slot::after {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--nw-ink) 28%, transparent);
+  content: '';
+  pointer-events: none;
+}
+.nw-spare {
+  flex: none;
+  background-color: var(--nw-paper);
+}
+/* A text note shown seamless has no paper: its words sit on the app's own surface, as in a document. */
+.nw-pages[data-paperless] .nw-page,
+.nw-pages[data-paperless] .nw-spare {
+  background-color: transparent;
+  background-image: none;
+}
+.nw-desk:has(> .nw-pages[data-paperless]) {
+  background: var(--ui-surface);
+}
+
+/* A text note's title at the top of its first page, in the page's top margin, and its line under it. */
+.nw-title-head {
+  position: absolute;
+  z-index: 1;
+  top: 2.5mm;
+  right: 20mm;
+  left: 20mm;
+}
+.nw-title {
+  display: block;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: var(--nw-ink);
+  font: 700 32px/1.2 var(--nw-sans);
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  outline: none;
+}
+.nw-title-line {
+  margin: 1px 0 0;
+  color: color-mix(in srgb, var(--nw-ink) 55%, transparent);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 /* Blocks placed on the page. Frames grow with their text; the others fill their box. */
@@ -919,7 +1049,7 @@ body[data-dragging] * {
   pointer-events: none;
 }
 .nw-ink-under {
-  mix-blend-mode: multiply;
+  mix-blend-mode: var(--nw-under-blend, multiply);
 }
 /* A press reaches handwriting only where there is ink, so the words under it and around it stay easy to click; once chosen, its whole box moves. */
 .nw-box[data-free='ink'] {
@@ -3805,4 +3935,39 @@ button.nw-ai-instant:hover {
   color: var(--ui-text);
   font: 13px/1.4 'JetBrains Mono', 'Cascadia Mono', Consolas, monospace;
   resize: vertical;
+}
+
+/* The print window: every page on its own sheet, at its real size, on white paper; nothing of the app around them. */
+.nw-print {
+  display: none;
+}
+@media print {
+  body > :not(.nw-print) {
+    display: none !important;
+  }
+  .nw-print {
+    display: block;
+    --nw-paper: #fff;
+    --nw-ink: #1d1d22;
+    --nw-gray: #6b7079;
+    --nw-red: #c62828;
+    --nw-orange: #d9640a;
+    --nw-yellow: #a88400;
+    --nw-green: #2e7d32;
+    --nw-blue: #1f5fbf;
+    --nw-purple: #7a3db8;
+    --nw-rule: #c9d7e8;
+    --nw-highlight: #fff1a1;
+    --nw-under-blend: multiply;
+  }
+  .nw-print-page {
+    break-after: page;
+  }
+  .nw-print-page:last-child {
+    break-after: auto;
+  }
+  .nw-print .nw-page {
+    box-shadow: none;
+    print-color-adjust: exact;
+  }
 }

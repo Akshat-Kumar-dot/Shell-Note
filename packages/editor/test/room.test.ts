@@ -53,7 +53,20 @@ describe('a frame that grows', () => {
     expect(yOf(far, 'fc')).toBe(yOf(far, 'fe') + 1000 + 500)
   })
 
-  it('never moves anything off its page, and never up', () => {
+  it('pushes ink across the page’s line on to the next page, in the same undo step', () => {
+    const base = page()
+    const doc = apply(base, [{ op: 'add', block: { id: 'kk', r: 0, type: 'ink', page: base.pages[0]!, x: 2500, y: 24000, w: 3000, h: 1000, strokes: [{ pts: [0, 0, 128, 3000, 1000, 128], color: 'ink', width: 'm' }] } as Block }]).doc
+    const store = new EditorStore(doc)
+    store.apply(roomOps(doc, 'ff', 22500), { origin: 'layout' })
+    const ink = store.doc.block.kk as Extract<Block, { type: 'ink' }>
+    expect(store.doc.pages).toHaveLength(2)
+    expect(ink).toMatchObject({ page: store.doc.pages[1], y: 2000 })
+    expect(store.undo()).toBe(true)
+    expect(store.doc.block.kk).toMatchObject({ page: doc.pages[0], y: 24000 })
+    expect(store.doc.pages).toHaveLength(1)
+  })
+
+  it('never moves a frame off its page, and nothing up', () => {
     const doc = page()
     const after = apply(doc, roomOps(doc, 'ff', 26000)).doc
     expect(yOf(after, 'fz')).toBe(29700 - 2000)

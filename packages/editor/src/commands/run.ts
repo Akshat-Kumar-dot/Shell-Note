@@ -33,6 +33,8 @@ export interface WorkspacePlace {
   undoAi(): string
   /** Edit the note here when another window edits it (note.editHere): that one keeps its work and steps back. */
   editHere(): string
+  /** Open the print window for the note: every page on its own sheet, at its real size, on white paper. */
+  print(): string
 }
 
 /** The AI box on the open note, while the note is shown: what its own buttons do. */

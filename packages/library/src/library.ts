@@ -20,7 +20,7 @@
 //
 // The merging knows nothing of files, and the files nothing of notes
 // (files.ts), so a drive reached another way can use both as they are.
-import { apply, become, compare, contentId, createDoc, idFrom, includes, lineageText, merge, mergeOptions, newId, pack, parseDoc, PenProfile, sameContent, seenByBoth, unpack, validateDoc, ValidationError, type Doc, type Lineage, type Opened, type Seen } from '@shellnote/core'
+import { apply, become, compare, contentId, createDoc, idFrom, includes, lineageText, merge, mergeOptions, newId, pack, parseDoc, PenProfile, sameContent, seenByBoth, settleMerged, unpack, validateDoc, ValidationError, type Doc, type Lineage, type Opened, type Seen } from '@shellnote/core'
 import { EXTENSION } from './names.js'
 import { KEPT_DAYS, type Exchanged, type ExchangedNote, type FileState, type FolderEntry, type ItemRef, type Library, type LibraryStore, type NoteEntry, type OpenedNote, type OutsideChange, type SavingNote } from './store.js'
 import { canMove, contents, onlyUsedBy, uniqueName } from './tree.js'
@@ -415,7 +415,8 @@ export class FolderLibrary implements LibraryStore {
     } else {
       // Written apart: merged, over the last version both are known to come from when this device has it.
       const base = state.base && includes(theirs.seen, state.base.seen) ? await this.#baseDoc(id) : undefined
-      next = validateDoc(become(doc, merge(doc, opened.doc, { ...(base ? { base } : {}), ...mergeOptions(mine, theirs) }).doc).doc)
+      // What the other version put across a page's line goes to its place, as after any change.
+      next = validateDoc(become(doc, settleMerged(doc, merge(doc, opened.doc, { ...(base ? { base } : {}), ...mergeOptions(mine, theirs) }).doc)).doc)
       const cid = await contentId(next)
       state.seen = seenByBoth(mine.seen, theirs.seen)
       // A merge that says nothing new of what was seen, yet holds something new, counts as this device's change.
@@ -817,7 +818,7 @@ export class FolderLibrary implements LibraryStore {
       const mine = await this.#doc(doc.id)
       // What the screen holds, merged with what arrived since it last looked; through apply, so this device's count goes on.
       const arrived = since !== undefined && !sameContent(since, mine)
-      const target = arrived ? merge(doc, mine, { base: since, first: 'mine' }).doc : doc
+      const target = arrived ? settleMerged(doc, merge(doc, mine, { base: since, first: 'mine' }).doc) : doc
       if (!sameContent(mine, target)) await this.#changedHere(state, become(mine, target).doc)
       else if (state.dirty) await this.#write(state)
       this.#tell()

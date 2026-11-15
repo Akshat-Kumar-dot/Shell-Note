@@ -3,7 +3,7 @@
 // it comes from typing, the toolbar, undo, or later an AI edit, and each
 // listener hears which blocks changed and who made the change, so the frame
 // being typed in does not redraw what it already shows.
-import { apply, become, emptyHistory, merge, rebase, record, redo, undo, type Applied, type Doc, type History, type Id, type Op, type Selection } from '@shellnote/core'
+import { apply, become, emptyHistory, merge, rebase, record, redo, settle, settleMerged, undo, type Applied, type Doc, type History, type Id, type Op, type Selection } from '@shellnote/core'
 import { AssetStore } from './assets.js'
 
 export interface Change {
@@ -39,6 +39,16 @@ export interface FocusRequest {
 
 const NOTHING: Selection = { blocks: [] }
 
+/** The moves that settle what a change touched; none, with a warning, should settling ever fail, so the change still stands. */
+function settledOps(applied: Applied): Op[] {
+  try {
+    return settle(applied.doc, applied.changed)
+  } catch (error) {
+    console.warn('shellnote: the pages could not be settled', error)
+    return []
+  }
+}
+
 /**
  * How a selection was made: by typing and moving the caret in text, or by
  * choosing blocks as objects (a click on a block on the page, Shift+click, the
@@ -49,10 +59,11 @@ export type SelectionKind = 'text' | 'objects'
 /**
  * The tool in use, chosen in the bar: Type, the usual one; Select, a box that
  * takes only what is inside it; Free cursor, a click on
- * empty paper to start typing there; and the ink tools (phase 3): Pen,
- * Highlighter and Eraser (ink/PenLayer.tsx).
+ * empty paper to start typing there; the ink tools (phase 3): Pen,
+ * Highlighter and Eraser (ink/PenLayer.tsx); and the Hand, in the pen's row, a
+ * drag of which moves the sheet and writes nothing.
  */
-export type Tool = 'type' | 'select' | 'free' | 'pen' | 'highlighter' | 'eraser'
+export type Tool = 'type' | 'select' | 'free' | 'pen' | 'highlighter' | 'eraser' | 'hand'
 
 /** The tools that put ink on the page or take it off. */
 export const INK_TOOLS: readonly Tool[] = ['pen', 'highlighter', 'eraser']
@@ -153,9 +164,17 @@ export class EditorStore {
    */
   apply(ops: Op[], options: StoreApplyOptions = {}): Applied {
     if (ops.length === 0) return { doc: this.#doc, inverse: [], changed: [] }
-    const result = apply(this.#doc, ops, options.baseRev === undefined ? {} : { baseRev: options.baseRev })
+    let result = apply(this.#doc, ops, options.baseRev === undefined ? {} : { baseRev: options.baseRev })
+    let done = ops
+    // What the change put across a page's line goes to its place (core's settle), in the same undo step.
+    const more = settledOps(result)
+    if (more.length > 0) {
+      const settled = apply(result.doc, more)
+      result = { doc: settled.doc, inverse: [...settled.inverse, ...result.inverse], changed: [...new Set([...result.changed, ...settled.changed])] }
+      done = [...ops, ...more]
+    }
     this.#doc = result.doc
-    this.#history = record(this.#history, ops, result.inverse, {
+    this.#history = record(this.#history, done, result.inverse, {
       ...(options.key === undefined ? {} : { key: options.key }),
       ...(options.join ? { join: true } : {}),
     })
@@ -194,7 +213,7 @@ export class EditorStore {
   absorb(since: Doc, theirs: Doc): boolean {
     const before = this.#doc
     // What the person just did here stands over the same small thing changed elsewhere.
-    const result = become(before, merge(before, theirs, { base: since, first: 'mine' }).doc)
+    const result = become(before, settleMerged(before, merge(before, theirs, { base: since, first: 'mine' }).doc))
     if (result.changed.length === 0) return false
     this.#doc = result.doc
     this.#history = rebase(this.#history, before, result.doc)

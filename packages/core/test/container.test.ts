@@ -2,7 +2,7 @@
 import fc from 'fast-check'
 import { strToU8, zipSync } from 'fflate'
 import { describe, expect, it } from 'vitest'
-import { apply, fromFiles, pack, toFiles, unpack, type Doc } from '../src/index.js'
+import { apply, fromFiles, pack, SCHEMA_VERSION, toFiles, unpack, type Doc } from '../src/index.js'
 import { isRecord } from '../src/util.js'
 import { Namer, planTransaction, transactions } from './arbitraries.js'
 import { FIXTURES, MIXED, PHYSICS } from './fixtures/index.js'
@@ -121,7 +121,7 @@ describe('damaged files are refused with a reason', () => {
 
   it('a file from a newer version of the app', () => {
     const files = toFiles(PHYSICS)
-    files['doc.json'] = files['doc.json']!.replace('"v": 4', '"v": 5')
+    files['doc.json'] = files['doc.json']!.replace(`"v": ${SCHEMA_VERSION}`, `"v": ${SCHEMA_VERSION + 1}`)
     expectError(() => fromFiles(files), 'too_new', /Update the app/)
   })
 

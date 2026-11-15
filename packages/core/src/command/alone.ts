@@ -18,7 +18,7 @@ export const ALONE: ReadonlySet<string> = new Set([
   'video.show', 'video.hide', 'video.play', 'video.pause', 'video.times',
   'output.answers', 'output.made',
   'timer.start', 'timer.pause', 'timer.stop',
-  'settings.open', 'settings.theme', 'settings.accent',
+  'settings.open', 'settings.theme', 'settings.accent', 'settings.paper',
   'ai.open', 'ai.close',
 ])
 

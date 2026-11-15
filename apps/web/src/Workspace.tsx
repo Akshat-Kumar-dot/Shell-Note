@@ -6,9 +6,9 @@
 // the ✨ button or Ctrl+K; its answers and its log show in a panel beside the pages, and the log is kept beside the
 // note in the library, never in its file.
 import { textOf, ValidationError, type Doc, type LogEntry, type Selection } from '@shellnote/core'
-import { aiEdit, AiLayer, AskPanel, AssetStore, BarMenu, BarStrip, CHANGED_SINCE, checkDiagram, commands, EditorStore, MenuItem, MovableBar, NoteBar, undoEdit, type By, type NewNote, LogPanel, PageView, useUndoKeys, EditorArea, programHost, showSideTab, tabWord, inDesktopApp, workspace, type AiHost, type AskAnswer, type LogItem } from '@shellnote/editor'
+import { aiEdit, AiLayer, AskPanel, AssetStore, BarMenu, BarStrip, CHANGED_SINCE, checkDiagram, commands, EditorStore, MenuItem, MovableBar, NoteBar, undoEdit, type By, type NewNote, LogPanel, PageView, PrintView, useUndoKeys, EditorArea, programHost, showSideTab, tabWord, inDesktopApp, workspace, type AiHost, type AskAnswer, type LogItem } from '@shellnote/editor'
 import { openAICompatible } from '@shellnote/providers'
-import { Check, CircleAlert, CloudCheck, Ellipsis, FileDown, FilePlus2, FolderOpen, HardDrive, Maximize2, ScrollText, TriangleAlert } from 'lucide-react'
+import { Check, CircleAlert, CloudCheck, CornerDownLeft, Ellipsis, FileDown, FilePlus2, FolderOpen, HardDrive, Maximize2, ScrollText, TriangleAlert } from 'lucide-react'
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { assistantLog, withAssistants } from './ai/assistants.js'
@@ -18,6 +18,7 @@ import { keepWhenClosing } from './desktop.js'
 import { importNote } from './library/importing.js'
 import { libraryPictures } from './library/pictures.js'
 import { Settings } from './library/Settings.js'
+import { NoteMenu } from './shell/NoteMenu.js'
 import { noteScreen, tabsAt, tabsEnd } from './shell/state.js'
 import type { LibraryStore } from '@shellnote/library'
 import type { Tabs } from './library/tabs.js'
@@ -70,13 +71,20 @@ export interface Session {
 let sessions = 0
 
 /** A session for a document, its pictures' bytes loaded into the editor's store. */
+/** A note's kind, and its paper, as the status line says them. */
+const KIND_WORDS = { text: 'Text', sketch: 'Sketch', mixed: 'Mixed' } as const
+const PAPER_WORDS = { blank: 'Blank', ruled: 'Lines', grid: 'Squares', dots: 'Dots' } as const
+
 export async function sessionFor(doc: Doc, assets: ReadonlyMap<string, Blob>, place: { note: string | undefined; folder: string | null; file: FileState | undefined }): Promise<Session> {
   const store = new AssetStore()
   for (const [hash, blob] of assets) {
     const asset = doc.asset[hash]
     if (asset) await store.put(hash, blob, asset.mime)
   }
-  return { key: ++sessions, store: new EditorStore(doc, store), ...place }
+  const editor = new EditorStore(doc, store)
+  // A sketch is for the pen: it opens with the pen in hand, its row of tools shown first.
+  if (doc.kind === 'sketch') editor.setTool('pen')
+  return { key: ++sessions, store: editor, ...place }
 }
 
 /** A hint a person can act on, from an error. */
@@ -133,6 +141,31 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
   const [problem, setProblem] = useState<string>()
   const [now, setNow] = useState(Date.now)
   const [openedAt] = useState(Date.now)
+  // The folder the note is in, by name, and when it was last edited: the title line of a text note.
+  const [placeName, setPlaceName] = useState<string>()
+  const editedAt = useRef(openedAt)
+  useEffect(() => {
+    let on = true
+    library.list().then(
+      (read) => {
+        if (!on) return
+        setPlaceName(read.folders.find((one) => one.id === folder)?.name)
+        const entry = read.notes.find((one) => one.id === note)
+        if (entry) editedAt.current = entry.edited
+      },
+      () => undefined,
+    )
+    return () => {
+      on = false
+    }
+  }, [library, folder, note])
+  useEffect(
+    () =>
+      store.subscribe((change) => {
+        if (change.recorded) editedAt.current = Date.now()
+      }),
+    [store],
+  )
   const editing = mode === 'edit'
   useUndoKeys(store, editing)
   // The shell's rail: its buttons for the panel beside the note work while the note is edited here.
@@ -149,6 +182,16 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
   noteRef.current = note
   const takeAssistants = useRef<() => void>(() => undefined)
   const [settings, setSettings] = useState(false)
+  // The print window's pages, drawn while it is open (note.print).
+  const [printing, setPrinting] = useState(false)
+  const printed = useCallback(() => setPrinting(false), [])
+  // A text note shown seamless has no paper: its words take the dark paper's colours in the dark theme (theme.css).
+  const paperless = doc.kind === 'text' && doc.view === 'seamless'
+  useEffect(() => {
+    const root = document.documentElement
+    root.toggleAttribute('data-paperless', paperless)
+    return () => root.removeAttribute('data-paperless')
+  }, [paperless])
 
   useEffect(() => {
     document.title = `${doc.title} – ShellNote`
@@ -553,6 +596,10 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
         openSettings: () => setSettings(true),
         undoAi: () => own.current.undoAi(),
         editHere: () => own.current.takeOver(),
+        print: () => {
+          setPrinting(true)
+          return 'the print window opens: print the note, or save it as a PDF'
+        },
       }),
     // Given again once the other windows have answered, so a command waiting for this screen hears it is ready.
     [mode === 'checking'],
@@ -609,6 +656,10 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
   const [noticePlace, setNoticePlace] = useState<HTMLElement | null>(null)
   // The notes being edited, made once a note, zoom and the bar's place: the page view follows the note itself, key by
   // key (with a store, PageView shows the store's own note), so the workspace round it is not drawn again for each key.
+  // A sketch shown seamless says, at the foot of the window, that its sheet grows as you write.
+  const growing = doc.kind === 'sketch' && doc.view === 'seamless'
+  // A text note's title line, at the top of its first page: its folder, and when it was last edited.
+  const heading = doc.kind === 'text' ? `${placeName ?? 'Library'} · edited ${ago(editedAt.current, now)}` : undefined
   const notes = useMemo(
     () => (
       <>
@@ -618,7 +669,13 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
         <div className="sh-notes-row">
           {at === 'left' ? <BarStrip side="left">{[toolsBar]}</BarStrip> : null}
           <div className="pages-area">
-            <PageView key={session.key} doc={store.doc} zoom={zoom} onZoom={setZoom} store={store} />
+            <PageView key={session.key} doc={store.doc} zoom={zoom} onZoom={setZoom} store={store} heading={heading} />
+            {growing ? (
+              <span className="sh-grows" role="note">
+                The sheet grows as you write near its edge
+                <CornerDownLeft size={14} aria-hidden />
+              </span>
+            ) : null}
           </div>
           {at === 'right' ? <BarStrip side="right">{[toolsBar]}</BarStrip> : null}
         </div>
@@ -626,7 +683,7 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
         <div className="sh-status-place" ref={setStatusPlace} />
       </>
     ),
-    [at, toolsBar, session.key, store, zoom],
+    [at, toolsBar, session.key, store, zoom, growing, heading],
   )
 
   const rename = (title: string): void => {
@@ -667,6 +724,11 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
         {note === undefined ? 'Not kept' : place !== undefined ? 'Kept in your folder' : inDesktopApp() ? 'Kept on this computer' : 'Kept in this browser'}
       </button>
       <span className="sh-grow" />
+      <span className="sh-kind" title="What this note is, and how its pages show (the note's menu, Kind and Page)">
+        {KIND_WORDS[doc.kind ?? 'mixed']}
+        {doc.view === 'seamless' ? (doc.kind === 'sketch' ? ' · growing sheet' : ' · no page breaks') : ''}
+      </span>
+      {doc.kind === 'sketch' ? <span title="The paper (the note's menu, Paper)">{PAPER_WORDS[doc.page[doc.pages[0]!]?.bg ?? 'blank']}</span> : null}
       <span>
         {pages} {pages === 1 ? 'page' : 'pages'}
       </span>
@@ -713,7 +775,11 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
             <div className="sh-tabs-place" ref={tabsAt} />
             {noticeBar}
             <div className="pages-area">
-              {mode === 'view' || mode === 'checking' ? <PageView doc={doc} zoom={zoom} onZoom={setZoom} assets={store.assets.snapshot()} /> : <PageView key={session.key} doc={doc} zoom={zoom} onZoom={setZoom} store={store} />}
+              {mode === 'view' || mode === 'checking' ? (
+                <PageView doc={doc} zoom={zoom} onZoom={setZoom} assets={store.assets.snapshot()} heading={heading} />
+              ) : (
+                <PageView key={session.key} doc={doc} zoom={zoom} onZoom={setZoom} store={store} heading={heading} />
+              )}
             </div>
             {statusLine}
           </div>
@@ -725,10 +791,46 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
       {end
         ? createPortal(
             <>
-              <BarMenu label="This note" title="This note: save a copy, open a file, what the AI changed" button={<Ellipsis size={18} aria-hidden />}>
+              <BarMenu label="This note" title="This note: what it is, its pages and paper, its cover; save, print, what the AI changed" button={<Ellipsis size={18} aria-hidden />}>
                 {(close) => (
-                  <>
-                    <div className="sh-menu-head">This note</div>
+                  <NoteMenu
+                    store={store}
+                    close={close}
+                    editing={editing}
+                    after={
+                      editing ? (
+                        <>
+                          <MenuItem
+                            label="AI log"
+                            title="The AI log: every request on this note, with Undo"
+                            command="output.answers"
+                            onChoose={() => {
+                              close()
+                              commands.tap('output.answers')
+                            }}
+                          >
+                            <ScrollText size={18} aria-hidden />
+                            What the AI changed
+                          </MenuItem>
+                          <hr />
+                          <MenuItem
+                            label={full ? 'Leave full view' : 'Full view: the notes alone'}
+                            title={full ? 'Leave full view (Esc)' : 'Full view: the notes alone, the panels beside them out of sight'}
+                            checked={full}
+                            kind="checkbox"
+                            command="panel.full"
+                            onChoose={() => {
+                              close()
+                              commands.tap('panel.full', full ? { on: false } : { pane: 'notes' })
+                            }}
+                          >
+                            <Maximize2 size={18} aria-hidden />
+                            The notes alone
+                          </MenuItem>
+                        </>
+                      ) : null
+                    }
+                  >
                     <MenuItem
                       label="Save"
                       title={`${status.text}. Save the note to a .shellnote file, the copy that lasts. ${keptWords}`}
@@ -767,38 +869,7 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
                       Open a file…
                       <kbd>Ctrl+O</kbd>
                     </MenuItem>
-                    {editing ? (
-                      <>
-                        <hr />
-                        <MenuItem
-                          label={full ? 'Leave full view' : 'Full view: the notes alone'}
-                          title={full ? 'Leave full view (Esc)' : 'Full view: the notes alone, the panels beside them out of sight'}
-                          checked={full}
-                          kind="checkbox"
-                          command="panel.full"
-                          onChoose={() => {
-                            close()
-                            commands.tap('panel.full', full ? { on: false } : { pane: 'notes' })
-                          }}
-                        >
-                          <Maximize2 size={18} aria-hidden />
-                          The notes alone
-                        </MenuItem>
-                        <MenuItem
-                          label="AI log"
-                          title="The AI log: every request on this note, with Undo"
-                          command="output.answers"
-                          onChoose={() => {
-                            close()
-                            commands.tap('output.answers')
-                          }}
-                        >
-                          <ScrollText size={18} aria-hidden />
-                          What the AI changed
-                        </MenuItem>
-                      </>
-                    ) : null}
-                  </>
+                  </NoteMenu>
                 )}
               </BarMenu>
             </>,
@@ -807,6 +878,7 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
         : null}
       {editing ? <AiLayer key={session.key} store={store} host={host} enabled={editing} /> : null}
       {settings ? <Settings onClose={() => setSettings(false)} beforeChange={flush} /> : null}
+      {printing ? <PrintView doc={store.doc} assets={store.assets.snapshot()} onDone={printed} heading={heading} /> : null}
     </div>
   )
 }

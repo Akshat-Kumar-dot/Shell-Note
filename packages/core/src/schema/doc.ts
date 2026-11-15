@@ -10,9 +10,11 @@ import { isWellFormed } from '../util.js'
  * subscript, superscript, and a size or font on words (markdown/inline.ts).
  * Version 3, 13 October 2026 (the pen, phase 3): a stroke may have a pen kind,
  * a colour code, five widths, tilt and a snapped shape, and a note its own
- * pen switches.
+ * pen switches. Version 4, 25 October 2026: other programs written beside.
+ * Version 5, 15 November 2026: a note's kind, how its pages are shown, and its
+ * cover picture.
  */
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 
 /**
  * The most blocks a note holds. Every block of a note is checked as it is opened, so a file with very many (a small
@@ -391,11 +393,31 @@ export const Clip = z
   .refine((c) => c.to > c.from, { error: 'A clip ends after it starts.' })
 export type Clip = z.infer<typeof Clip>
 
+/**
+ * What a note is for (version 5): typing (text), the pen (sketch), or both (mixed). It chooses the tools shown first,
+ * the paper of new pages and the library's picture; it never changes what the note holds.
+ */
+export const NoteKind = z.enum(['text', 'sketch', 'mixed'])
+export type NoteKind = z.infer<typeof NoteKind>
+
+/**
+ * How a note's pages are shown (version 5): one below another with a gap (pages), or as one sheet with no breaks
+ * (seamless), the margins between two pages folded away. The pages are the same either way: a view, never a change.
+ */
+export const NoteView = z.enum(['pages', 'seamless'])
+export type NoteView = z.infer<typeof NoteView>
+
 /** The whole document. Use validateDoc() to check one: it gives clearer errors. */
 export const Doc = z.strictObject({
   v: z.literal(SCHEMA_VERSION),
   id: Id,
   title: Str,
+  /** What the note is for (version 5). Missing: mixed, as every note before. */
+  kind: NoteKind.optional(),
+  /** How its pages are shown (version 5). Missing: pages, as every note before. */
+  view: NoteView.optional(),
+  /** Its cover picture (version 5): one of its own assets, shown in the library. */
+  cover: Hash.optional(),
   /** +1 for each applied transaction. */
   rev: z.int().nonnegative(),
   /** Page order. */
@@ -418,4 +440,4 @@ export const Doc = z.strictObject({
 export type Doc = z.infer<typeof Doc>
 
 /** The document-level fields that `update` may set. */
-export const DocFields = Doc.pick({ title: true, rules: true, pen: true, media: true, clips: true, programs: true })
+export const DocFields = Doc.pick({ title: true, kind: true, view: true, cover: true, rules: true, pen: true, media: true, clips: true, programs: true })

@@ -32,6 +32,7 @@ import {
   Pilcrow,
   Quote,
   Rows2,
+  Workflow,
   SquareCheck,
   SquareDashedMousePointer,
   Strikethrough,
@@ -103,6 +104,10 @@ const MARKS: [keyof WordMarks, string, string, string, LucideIcon][] = [
   ['sub', 'subscript', 'Subscript', 'Ctrl+=', Subscript],
   ['sup', 'superscript', 'Superscript', 'Ctrl+Shift+=', Superscript],
 ]
+
+/** The flowchart More's Diagram starts with, to be changed as the person likes. */
+const STARTER_DIAGRAM = 'flowchart TD\n  A[Start] --> B[Next step]'
+
 const IN_ROW = 3
 
 /** What a press on the page does, while words are in hand: under More. */
@@ -134,7 +139,8 @@ function runner(store: EditorStore) {
 export function NoteBar({ store }: { store: EditorStore }) {
   const tool = useSyncExternalStore(store.subscribeTool, store.toolSnapshot)
   const both = useSyncExternalStore(bothRows.subscribe, bothRows.snapshot)
-  const ink = isInkTool(tool)
+  // The Hand is the pen's row's: with it in hand, that row stays.
+  const ink = isInkTool(tool) || tool === 'hand'
   return (
     <div className="sh-rows" data-both={both ? '' : undefined}>
       {both || !ink ? <TextRow store={store} /> : null}
@@ -445,6 +451,17 @@ function TextRow({ store }: { store: EditorStore }) {
               </MenuItem>
             ) : null}
             <hr />
+            <MenuItem
+              label="Diagram"
+              title="A flowchart under the line the caret is on, to change as you like (Mermaid)"
+              onChoose={() => {
+                close()
+                void commands.press('diagram.add', { words: STARTER_DIAGRAM, ...(block ? { after: block.id } : { at: 'end' }) })
+              }}
+            >
+              <Workflow size={ICON} aria-hidden />
+              Diagram
+            </MenuItem>
             <div className="sh-menu-head">A press on the page</div>
             {POINTERS.map(([value, label, hint, Icon]) => (
               <MenuItem

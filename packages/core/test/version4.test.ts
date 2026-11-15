@@ -20,13 +20,13 @@ function written(...strokes: Stroke[]): Doc {
 const stroke = (extra: Partial<Stroke> = {}): Stroke => ({ pts: [0, 0, 128, 500, 40, 140], color: 'ink', width: 'm', ...extra })
 
 describe('file format version 4', () => {
-  it('is the version written', () => {
-    expect(SCHEMA_VERSION).toBe(4)
+  it('is followed by version 5, which only adds (a note’s kind, view and cover)', () => {
+    expect(SCHEMA_VERSION).toBe(5)
   })
 
   it('opens a version 3 note unchanged but for its version', () => {
     const old = { ...structuredClone(PHYSICS), v: 3 }
-    expect(parseDoc(old)).toEqual({ ...PHYSICS, v: 4 })
+    expect(parseDoc(old)).toEqual({ ...PHYSICS, v: SCHEMA_VERSION })
   })
 
   it('keeps a program as a source, and each stroke’s moment beside it, through saving and opening', () => {

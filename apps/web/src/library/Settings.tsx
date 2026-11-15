@@ -9,7 +9,7 @@ import { HardDrive, Monitor, Moon, ShieldCheck, Sun, TriangleAlert } from 'lucid
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { AiSettingsPart } from '../ai/AiSettings.js'
 import { lastKeepAnswer } from '../commands.js'
-import { ACCENTS, accentNow, appearanceNow, onAppearance, type Accent, type Appearance } from '../theme.js'
+import { ACCENTS, accentNow, appearanceNow, darkPaperNow, onAppearance, type Accent, type Appearance } from '../theme.js'
 import { library } from './chosen.js'
 import { Dialog } from './Dialog.js'
 import { LibraryPlace } from './LibraryPlace.js'
@@ -40,6 +40,7 @@ type Asking = 'not asked' | 'asking' | 'refused'
 export function Settings({ onClose, beforeChange }: { onClose: () => void; beforeChange?: () => Promise<void> }) {
   const look = useSyncExternalStore(onAppearance, appearanceNow)
   const accent = useSyncExternalStore(onAppearance, accentNow)
+  const darkPaper = useSyncExternalStore(onAppearance, darkPaperNow)
   const [usage, setUsage] = useState<{ used: number; quota: number }>()
   const [safe, setSafe] = useState<boolean>()
   const [asking, setAsking] = useState<Asking>('not asked')
@@ -92,7 +93,22 @@ export function Settings({ onClose, beforeChange }: { onClose: () => void; befor
           ))}
           <span className="accent-name">{ACCENT_NAMES[accent]}</span>
         </div>
-        <p className="settings-hint">The paper always stays white, as it prints.</p>
+        <div className="settings-row">
+          <span className="settings-row-name">Paper in dark</span>
+          <div className="segmented" role="radiogroup" aria-label="Paper in dark">
+            {(
+              [
+                [false, 'White'],
+                [true, 'Dark'],
+              ] as const
+            ).map(([dark, name]) => (
+              <button key={name} type="button" role="radio" aria-checked={darkPaper === dark} data-command="settings.paper" onClick={() => commands.tap('settings.paper', { on: dark })}>
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
+        <p className="settings-hint">In the dark theme, the paper can be dark too, its ink in colours that read on it. Printing is always on white.</p>
       </section>
       <AiSettingsPart />
       {inWindowsApp() ? <LibraryPlace beforeChange={beforeChange} /> : null}

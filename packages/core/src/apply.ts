@@ -163,7 +163,7 @@ const BLOCK_FIELDS: Record<BlockType, readonly string[]> = {
   table: ['rows', 'head', 'alt', 'caption', 'cols', 'width', 'look'],
 }
 const PAGE_FIELDS = ['w', 'h', 'bg']
-const DOC_FIELDS = ['title', 'rules', 'pen', 'media', 'clips', 'programs']
+const DOC_FIELDS = ['title', 'kind', 'view', 'cover', 'rules', 'pen', 'media', 'clips', 'programs']
 
 const MOVED = 'Use move to change where a block is.'
 const BLOCK_ELSEWHERE: Record<string, string> = {
@@ -199,11 +199,26 @@ function update(draft: Draft, op: OpOf<'update'>): Op[] {
     checkFields(op.set, DOC_FIELDS, DOC_ELSEWHERE, 'The document')
     // Fields it lacks are left out, not passed as undefined: `patch` would count them as there, and its undo could
     // not remove them again.
-    const { title, rules, pen, media, clips, programs } = draft.doc
-    const { next, undo } = patch({ title, rules, ...(pen ? { pen } : {}), ...(media ? { media } : {}), ...(clips ? { clips } : {}), ...(programs ? { programs } : {}) }, op.set)
+    const { title, kind, view, cover, rules, pen, media, clips, programs } = draft.doc
+    const { next, undo } = patch(
+      { title, ...(kind ? { kind } : {}), ...(view ? { view } : {}), ...(cover ? { cover } : {}), rules, ...(pen ? { pen } : {}), ...(media ? { media } : {}), ...(clips ? { clips } : {}), ...(programs ? { programs } : {}) },
+      op.set,
+    )
     const fields = parseWith(DocFields, next, 'The document')
     checkMedia(draft, fields.media ?? [], fields.clips ?? [])
-    draft.setDocFields({ title: fields.title, rules: fields.rules, pen: fields.pen ?? null, media: fields.media ?? null, clips: fields.clips ?? null, programs: fields.programs ?? null })
+    // A cover is one of the note's own pictures, so it travels with the note.
+    if (fields.cover !== undefined && !draft.asset(fields.cover)) missing('asset', fields.cover)
+    draft.setDocFields({
+      title: fields.title,
+      kind: fields.kind ?? null,
+      view: fields.view ?? null,
+      cover: fields.cover ?? null,
+      rules: fields.rules,
+      pen: fields.pen ?? null,
+      media: fields.media ?? null,
+      clips: fields.clips ?? null,
+      programs: fields.programs ?? null,
+    })
     return [{ op: 'update', id: op.id, set: undo }]
   }
 
@@ -475,6 +490,7 @@ function asset(draft: Draft, op: OpOf<'asset'>): Op[] {
     const video = draft.doc.media?.find((m) => m.kind === 'file' && m.asset === op.hash)
     if (video) fail('in_use', `Video ${video.id} still uses asset ${op.hash}. Remove that video from the note first.`)
     if (Object.values(draft.doc.block).some((b) => b.type === 'ink' && b.strokes.some((stroke) => stroke.pm?.pic === op.hash))) fail('in_use', `A line written beside a program keeps asset ${op.hash} as its picture. Take the places off that line first.`)
+    if (draft.doc.cover === op.hash) fail('in_use', `Asset ${op.hash} is the note's cover. Take the cover off first.`)
     draft.dropAsset(op.hash)
   } else {
     draft.putAsset(op.hash, op.meta)

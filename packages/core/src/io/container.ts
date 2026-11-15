@@ -27,6 +27,10 @@ export function toFiles(doc: Doc): Record<string, string> {
     `"v": ${doc.v}`,
     `"id": ${JSON.stringify(doc.id)}`,
     `"title": ${JSON.stringify(doc.title)}`,
+    // A note's kind, view and cover (version 5), only when it has them, so an older note's bytes do not change.
+    ...(doc.kind ? [`"kind": ${JSON.stringify(doc.kind)}`] : []),
+    ...(doc.view ? [`"view": ${JSON.stringify(doc.view)}`] : []),
+    ...(doc.cover ? [`"cover": ${JSON.stringify(doc.cover)}`] : []),
     `"rev": ${doc.rev}`,
     `"pages": ${JSON.stringify(doc.pages)}`,
     `"page": ${entryLines(pages)}`,

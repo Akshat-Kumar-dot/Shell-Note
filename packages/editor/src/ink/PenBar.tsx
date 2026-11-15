@@ -4,7 +4,7 @@
 // and a picture. The Pen switches are for this person or for this note, with what the pen has learned of this
 // person's hand. Like every button in the rows, none takes the focus.
 import { StrokeWidth, type AnyColor, type Color, type PenSettings, type SymbolKind, type TidyRules } from '@shellnote/core'
-import { Brush, ChevronDown, Eraser, Highlighter, Lasso, Pen, Pencil, PenLine, PenTool, SlidersHorizontal, Type, WandSparkles, type LucideIcon } from 'lucide-react'
+import { Brush, ChevronDown, Eraser, Hand, Highlighter, Lasso, Pen, Pencil, PenLine, PenTool, SlidersHorizontal, Type, WandSparkles, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react'
 import { BarMenu, keepFocus, MenuItem } from '../BarMenu.js'
 import { PictureButton, UndoRedo } from '../BarParts.js'
@@ -61,6 +61,9 @@ export function PenBar({ store }: { store: EditorStore }) {
     <div className="sh-tools nw-penbar" role="toolbar" aria-label={eraser ? 'Eraser' : highlighter ? 'Highlighter' : 'Pen'}>
       <button type="button" className="sh-b" aria-label="Select" aria-pressed={tool === 'select'} title="Select: draw a box to take only what is inside it" data-command="tool.choose" onMouseDown={keepFocus} onClick={() => choose('select')}>
         <Lasso size={ICON} aria-hidden />
+      </button>
+      <button type="button" className="sh-b" aria-label="Move the sheet" aria-pressed={tool === 'hand'} title="Move the sheet: drag it to look along it, writing nothing" data-command="tool.choose" onMouseDown={keepFocus} onClick={() => choose('hand')}>
+        <Hand size={ICON} aria-hidden />
       </button>
       <span className="sh-sep" />
       <BarMenu

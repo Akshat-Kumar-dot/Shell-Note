@@ -76,6 +76,9 @@ export function structureProblems(doc: Doc): string[] {
     }
   }
 
+  // The cover (version 5) is one of the note's own pictures.
+  if (doc.cover !== undefined && !has(doc.asset, doc.cover)) problem(`the cover is asset ${doc.cover}, which does not exist`)
+
   // The note's videos and their marks, and the programs written beside (version 4): ids new to the document, a file's
   // asset there, a mark on a video and a page.
   const mediaIds = new Set<string>()

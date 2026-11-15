@@ -12,7 +12,7 @@ import { commands, inDesktopApp, type AppPlace, type By, type HomePlace, type It
 import type { Library, LibraryStore } from '@shellnote/library'
 import { deletedItems, folderPath, hidden } from '@shellnote/library/tree'
 import { loadSettings, modelsNow, saveSettings, withModel } from './ai/settings.js'
-import { applyAccent, applyAppearance, type Accent, type Appearance } from './theme.js'
+import { applyAccent, applyAppearance, applyDarkPaper, type Accent, type Appearance } from './theme.js'
 
 type Kind = ItemRef['kind']
 type Here = Places & { app: AppPlace }
@@ -228,6 +228,29 @@ export function defineAppCommands(store: LibraryStore): void {
   })
 
   // ----- files -----
+  // ----- the note's cover and printing -----
+  commands.define('note.cover', ['note'], async ({ on }, { note }, by) => {
+    const store = note.store
+    if (on === false) {
+      if (store.doc.cover === undefined) return 'the note has no cover'
+      store.apply([{ op: 'update', id: store.doc.id, set: { cover: null } }], { origin: 'toolbar' })
+      return "the cover is off: the library shows the note's kind"
+    }
+    if (by === 'agent') throw new Error("A cover is a picture the person chooses: the note's menu, Cover picture.")
+    const file = await pickPicture()
+    if (!file) return 'no picture chosen'
+    const picture = await store.assets.add(file)
+    store.apply(
+      [
+        { op: 'asset', hash: picture.hash, meta: picture.meta },
+        { op: 'update', id: store.doc.id, set: { cover: picture.hash } },
+      ],
+      { origin: 'toolbar' },
+    )
+    return 'the note has a cover picture, kept in its file'
+  })
+  commands.define('note.print', ['workspace'], (_, { workspace }) => workspace.print())
+
   commands.define('file.save', ['workspace'], (_, { workspace }, by) => workspace.save(false, by))
   commands.define('file.saveAs', ['workspace'], (_, { workspace }, by) => workspace.save(true, by))
   commands.define('file.open', ['app', ['workspace', 'home']], (_, places, by) => {
@@ -270,6 +293,10 @@ export function defineAppCommands(store: LibraryStore): void {
     applyAccent(accent as Accent)
     return `the app's colour is ${String(accent)}`
   })
+  commands.define('settings.paper', [], ({ on }) => {
+    applyDarkPaper(on !== false)
+    return on !== false ? 'in the dark theme the paper is dark, its ink in colours that read on it; printing stays white' : 'the paper is white in the dark theme too'
+  })
   commands.define('settings.keepStorage', [], async () => {
     const keeper = inDesktopApp() ? 'WebView2' : 'The browser'
     if (typeof navigator.storage?.persist !== 'function') throw new Error(`${keeper} cannot be asked to keep the notes here.`)
@@ -287,5 +314,17 @@ export function defineAppCommands(store: LibraryStore): void {
   commands.describe('note', () => {
     const open = commands.places.note?.store.doc
     return open ? `note "${open.title}" (${open.id}) · ${open.pages.length} ${open.pages.length === 1 ? 'page' : 'pages'}` : undefined
+  })
+}
+
+/** A picture the person picks from their files; none when they close the window without one. */
+function pickPicture(): Promise<File | undefined> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'image/png,image/jpeg,image/gif,image/webp,image/avif'
+    input.addEventListener('change', () => resolve(input.files?.[0]), { once: true })
+    input.addEventListener('cancel', () => resolve(undefined), { once: true })
+    input.click()
   })
 }

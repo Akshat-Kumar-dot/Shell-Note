@@ -79,7 +79,7 @@ describe("the note's commands, through the terminal", () => {
   it("refuse while another window edits the note, as every command that changes it does", async () => {
     const store = open()
     const before = store.doc
-    const readOnly = commands.provide('workspace', { zoom: () => 1, setZoom: () => undefined, close: async () => undefined, save: async () => '', openFile: async () => '', newNote: async () => ({ id: '', title: '' }), rename: () => undefined, editing: () => false, entry: () => undefined, ready: () => true, openSettings: () => undefined, undoAi: () => '', editHere: () => '' })
+    const readOnly = commands.provide('workspace', { zoom: () => 1, setZoom: () => undefined, close: async () => undefined, save: async () => '', openFile: async () => '', newNote: async () => ({ id: '', title: '' }), rename: () => undefined, editing: () => false, entry: () => undefined, ready: () => true, openSettings: () => undefined, undoAi: () => '', editHere: () => '', print: () => '' })
     try {
       const out = await request(['block: remove block=t1'])
       expect(out[0]).toMatchObject({ ok: false })

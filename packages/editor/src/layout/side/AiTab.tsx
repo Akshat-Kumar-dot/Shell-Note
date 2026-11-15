@@ -6,7 +6,7 @@
 // YouTube's player (its policies, III.E.1). A thing made goes into what is chosen in the note, or the empty part of the
 // page in view, as one undo step, in the AI log. Later: RAG, finding in one's notes.
 import { logLine, NO_VISION, parsePipeTable, type Id, type Model } from '@shellnote/core'
-import { ArrowUp, Film, ImagePlus, Plus, Square, X } from 'lucide-react'
+import { ArrowUp, Film, ImagePlus, Paperclip, Square, X } from 'lucide-react'
 import { ThinkingOrb, type OrbState } from 'thinking-orbs'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type ClipboardEvent } from 'react'
 import { PICTURE_TYPES } from '../../assets.js'
@@ -428,7 +428,7 @@ export function AiTab({ store, host }: { store: EditorStore; host: AiHost | unde
     paid: () => host.paid?.() ?? false,
     line: () => `AI chat: ${chat.length} ${chat.length === 1 ? 'turn' : 'turns'} · next: ${MAKE_OF[mode]}${mode === 'ask' ? '' : `, into ${put === 'pad' ? 'the scratch pad' : 'the note'}`}${working ? ' · working' : ''}${picture ? ' · a picture waiting' : ''}`,
   }
-  const placeholder = mode === 'ask' ? 'Ask about the video, a picture, or the note…' : mode === 'summary' ? (transcript ? 'Press send to summarise the transcript' : read ? 'Press send to summarise what the programs showed' : 'Paste the transcript first (the Transcript tab)') : `What the ${mode === 'table' ? 'table' : 'flowchart'} is of…`
+  const placeholder = mode === 'ask' ? (media ? 'Ask about the video, a picture, or the note…' : 'Ask about this note, or what is selected') : mode === 'summary' ? (transcript ? 'Press send to summarise the transcript' : read ? 'Press send to summarise what the programs showed' : 'Paste the transcript first (the Transcript tab)') : `What the ${mode === 'table' ? 'table' : 'flowchart'} is of…`
 
   return (
     <div className="nw-chat" onPaste={paste}>
@@ -491,74 +491,6 @@ export function AiTab({ store, host }: { store: EditorStore; host: AiHost | unde
             </button>
           </div>
         ) : null}
-        <div className="nw-chat-composer">
-          <span className="nw-chat-plus" ref={plus}>
-            <button type="button" className="nw-chat-icon" aria-label="Add a picture" aria-haspopup="menu" aria-expanded={adding} title="A picture for the AI" onClick={() => setAdding(!adding)}>
-              <Plus size={18} aria-hidden />
-            </button>
-            {adding ? (
-              <div ref={placeMenu} className="nw-popover nw-chat-menu" role="menu" aria-label="A picture for the AI">
-                {media?.kind === 'file' ? (
-                  <button type="button" role="menuitem" className="nw-bar-place" data-command="chat.frame" onClick={takeFrame}>
-                    <Film size={14} aria-hidden /> Take this frame
-                  </button>
-                ) : null}
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="nw-bar-place"
-                  onClick={() => {
-                    setAdding(false)
-                    files.current?.click()
-                  }}
-                >
-                  <ImagePlus size={14} aria-hidden /> A picture file
-                </button>
-                <p className="nw-video-note">Or paste one here: Ctrl+V.</p>
-              </div>
-            ) : null}
-          </span>
-          <input
-            ref={files}
-            type="file"
-            accept={PICTURE_TYPES.join(',')}
-            hidden
-            aria-label="Picture file for the AI"
-            onChange={(event) => {
-              const file = event.target.files?.[0]
-              event.target.value = ''
-              if (file) void fileData(file).then(setPicture)
-            }}
-          />
-          <textarea
-            ref={box}
-            data-command="chat.send"
-            rows={1}
-            aria-label="Ask the AI, or say what to make"
-            placeholder={placeholder}
-            value={text}
-            onChange={(event) => {
-              setText(event.target.value)
-              event.target.style.height = 'auto'
-              event.target.style.height = `${Math.min(160, event.target.scrollHeight)}px`
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) {
-                event.preventDefault()
-                send()
-              }
-            }}
-          />
-          {working ? (
-            <button type="button" className="nw-chat-send" aria-label="Stop" title="Stop" data-command="chat.stop" onClick={() => commands.tap('chat.stop')}>
-              <Square size={13} aria-hidden fill="currentColor" />
-            </button>
-          ) : (
-            <button type="button" className="nw-chat-send" aria-label={sendLabel} title={sendLabel} disabled={!canSend} data-command="chat.send" onClick={send}>
-              <ArrowUp size={18} aria-hidden />
-            </button>
-          )}
-        </div>
         <div className="nw-chat-pills" role="radiogroup" aria-label="What to do">
           {MODES.map(([value, label]) => (
             <button key={value} type="button" role="radio" aria-checked={mode === value} data-command="chat.choose" onClick={() => commands.tap('chat.choose', { make: MAKE_OF[value] })}>
@@ -580,7 +512,76 @@ export function AiTab({ store, host }: { store: EditorStore; host: AiHost | unde
             ))}
           </div>
         ) : null}
-        <p className="nw-chat-later">Later: finding in your notes to answer (RAG).</p>
+        <div className="nw-chat-composer">
+          <textarea
+            ref={box}
+            data-command="chat.send"
+            rows={1}
+            aria-label="Ask the AI, or say what to make"
+            placeholder={placeholder}
+            value={text}
+            onChange={(event) => {
+              setText(event.target.value)
+              event.target.style.height = 'auto'
+              event.target.style.height = `${Math.min(160, event.target.scrollHeight)}px`
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault()
+                send()
+              }
+            }}
+          />
+          <div className="nw-chat-line">
+            <span className="nw-chat-plus" ref={plus}>
+              <button type="button" className="nw-chat-icon" aria-label="Add a picture" aria-haspopup="menu" aria-expanded={adding} title="A picture for the AI" onClick={() => setAdding(!adding)}>
+                <Paperclip size={17} aria-hidden />
+              </button>
+              {adding ? (
+                <div ref={placeMenu} className="nw-popover nw-chat-menu" role="menu" aria-label="A picture for the AI">
+                  {media?.kind === 'file' ? (
+                    <button type="button" role="menuitem" className="nw-bar-place" data-command="chat.frame" onClick={takeFrame}>
+                      <Film size={14} aria-hidden /> Take this frame
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="nw-bar-place"
+                    onClick={() => {
+                      setAdding(false)
+                      files.current?.click()
+                    }}
+                  >
+                    <ImagePlus size={14} aria-hidden /> A picture file
+                  </button>
+                  <p className="nw-video-note">Or paste one here: Ctrl+V.</p>
+                </div>
+              ) : null}
+            </span>
+            <input
+              ref={files}
+              type="file"
+              accept={PICTURE_TYPES.join(',')}
+              hidden
+              aria-label="Picture file for the AI"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                event.target.value = ''
+                if (file) void fileData(file).then(setPicture)
+              }}
+            />
+            {working ? (
+              <button type="button" className="nw-chat-send" aria-label="Stop" title="Stop" data-command="chat.stop" onClick={() => commands.tap('chat.stop')}>
+                <Square size={13} aria-hidden fill="currentColor" />
+              </button>
+            ) : (
+              <button type="button" className="nw-chat-send" aria-label={sendLabel} title={sendLabel} disabled={!canSend} data-command="chat.send" onClick={send}>
+                <ArrowUp size={18} aria-hidden />
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

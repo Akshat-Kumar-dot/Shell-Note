@@ -32,9 +32,9 @@ export function stepZoom(zoom: number, direction: 1 | -1): number {
  * Which pages to draw: the ones that overlap the visible band of the scroll
  * area, plus `overscan` pages either side so that scrolling never shows a
  * blank page. Heights are on-screen pixels; pages are stacked with PAGE_GAP
- * above each, and below the last.
+ * above the first, and `gap` between two (none in the seamless view).
  */
-export function pagesInView(heights: readonly number[], scrollTop: number, viewport: number, overscan = 1): { first: number; last: number } {
+export function pagesInView(heights: readonly number[], scrollTop: number, viewport: number, overscan = 1, gap = PAGE_GAP): { first: number; last: number } {
   if (heights.length === 0) return { first: 0, last: -1 }
   const top = scrollTop
   const bottom = scrollTop + viewport
@@ -46,7 +46,7 @@ export function pagesInView(heights: readonly number[], scrollTop: number, viewp
       if (first === -1) first = i
       last = i
     }
-    y += h + PAGE_GAP
+    y += h + gap
   })
   // Scrolled into a gap below every page: show the last one.
   if (first === -1) first = last = top <= PAGE_GAP ? 0 : heights.length - 1
@@ -54,12 +54,12 @@ export function pagesInView(heights: readonly number[], scrollTop: number, viewp
 }
 
 /** The page at a height in the scroll area (on-screen pixels): the one there, or the nearer one when y is in a gap. */
-export function pageAt(heights: readonly number[], y: number): number {
+export function pageAt(heights: readonly number[], y: number, gap = PAGE_GAP): number {
   let top = PAGE_GAP
   for (let i = 0; i < heights.length; i++) {
     const bottom = top + heights[i]!
-    if (y < bottom + PAGE_GAP / 2) return i
-    top = bottom + PAGE_GAP
+    if (y < bottom + gap / 2) return i
+    top = bottom + gap
   }
   return Math.max(0, heights.length - 1)
 }

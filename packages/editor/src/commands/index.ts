@@ -5,6 +5,7 @@ import { defineAi, padLine } from './ai.js'
 import { defineContent } from './content.js'
 import { definePen } from './pen.js'
 import { Commands } from './run.js'
+import { defineSheets, pagesLine } from './sheets.js'
 import { defineSide, sideLine } from './side.js'
 import { defineTimer, timerLine } from './timer.js'
 import { defineTools, toolsLine } from './tools.js'
@@ -22,10 +23,12 @@ defineSide(commands)
 defineAi(commands)
 definePen(commands)
 defineContent(commands)
+defineSheets(commands)
 commands.describe('app', () => commands.places.app?.where())
 commands.describe('library', () => commands.places.home?.showing())
 commands.describe('tools', () => toolsLine(commands.places.note?.store))
 commands.describe('view', () => viewLine(commands.places.workspace?.zoom()))
+commands.describe('pages', () => pagesLine(commands.places.note?.store))
 commands.describe('video', () => (commands.places.workspace ? videoLine(commands.places.note?.store) : undefined))
 commands.describe('timer', () => (commands.places.workspace ? timerLine() : undefined))
 commands.describe('side', () => (commands.places.workspace ? sideLine(commands.places.note?.store) : undefined))
@@ -35,6 +38,7 @@ commands.describe('pad', () => (commands.places.workspace ? padLine(commands.pla
 
 export { Commands, type AiPlace, type AppPlace, type By, type ChatMake, type ChatPlace, type DoerOptions, type Doer, type HomePlace, type ItemRef, type LibraryAt, type Need, type NewNote, type Places, type PicturesPlace, type Ran, type WorkspacePlace } from './run.js'
 export { chooseTool } from './tools.js'
+export { pagesOf } from './sheets.js'
 export { beginNoteRequest } from './content.js'
 export { setChoiceLog, type ChoiceEntry } from './choices.js'
 export { NO_TIMES } from './side.js'

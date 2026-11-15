@@ -14,8 +14,8 @@ function withInk(...strokes: Stroke[]): Doc {
 }
 
 describe('file format version 3', () => {
-  it('is followed by version 4, which only adds (other programs’ places, stage 4)', () => {
-    expect(SCHEMA_VERSION).toBe(4)
+  it('is followed by versions 4 and 5, which only add (other programs’ places; a note’s kind, view and cover)', () => {
+    expect(SCHEMA_VERSION).toBe(5)
   })
 
   it('opens a version 2 note unchanged but for its version', () => {

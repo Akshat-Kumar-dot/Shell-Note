@@ -1,6 +1,7 @@
-// How the app looks: light, dark, or as the system has it, and its own colour
-// (graphite, which is no colour, or one of six). Only the app's own surfaces
-// change; the paper always stays white. Both are this browser's convenience,
+// How the app looks: light, dark, or as the system has it; its own colour
+// (graphite, which is no colour, or one of six); and, in the dark, whether the
+// paper is white or dark, its ink in colours that read on it (the editor's
+// theme.css). Printing is always on white. All are this browser's convenience,
 // kept in localStorage, and the app works without them.
 export type Appearance = 'system' | 'light' | 'dark'
 
@@ -10,9 +11,11 @@ export type Accent = (typeof ACCENTS)[number]
 
 const KEY = 'shellnote:appearance'
 const ACCENT_KEY = 'shellnote:accent'
+const PAPER_KEY = 'shellnote:paper'
 const heard = new Set<() => void>()
 let current: Appearance | undefined
 let accent: Accent | undefined
+let paper: boolean | undefined
 
 /** Hear each change of appearance or colour (Settings shows the one chosen, whoever chose it). */
 export function onAppearance(listener: () => void): () => void {
@@ -74,3 +77,25 @@ export function applyAccent(next: Accent, remember = true): void {
 
 /** The colour shown now. */
 export const accentNow = (): Accent => accent ?? savedAccent()
+
+/** Whether the paper is dark in the dark theme, as chosen in this browser; white unless chosen. */
+export function savedDarkPaper(): boolean {
+  try {
+    return localStorage.getItem(PAPER_KEY) === 'dark'
+  } catch {
+    return false
+  }
+}
+
+/** Show the paper dark in the dark theme, or white, and remember it. */
+export function applyDarkPaper(dark: boolean, remember = true): void {
+  const root = document.documentElement
+  if (dark) root.dataset.paper = 'dark'
+  else delete root.dataset.paper
+  if (remember) remembered(PAPER_KEY, dark ? 'dark' : 'white')
+  paper = dark
+  for (const listener of [...heard]) listener()
+}
+
+/** Whether the paper is dark in the dark theme now. */
+export const darkPaperNow = (): boolean => paper ?? savedDarkPaper()

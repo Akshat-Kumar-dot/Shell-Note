@@ -1,7 +1,7 @@
 // The working copy apply() edits while it runs. The input document is never
 // modified: the first write to a map copies that map (not the blocks in it),
 // so every unchanged block is shared between the old and the new document.
-import type { Asset, Block, Clip, Doc, Id, Media, Page, PenOverrides, ProgramSource } from './schema/doc.js'
+import type { Asset, Block, Clip, Doc, Hash, Id, Media, NoteKind, NoteView, Page, PenOverrides, ProgramSource } from './schema/doc.js'
 import { has } from './util.js'
 import type { ContentField } from './validate/content.js'
 import { ValidationError } from './validate/errors.js'
@@ -93,8 +93,24 @@ export class Draft {
   }
 
   /** The document's own fields; `pen: null` removes the note's pen switches, and so on. */
-  setDocFields(fields: { title?: string; rules?: string[]; pen?: PenOverrides | null; media?: Media[] | null; clips?: Clip[] | null; programs?: ProgramSource[] | null }): void {
+  setDocFields(fields: {
+    title?: string
+    kind?: NoteKind | null
+    view?: NoteView | null
+    cover?: Hash | null
+    rules?: string[]
+    pen?: PenOverrides | null
+    media?: Media[] | null
+    clips?: Clip[] | null
+    programs?: ProgramSource[] | null
+  }): void {
     if (fields.title !== undefined) this.doc.title = fields.title
+    if (fields.kind === null) delete this.doc.kind
+    else if (fields.kind !== undefined) this.doc.kind = fields.kind
+    if (fields.view === null) delete this.doc.view
+    else if (fields.view !== undefined) this.doc.view = fields.view
+    if (fields.cover === null) delete this.doc.cover
+    else if (fields.cover !== undefined) this.doc.cover = fields.cover
     if (fields.rules !== undefined) this.doc.rules = fields.rules
     if (fields.pen === null) delete this.doc.pen
     else if (fields.pen !== undefined) this.doc.pen = fields.pen

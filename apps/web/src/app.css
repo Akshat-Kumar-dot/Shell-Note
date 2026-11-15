@@ -738,6 +738,10 @@ a {
   flex: 1;
   min-width: 0;
 }
+.settings-row-name {
+  min-width: 7em;
+  color: var(--ui-text-2);
+}
 .settings-key {
   flex: 1;
   margin: 0;

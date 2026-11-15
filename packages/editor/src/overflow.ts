@@ -68,7 +68,10 @@ const KEEP_GAP = 500
  * lies below it on its page: each
  * block below it, in the same column, moves down only as far as it must,
  * keeping the gap it had, up to 5 mm; what that block then reaches moves on
- * in turn. Blocks beside the frame stay; nothing moves up or leaves its page.
+ * in turn. Blocks beside the frame stay; nothing moves up. A frame pushed
+ * stops at the foot of its page, where its own lines then flow on; anything
+ * else pushed across the page's line goes on to the next page by the page rule
+ * (core's settle), as the store applies these moves.
  */
 export function roomOps(doc: Doc, frameId: Id, h: number): Op[] {
   const frame = doc.block[frameId]
@@ -89,7 +92,7 @@ export function roomOps(doc: Doc, frameId: Id, h: number): Op[] {
     for (const above of pushers) {
       if (sideBySide(above, block) && block.y >= above.was) y = Math.max(y, above.now + Math.min(KEEP_GAP, block.y - above.was))
     }
-    y = Math.min(y, page.h - block.h)
+    if (block.type === 'frame') y = Math.min(y, page.h - block.h)
     if (y > block.y) ops.push({ op: 'move', id: block.id, to: { page: page.id, x: block.x, y: Math.round(y) } })
     pushers.push({ x: block.x, w: block.w, was: block.y + block.h, now: Math.max(block.y, y) + block.h })
   }

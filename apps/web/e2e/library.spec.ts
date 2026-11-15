@@ -351,13 +351,14 @@ test("the app's own links open apart with Ctrl+click: a tab of their own in a br
   await expect(page.locator('.home')).toBeVisible()
 })
 
-test('the settings show the storage used and change between light and dark, the paper staying white', async ({ page }) => {
+test('the settings show the storage used and change between light and dark, the paper staying white unless chosen dark', async ({ page }) => {
   await home(page)
   await page.getByRole('button', { name: 'Settings' }).click()
   const dialog = page.getByRole('dialog', { name: 'Settings' })
   await expect(dialog.getByTestId('storage-used')).toContainText('Your notes and pictures use')
-  await dialog.getByRole('radio', { name: 'Dark' }).click()
+  await dialog.getByRole('radiogroup', { name: 'Appearance' }).getByRole('radio', { name: 'Dark' }).click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+  await expect(dialog.getByRole('radiogroup', { name: 'Paper in dark' }).getByRole('radio', { name: 'White' })).toHaveAttribute('aria-checked', 'true')
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgb(21, 21, 22)')
   // The app's own colour: graphite until another is chosen.
   await expect(dialog.getByRole('radio', { name: 'Graphite' })).toHaveAttribute('aria-checked', 'true')

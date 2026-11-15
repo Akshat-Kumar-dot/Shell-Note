@@ -35,6 +35,26 @@ All notable changes to ShellNote are listed here. The format follows
   made with an out-of-date view of a block is refused. Each edit shows in the note's AI log with an Undo, and the note
   as it was is kept before a run of edits, to be brought back from the command line.
 
+- A note says what it is for, Text, Sketch or Mixed, and how its pages show: one below another, or as one sheet with
+  no page breaks. The pages are the same either way, so changing the view changes nothing in the note, and it prints as
+  its pages. Its size, A4, A5, A6 or Letter, and which way up, upright or across, are chosen in its menu, and what each
+  page holds is fitted to a new size. The note file is version 5 ([docs/file-format.md](docs/file-format.md)).
+- What is placed on a page (ink, a picture, a formula, a diagram) never lies across the line to the next page: a thing
+  that would moves whole to the top of the next page, with what touches it and the ink on its line, and what is in its
+  way there moves down together, just enough. Only ink taller than a whole page is cut at the line, its two parts
+  meeting exactly. Typed text flows on as before. One undo takes back the change and the move together, and the same
+  rule follows a change merged from another device.
+- The note's own menu, at the end of the tabs: its kind, its pages, its paper, a cover picture of your own kept in the
+  note's file, and Export: print it, or save it as a PDF from the print window, each page on its own sheet at its real
+  size.
+- Dark paper in the dark theme, chosen in Settings, Appearance, with its ink in colours that read on it; printing is
+  always on white. A text note shown with no page breaks has no paper at all: its words sit on the app's own surface,
+  under its title and a line saying its folder and when it was last edited.
+- A Sketch note opens with the pen in hand, says in the status line that its sheet grows, and grows as you write near
+  its end. The pen's own touch chooses for itself: a stroke writes, whatever tool is in hand, and a tap on typed words
+  puts the caret there. The Hand, in the pen's row, moves the sheet. More has a Diagram that starts a flowchart under
+  the caret's line.
+
 ### Changed
 
 - ShellNote is now licensed under the Apache License 2.0 alone, in place of a choice of MIT or Apache-2.0.
@@ -60,6 +80,8 @@ All notable changes to ShellNote are listed here. The format follows
   below the note or floating, and put back with its menu or the new command `video.inside`. A program has the same,
   by its own buttons alone. A panel moved about gives its room back to the note.
 - What the stroke recorder is for, and the way to it, are in the pen's settings, under Your hand.
+- The AI's box in the panel beside the note: Ask, Table, Flowchart and Summarise above it, a picture's clip and the send
+  button on its line, and the model in use named in the panel's head.
 
 ### Security
 

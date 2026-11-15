@@ -114,6 +114,7 @@ export function SidePanel({ store, parts }: { store: EditorStore; parts?: SidePa
     )
   const Icon = ai ? Sparkles : MonitorPlay
   const name = ai ? 'AI' : 'Beside'
+  const chip = ai ? modelChip(parts?.host) : undefined
   return (
     <section ref={section} className="nw-side-panel sh-panel" aria-label="Side panel" data-section={ai ? 'ai' : 'beside'}>
       <PanelBar title="Side panel" closeCommand="panel.hide" onClose={() => void commands.do('panel.hide')}>
@@ -121,6 +122,11 @@ export function SidePanel({ store, parts }: { store: EditorStore; parts?: SidePa
           <Icon size={16} strokeWidth={1.75} aria-hidden />
           <b>{name}</b>
         </span>
+        {ai && chip ? (
+          <span className="sh-chip" title="The AI's model, chosen in Settings">
+            {chip}
+          </span>
+        ) : null}
         {!ai && part === 'video' ? <VideoButton store={store} /> : null}
       </PanelBar>
       {ai ? null : (
@@ -203,4 +209,13 @@ function ProgramPart({ shown, inside }: { shown: boolean; inside: boolean }) {
       </button>
     </div>
   )
+}
+
+/** The model in use, for the AI's head: its name, and whether it runs on this computer or is hosted; none when none is set. */
+function modelChip(host: AiHost | undefined): string | undefined {
+  const model = host?.model()
+  if (model === undefined || typeof model === 'string') return undefined
+  const [where, ...rest] = model.name.split(':')
+  const id = rest.length > 0 ? rest.join(':') : model.name
+  return `${id} · ${where === 'openrouter' ? 'hosted' : 'local'}`
 }

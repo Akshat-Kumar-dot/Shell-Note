@@ -325,6 +325,10 @@ export function merge(mine: Doc, theirs: Doc, options: MergeOptions): Merged {
   // The note's own fields.
   const known = base !== undefined
   const title = three(W.title, L.title, base?.title, known).value
+  // A note's kind, view and cover (version 5): what one side changed; changed on both, the first side's.
+  const kind = three(W.kind, L.kind, base?.kind, known).value
+  const view = three(W.view, L.view, base?.view, known).value
+  const coverChosen = three(W.cover, L.cover, base?.cover, known).value
   const rules = (base && mergeList(base.rules, W.rules, L.rules)) ?? [...W.rules, ...L.rules.filter((rule) => !W.rules.includes(rule))]
   const pen: Fields = {}
   for (const key of new Set([...Object.keys(W.pen ?? {}), ...Object.keys(L.pen ?? {})])) {
@@ -357,6 +361,9 @@ export function merge(mine: Doc, theirs: Doc, options: MergeOptions): Merged {
     if (kept.type === 'ink') for (const stroke of kept.strokes) if (stroke.pm?.pic !== undefined) shown.add(stroke.pm.pic)
   }
   for (const item of media) if (item.kind === 'file') shown.add(item.asset)
+  // The cover's picture comes from the side that chose it; one neither side has any more is let go.
+  const cover = coverChosen !== undefined && (has(W.asset, coverChosen) || has(L.asset, coverChosen)) ? coverChosen : undefined
+  if (cover !== undefined) shown.add(cover)
   const asset: Doc['asset'] = {}
   for (const hash of new Set([...Object.keys(W.asset), ...Object.keys(L.asset)])) {
     const w = has(W.asset, hash) ? W.asset[hash] : undefined
@@ -369,6 +376,9 @@ export function merge(mine: Doc, theirs: Doc, options: MergeOptions): Merged {
     v: mine.v,
     id: mine.id,
     title,
+    ...(kind !== undefined ? { kind } : {}),
+    ...(view !== undefined ? { view } : {}),
+    ...(cover !== undefined ? { cover } : {}),
     rev: mine.rev,
     pages,
     page,

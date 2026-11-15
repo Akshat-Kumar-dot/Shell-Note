@@ -15,6 +15,9 @@ const MIGRATIONS: Partial<Record<number, (doc: RawDoc) => RawDoc>> = {
   2: (doc) => doc,
   // Version 3 to 4 (other programs' places, stage 4): only new, optional fields; version 3 means the same.
   3: (doc) => doc,
+  // Version 4 to 5 (a note's kind, view and cover): only new, optional fields. A note without them is a mixed note
+  // shown as pages with no cover, which is what every version 4 note is.
+  4: (doc) => doc,
 }
 
 /**

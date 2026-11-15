@@ -22,7 +22,9 @@ import {
   arrowOfTwo,
   arrowOnLift,
   bandOf,
+  boxOf,
   cutOps,
+  diagonal,
   drawShape,
   editInk,
   eraseOps,
@@ -72,6 +74,9 @@ import {
 } from '@shellnote/core'
 import { useEffect, useRef, useSyncExternalStore, type RefObject } from 'react'
 import { clampZoom, px } from '../geometry.js'
+import { caretNear } from '../caret.js'
+import { frameEditors } from '../frame/active.js'
+import { sheetOfSpare } from '../seamless.js'
 import { inDesktopApp } from '../host.js'
 import { INK_TOOLS, isInkTool, type EditorStore, type Tool } from '../store.js'
 import { PalmRules, type Contact } from './palm.js'
@@ -146,7 +151,8 @@ interface Sheet {
 }
 
 function sheetAt(doc: Doc, target: EventTarget | null): Sheet | undefined {
-  const el = target instanceof Element ? target.closest<HTMLElement>('.nw-page') : null
+  // Under the last page of the seamless view, its room to write in stands for that page, past its foot.
+  const el = target instanceof Element ? (target.closest<HTMLElement>('.nw-page') ?? sheetOfSpare(target)) : null
   const id = el?.dataset.page
   const page = id === undefined ? undefined : doc.page[id]
   if (!el || !page) return undefined
@@ -186,6 +192,61 @@ function samples(event: PointerEvent): PointerEvent[] {
 
 /** Whether a sample carries a real pressure: a pen's, not a mouse's or a finger's. */
 const pressed = (event: PointerEvent): boolean => event.pointerType === 'pen' && event.pressure > 0
+
+/** A pen's touch that is a tap, not a stroke: shorter than this, in milliseconds... */
+const TAP_TIME = 350
+/** ...and smaller than this, in the page's units: 1.5 mm. */
+const TAP_SIZE = 150
+/** How far a pen moves on the screen, in pixels, before its touch is a stroke and not a tap. */
+const PEN_SLOP = 4
+
+/** Whether typed words lie under a point of the screen: a line of text, or a table's cell, with words in it. */
+const onWords = (x: number, y: number): boolean =>
+  document.elementsFromPoint(x, y).some((el) => {
+    const text = el.closest('.ProseMirror .nw-text, .ProseMirror td, .ProseMirror th')
+    return text !== null && (text.textContent ?? '').trim() !== ''
+  })
+
+/** The caret at a point of the screen, as a click puts it: in the typed words there, or on the nearest line of the page. */
+function caretAt(store: EditorStore, x: number, y: number): void {
+  const under = document.elementsFromPoint(x, y)
+  const frame = under.map((el) => el.closest<HTMLElement>('.nw-frame[data-id]')).find((el) => el !== null)
+  const editor = frame?.dataset.id === undefined ? undefined : frameEditors.get(frame.dataset.id)
+  if (editor && !editor.isDestroyed) {
+    const found = editor.view.posAtCoords({ left: x, top: y })
+    if (found) {
+      editor.chain().focus().setTextSelection(found.pos).run()
+      return
+    }
+  }
+  const sheet = under.map((el) => el.closest<HTMLElement>('.nw-page') ?? sheetOfSpare(el)).find((el) => el !== null)
+  const page = sheet?.dataset.page
+  if (sheet && page !== undefined && store.doc.page[page]) caretNear(store.doc, page, sheet, x, y)
+}
+
+/** A pointer event's own values, to send it again. */
+function again(event: PointerEvent): PointerEventInit {
+  return {
+    pointerId: event.pointerId,
+    pointerType: event.pointerType,
+    isPrimary: event.isPrimary,
+    clientX: event.clientX,
+    clientY: event.clientY,
+    screenX: event.screenX,
+    screenY: event.screenY,
+    pressure: event.pressure,
+    tiltX: event.tiltX,
+    tiltY: event.tiltY,
+    twist: event.twist,
+    width: event.width,
+    height: event.height,
+    button: event.button,
+    buttons: event.buttons,
+    bubbles: true,
+    cancelable: true,
+    composed: true,
+  }
+}
 
 /** A colour token's value, for the canvas, which cannot read CSS variables; a highlighter's named colours are its own, lighter ones. */
 function colourValue(color: string, highlighter: boolean): string {
@@ -500,7 +561,8 @@ export function PenLayer({ store, desk, zoom, onZoom }: PenLayerProps) {
       canvasCtx.lineJoin = 'round'
       // The whole layer is see-through, not each piece, so pieces do not darken where they meet.
       canvas.style.opacity = String(look.opacity)
-      canvas.style.mixBlendMode = look.under ? 'multiply' : 'normal'
+      // Under the ink, as the page draws it: multiplied on white paper, lightening on dark (theme.css).
+      canvas.style.mixBlendMode = look.under ? getComputedStyle(document.documentElement).getPropertyValue('--nw-under-blend').trim() || 'multiply' : 'normal'
     }
 
     /** Let the stroke's own drawing in the page take over before the live one goes, so nothing flickers. */
@@ -909,6 +971,18 @@ export function PenLayer({ store, desk, zoom, onZoom }: PenLayerProps) {
       window.clearTimeout(d.hold)
       gesture = undefined
       clearTail()
+      // A pen's tap on typed words is a click there: the caret goes there, with typing in hand, and nothing is written.
+      const first = d.points[0]
+      if (d.pointerType === 'pen' && first && event.timeStamp - d.started < TAP_TIME && diagonal(boxOf(d.points)) < TAP_SIZE) {
+        const at = { x: d.sheet.left + first.x / d.sheet.scale, y: d.sheet.top + first.y / d.sheet.scale }
+        if (onWords(at.x, at.y)) {
+          clear()
+          ;(document.activeElement as HTMLElement | null)?.blur?.()
+          store.setTool('type')
+          caretAt(store, at.x, at.y)
+          return
+        }
+      }
       lastInput.set(d.raw.length > 0 ? { type: d.pointerType, pressure: [Math.min(...d.raw), Math.max(...d.raw)] } : { type: d.pointerType })
       learnFrom(d)
       // The video's time as the pen lifts, when it has moved on: the stroke's end, so a line shows from and to.
@@ -943,6 +1017,13 @@ export function PenLayer({ store, desk, zoom, onZoom }: PenLayerProps) {
       if (!apply([...(beside?.ops ?? []), ...placed.ops])) return clear()
       if (beside?.pm.place && d.moment) keepWords(store, beside.pm.m, d.moment.window, beside.pm.place)
       last.current = { block: placed.block, at: event.timeStamp }
+      // A stroke that lay across a page's line has been moved by the page rule (core's settle), or cut: it is kept as
+      // drawn, where the rule put it. The lift's corrections (a line straightened, an arrow joined, a word tidied) are
+      // worked out where the pen was, so they are for strokes that stayed there.
+      const landed = store.doc.block[placed.block]
+      const lastKept = landed?.type === 'ink' ? landed.strokes.at(-1) : undefined
+      const stayed = landed?.type === 'ink' && landed.page === d.sheet.id && lastKept !== undefined && landed.x + lastKept.pts[0]! === stroke.pts[0] && landed.y + lastKept.pts[1]! === stroke.pts[1]
+      if (!stayed) return clearSoon()
       if (!d.snapped && joinArrow(d, before, placed.block)) return clearSoon()
       // The correction is a second undo step: one undo gives back the stroke as drawn.
       const block = store.doc.block[placed.block]
@@ -1311,6 +1392,62 @@ export function PenLayer({ store, desk, zoom, onZoom }: PenLayerProps) {
       window.clearTimeout(rest)
       clear()
     }
+  }, [store, desk, tool])
+
+  /**
+   * The pen's own touch with typing in hand: a stroke takes the pen up and is written, from where the pen came down
+   * (sent again to the pen's layer once it listens); a tap is a click, the caret where it touched.
+   */
+  useEffect(() => {
+    const el = desk.current
+    if (!el || tool !== 'type') return
+    const onDown = (event: PointerEvent): void => {
+      if (event.pointerType !== 'pen' || event.button !== 0 || !(event.target instanceof Element)) return
+      if (event.target.closest('button, input, select, textarea, [role="menu"], .nw-page-bar, .nw-add-page')) return
+      if (!(event.target.closest('.nw-page') ?? sheetOfSpare(event.target))) return
+      event.preventDefault()
+      event.stopPropagation()
+      const down = event
+      const moves: PointerEvent[] = []
+      let stroke = false
+      const stop = (): void => {
+        window.removeEventListener('pointermove', move, true)
+        window.removeEventListener('pointerup', up, true)
+        window.removeEventListener('pointercancel', up, true)
+      }
+      const move = (e: PointerEvent): void => {
+        if (e.pointerId !== down.pointerId) return
+        moves.push(e)
+        if (stroke || Math.hypot(e.clientX - down.clientX, e.clientY - down.clientY) < PEN_SLOP) return
+        stroke = true
+        ;(document.activeElement as HTMLElement | null)?.blur?.()
+        store.setTool('pen')
+        // Once the pen's layer listens (the next frames), the stroke so far is sent to it, and the rest comes as it is.
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            stop()
+            const target = document.elementFromPoint(down.clientX, down.clientY) ?? el
+            target.dispatchEvent(new PointerEvent('pointerdown', again(down)))
+            for (const m of moves) el.dispatchEvent(new PointerEvent('pointermove', again(m)))
+          }),
+        )
+      }
+      const up = (e: PointerEvent): void => {
+        if (e.pointerId !== down.pointerId) return
+        if (stroke) {
+          // Lifted before the pen's layer listened: the stroke so far, then its lift, go to it.
+          requestAnimationFrame(() => requestAnimationFrame(() => el.dispatchEvent(new PointerEvent('pointerup', again(e)))))
+          return
+        }
+        stop()
+        if (e.type === 'pointerup') caretAt(store, down.clientX, down.clientY)
+      }
+      window.addEventListener('pointermove', move, true)
+      window.addEventListener('pointerup', up, true)
+      window.addEventListener('pointercancel', up, true)
+    }
+    el.addEventListener('pointerdown', onDown, true)
+    return () => el.removeEventListener('pointerdown', onDown, true)
   }, [store, desk, tool])
 
   const hidden = !isInkTool(tool)

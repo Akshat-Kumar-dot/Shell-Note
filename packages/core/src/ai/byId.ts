@@ -16,6 +16,7 @@ import { apply, type Applied } from '../apply.js'
 import { linearise } from '../linearise.js'
 import { checkInline } from '../markdown/inline.js'
 import { parsePipeTable } from '../markdown/table.js'
+import { settle } from '../pages/settle.js'
 import type { Doc, Id } from '../schema/doc.js'
 import type { Op } from '../schema/ops.js'
 import { OP_SETS, type AiOp, type Scope } from '../schema/protocol.js'
@@ -210,11 +211,17 @@ export function editById(input: IdEdit): IdEdited {
     if (atEnd && step.length > 0) end++
   })
   if (compiled.length === 0) return { ops: [], ai, targets: selected }
-  const result = apply(doc, compiled, { baseRev: input.baseRev, validators: input.validators ?? { md: checkInline } })
+  const edited = apply(doc, compiled, { baseRev: input.baseRev, validators: input.validators ?? { md: checkInline } })
   // The scope rule, on the whole note, whatever was sent.
-  const outside = outsideScope(doc, result.doc, selection, aliases)
+  const outside = outsideScope(doc, edited.doc, selection, aliases)
   if (outside !== null) throw new ValidationError('scope', outside)
-  return { result, ops: compiled, ai, targets: selected }
+  // What the edit put across a page's line goes to its place, as after any change, in the same edit: one undo takes
+  // both back. Worked out on the note as it now is, so a block changed since the edit's rev is moved, not refused.
+  const more = settle(edited.doc, edited.changed)
+  if (more.length === 0) return { result: edited, ops: compiled, ai, targets: selected }
+  const settled = apply(edited.doc, more)
+  const result = { doc: settled.doc, inverse: [...settled.inverse, ...edited.inverse], changed: [...new Set([...edited.changed, ...settled.changed])] }
+  return { result, ops: [...compiled, ...more], ai, targets: selected }
 }
 
 /** What an operation writes, by the block it writes to or makes; undefined when it writes nothing. */

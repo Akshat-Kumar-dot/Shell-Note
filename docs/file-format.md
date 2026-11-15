@@ -1,6 +1,6 @@
 # File format
 
-Version 3. Written and read by `pack`, `unpack`, `toFiles` and `fromFiles` in [packages/core/src/io/container.ts](../packages/core/src/io/container.ts).
+Version 5. Written and read by `pack`, `unpack`, `toFiles` and `fromFiles` in [packages/core/src/io/container.ts](../packages/core/src/io/container.ts).
 
 ## Layout
 
@@ -21,9 +21,11 @@ Anything else inside a zip is skipped and never read.
 
 ```json
 {
-  "v": 3,
+  "v": 5,
   "id": "d1",
   "title": "Physics lecture 4",
+  "kind": "mixed",
+  "view": "seamless",
   "rev": 12,
   "pages": ["p1"],
   "page": {
@@ -43,12 +45,29 @@ Anything else inside a zip is skipped and never read.
 | `v` | Schema version. Every schema change raises it and ships a migration. |
 | `id` | The document's id. Ids are unique across the document, its pages and its blocks. |
 | `title` | The title. |
+| `kind` | From version 5, and only when set: what the note is for, `text`, `sketch` or `mixed`. It chooses the tools shown first, the paper of new pages and the note's picture in the library; it never changes what the note holds. Missing: `mixed`. |
+| `view` | From version 5, and only when set: how the pages are shown, `pages` (one below another, with a gap) or `seamless` (one sheet with no breaks, the margins between two pages folded away). The pages are the same either way. Missing: `pages`. |
+| `cover` | From version 5, and only when set: the hash of the note's cover picture, one of its own assets. |
 | `rev` | Goes up by one with each change. Edits from an AI or MCP name the `rev` they were based on. |
 | `pages` | Page order. |
 | `page` | Each page: size in units of 0.01 mm (A4 is 21000 × 29700), background, and `free`, its free blocks from back to front. |
 | `asset` | Metadata of each image, keyed by content hash. |
 | `rules` | The user's notebook rules, one short line each. |
 | `pen` | From version 3, and only when the note sets any: the pen switches this note sets for itself, over each person's own defaults (see Ink). |
+
+### Pages, and what lies on them
+
+Every page has a margin of 20 mm (a quarter of a page shorter than 80 mm). A block placed on a page that is not a
+frame of typed text (ink, a picture, a formula, a diagram) lies on its page clear of the line to the next page: above
+the bottom margin (the top margin and the writing area are one room), or wholly in the bottom margin. The app keeps it
+so after every change: a block that would lie across the line moves whole to the top of the next page's writing area
+(or down to its own page's, when it reaches over the page's top edge), with what touches it and the ink on its line of
+writing; what is in its way there moves down
+together, just enough; a page like the last is added at the end when needed. Only ink taller than a whole writing area
+is cut at the line, the point where a stroke crosses kept in both parts. Typed text flows into a continuation frame on
+the next page instead. This is `settle` in [packages/core/src/pages/settle.ts](../packages/core/src/pages/settle.ts),
+which also runs after two versions of a note are merged. So the seamless view can fold the margins between two pages
+away and show everything whole, and printing cuts nothing.
 
 ## pages/&lt;pageId&gt;.json
 
@@ -113,6 +132,8 @@ An empty caption is removed rather than stored as `""`.
 |---|---|---|
 | 1 | 9 October 2026 | The first. |
 | 3 | 13 October 2026 | The pen: a stroke may have a pen kind, a colour code, the widths `xs` and `xl`, tilt and a snapped shape; a note may hold its own pen switches, `pen`. Nothing in version 2 changes meaning. |
+| 4 | 25 October 2026 | Other programs written beside: `programs` on the document, each with its file and title and the words of each place seen; a stroke may keep its moment beside one (`pm`: which program, when, its place, and a small picture). Nothing in version 3 changes meaning. |
+| 5 | 15 November 2026 | A note may say what it is for (`kind`), how its pages are shown (`view`) and which picture is its cover (`cover`). A note without them is a mixed note shown as pages, as before. Nothing in version 4 changes meaning. |
 | 2 | 10 October 2026 | Words may be underlined, `[words]{.underline}`; written small below or above the line, `H[2]{.sub}O`, `x[2]{.sup}`; or given a size or font of their own, `[words]{size=l}`, `[words]{font=lora}` (Pandoc's span form). A table may hold its column widths, its width and its look (`cols`, `width`, `look`). |
 
 Opening a file of an older version moves it to the current one in memory (`migrate` in [packages/core/src/schema/migrate.ts](../packages/core/src/schema/migrate.ts)); it is saved in the current version. From 1 to 2, text that only looked like one of the new spans, which version 1 read as plain text, is written again with its brackets escaped, so it still reads as text; all other text keeps its exact form. An app refuses a file of a newer version than its own, saying to update the app.

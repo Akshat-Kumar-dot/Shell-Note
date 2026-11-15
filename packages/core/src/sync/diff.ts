@@ -42,7 +42,7 @@ export function sameBlock(a: Block | undefined, b: Block | undefined): boolean {
 }
 
 /** The fields of a document besides its pages, blocks and pictures: `update` sets them on the document's own id. */
-const DOC_FIELDS = ['title', 'rules', 'pen', 'media', 'clips', 'programs'] as const
+const DOC_FIELDS = ['title', 'kind', 'view', 'cover', 'rules', 'pen', 'media', 'clips', 'programs'] as const
 
 /** True when two notes are the same but for `rev` and each block's `r`. */
 export function sameContent(a: Doc, b: Doc): boolean {

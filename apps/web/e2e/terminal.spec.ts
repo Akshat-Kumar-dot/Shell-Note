@@ -275,7 +275,7 @@ test('the bars, Settings, the AI box and the recorder answer the terminal as the
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
   await run('settings.open', '✓ Settings open')
   const settings = page.getByRole('dialog', { name: 'Settings' })
-  await expect(settings.getByRole('radio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'true')
+  await expect(settings.getByRole('radiogroup', { name: 'Appearance' }).getByRole('radio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'true')
   // Chosen while Settings is open, it shows there too.
   await run('settings.theme look=system', '✓ the appearance follows Windows')
   await expect(settings.getByRole('radio', { name: 'System' })).toHaveAttribute('aria-checked', 'true')
