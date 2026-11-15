@@ -4,7 +4,8 @@
 // by line at the page's own sizes, with its marks (textLayout.ts), pictures
 // from their bytes, tables as grids, handwriting as its strokes, and a diagram
 // as a box: enough to know a page at a glance.
-import { toRuns, type Block, type Doc, type TextBlock } from '@shellnote/core'
+import { toRuns, type Block, type Color, type Doc, type TextBlock } from '@shellnote/core'
+import { NAMED_HEX } from '@shellnote/editor'
 import { fontStyle, layoutRuns, LINE, SIZE_FACTOR, tableColumns, type Line, type Look } from './textLayout.js'
 
 /** The thumbnail's width in pixels; its height follows the page's shape. */
@@ -14,6 +15,25 @@ export const THUMB_WIDTH = 240
 const POINT = 35.28
 /** Headings, as theme.css draws them: 11 pt text scaled up. */
 const ROLES: Partial<Record<TextBlock['role'], number>> = { h1: 1.9, h2: 1.5, h3: 1.25 }
+
+/** The widest a cover's small picture is, in pixels: twice a card's width, for a sharp picture on a sharp screen. */
+const COVER_WIDTH = 480
+
+/** A note's cover picture, made small for its card. Resolves to undefined when the browser cannot read it. */
+export async function drawCover(picture: Blob): Promise<Blob | undefined> {
+  try {
+    const bitmap = await createImageBitmap(picture)
+    const scale = Math.min(1, COVER_WIDTH / bitmap.width)
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale))
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale))
+    canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+    bitmap.close()
+    return await new Promise((resolve) => canvas.toBlob((made) => resolve(made ?? undefined), 'image/webp', 0.86))
+  } catch {
+    return undefined
+  }
+}
 
 /** Draw page 1 of a note as a small picture. Resolves to undefined when the browser cannot draw one. */
 export async function drawThumbnail(doc: Doc, blob: (hash: string) => Blob | undefined): Promise<Blob | undefined> {
@@ -27,13 +47,14 @@ export async function drawThumbnail(doc: Doc, blob: (hash: string) => Blob | und
   if (!g) return undefined
   const css = getComputedStyle(document.documentElement)
   const token = (name: string, fallback: string): string => css.getPropertyValue(`--nw-${name}`).trim() || fallback
-  const colour = (value: string | undefined): string => (value === undefined ? token('ink', '#1d1d22') : value.startsWith('#') ? value : token(value, '#1d1d22'))
+  // The paper here is always white: the named colours as they are on white paper, whatever the screen shows now.
+  const colour = (value: string | undefined): string => (value === undefined ? NAMED_HEX.ink : value.startsWith('#') ? value : (NAMED_HEX[value as Color] ?? NAMED_HEX.ink))
   const px = (units: number): number => units * scale
 
   // The paper, always white, and its lines, squares or dots.
   g.fillStyle = '#ffffff'
   g.fillRect(0, 0, canvas.width, canvas.height)
-  g.fillStyle = g.strokeStyle = token('rule', '#c9d7e8')
+  g.fillStyle = g.strokeStyle = '#c9d7e8'
   g.lineWidth = 0.5
   if (page.bg === 'ruled') for (let y = 800; y < page.h; y += 800) g.fillRect(0, px(y), canvas.width, 0.6)
   if (page.bg === 'grid') {
@@ -59,7 +80,7 @@ export async function drawThumbnail(doc: Doc, blob: (hash: string) => Blob | und
         const x = x0 + piece.x
         const py = y + piece.shift
         if (piece.highlight) {
-          g.fillStyle = token('highlight', '#fff3a3')
+          g.fillStyle = '#fff1a1'
           g.fillRect(x, py, piece.width, piece.size * 1.15)
         }
         g.font = fontOf(piece)

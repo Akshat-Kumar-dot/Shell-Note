@@ -87,6 +87,7 @@ export { inkBlocks, inkBox, segmentsDistance, strokeBox, strokesAlong, strokesAt
 export { editInk, JOIN_GAP, JOIN_TIME, joinedBlock, placeStroke, shifted, type InkEdit, type LastStroke } from './ink/group.js'
 export { bodyOf, isPlacedBlock, liesInOneBand, MAKE_ROOM_GAP, marginOf, settle, settleMerged, splitStrokeAt, writingArea, type PlacedBlock } from './pages/settle.js'
 export { resizeOps, sheetOf, SHEETS, sheetSize, type Sheet, type Turn } from './pages/resize.js'
+export { startAs } from './pages/start.js'
 export { cutOps, cutStroke, eraseOps, hull, isScratch, scratchTargets } from './ink/erase.js'
 export { arrowOfTwo, arrowOnLift, described, describedOn, exampleOf, heldShape, LEARN_MARGIN, Learner, MAX_UNDONE, onScreen, pointsOfExample, scratchTest, SHAPE_LABELS, straightOnLift, SYMBOL_LABELS, taughtProfile, tune, withUndone, type Described, type Known, type Margins, type SymbolLabel, type Taught } from './ink/learn.js'
 export { penPoints, Recording, recordedExamples, recordedStrokes, type RecordedStroke } from './ink/recording.js'

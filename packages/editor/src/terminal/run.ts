@@ -27,7 +27,7 @@ export interface Output {
 const SHOWN = new Set([
   'tool.choose', 'pen.set', 'highlighter.set', 'eraser.set', 'screen.zoom', 'screen.fullscreen', 'panel.show', 'panel.hide', 'panel.full',
   'bar.place', 'bar.float', 'layout.reset', 'timer.start', 'timer.pause', 'timer.stop', 'timer.countdown', 'timer.stopwatch',
-  'video.show', 'video.hide', 'video.times', 'ai.open', 'ai.close', 'chat.choose', 'library.sort', 'note.rename',
+  'video.show', 'video.hide', 'video.times', 'ai.open', 'ai.close', 'chat.choose', 'library.sort', 'library.filter', 'note.rename',
 ])
 
 /** Asks the person to allow something that cannot be undone. */

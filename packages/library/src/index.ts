@@ -4,4 +4,5 @@
 export { MemoryFiles, type FileInfo, type Files } from './files.js'
 export { FolderLibrary, type FolderLibraryOptions } from './library.js'
 export { EXTENSION, fileName } from './names.js'
+export { holdsWords, MOST_WORDS, noteSnip, noteWords, SNIP_LENGTH } from './words.js'
 export { KEPT_DAYS, type Exchanged, type ExchangedNote, type FileState, type FolderEntry, type ItemRef, type Library, type LibraryStore, type NoteEntry, type OpenedNote, type OutsideChange, type SavingNote } from './store.js'

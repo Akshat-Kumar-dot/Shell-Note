@@ -5,9 +5,10 @@
 import { BarMenu, commands, MenuItem } from '@shellnote/editor'
 import type { FolderEntry, Library, LibraryStore, NoteEntry } from '@shellnote/library'
 import { contents, deletedItems, folderPath, hidden, search } from '@shellnote/library/tree'
-import { ArrowUpDown, ChevronDown, ChevronRight, FilePlus, Folder, FolderOpen, FolderPlus, Layers, PanelLeft, PanelLeftClose, PanelRight, Plus, Search, Trash2, X } from 'lucide-react'
+import { ArrowUpDown, ChevronDown, ChevronRight, FilePlus, Folder, FolderOpen, FolderPlus, PanelLeft, PanelLeftClose, PanelRight, Plus, Search, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import type { Tabs } from '../library/tabs.js'
+import { KIND_ICON, kindOf } from '../library/kinds.js'
 import { findWanted, noteScreen, showTree, tabsFollow, treeAt, treeShown, moveTree } from './state.js'
 
 const OPENED = 'shellnote:library-side-open'
@@ -60,7 +61,7 @@ export function Tree({ store, tabs, bin, ready }: TreeProps) {
     setRead(read)
     // The tabs of notes that have gone go too; the others take their titles, but the one on screen, which has its own.
     const open = noteScreen.value?.id
-    tabsFollow(new Map(read.notes.filter((entry) => !hidden(read, entry)).map((entry) => [entry.id, entry.title || 'Untitled'])), open)
+    tabsFollow(new Map(read.notes.filter((entry) => !hidden(read, entry)).map((entry) => [entry.id, { title: entry.title || 'Untitled', kind: kindOf(entry) }])), open)
   }, [])
   const [opened, setOpened] = useState(() => new Set(kept<string[]>(OPENED, [])))
   const [sort, setSort] = useState<'name' | 'edited'>(() => (kept<unknown>(SORT, 'name') === 'edited' ? 'edited' : 'name'))
@@ -183,25 +184,29 @@ export function Tree({ store, tabs, bin, ready }: TreeProps) {
     )
   }
 
-  const noteLine = (entry: NoteEntry, depth: number, where?: string): ReactNode => (
-    <li key={entry.id}>
-      <button
-        type="button"
-        className="tree-row"
-        style={{ '--depth': depth } as CSSProperties}
-        aria-current={entry.id === note ? 'page' : undefined}
-        aria-label={where === undefined ? undefined : `${titleOf(entry)}, in ${where}`}
-        title={where === undefined ? titleOf(entry) : `${titleOf(entry)}, in ${where}`}
-        data-command="note.open"
-        onClick={() => openNote(entry.id)}
-      >
-        <span className="tree-indent" aria-hidden />
-        <Layers {...ICON} />
-        <span className="tree-name">{titleOf(entry)}</span>
-        {where === undefined ? null : <span className="tree-where">{where}</span>}
-      </button>
-    </li>
-  )
+  const noteLine = (entry: NoteEntry, depth: number, where?: string): ReactNode => {
+    // Its kind: a text note, a sketch, or a mixed note.
+    const Kind = KIND_ICON[kindOf(entry)]
+    return (
+      <li key={entry.id}>
+        <button
+          type="button"
+          className="tree-row"
+          style={{ '--depth': depth } as CSSProperties}
+          aria-current={entry.id === note ? 'page' : undefined}
+          aria-label={where === undefined ? undefined : `${titleOf(entry)}, in ${where}`}
+          title={where === undefined ? titleOf(entry) : `${titleOf(entry)}, in ${where}`}
+          data-command="note.open"
+          onClick={() => openNote(entry.id)}
+        >
+          <span className="tree-indent" aria-hidden />
+          <Kind {...ICON} />
+          <span className="tree-name">{titleOf(entry)}</span>
+          {where === undefined ? null : <span className="tree-where">{where}</span>}
+        </button>
+      </li>
+    )
+  }
 
   const folderLine = (entry: FolderEntry, depth: number): ReactNode => {
     const open = opened.has(entry.id)

@@ -8,6 +8,7 @@
 // names. For the agent, a command goes where a person would first (the open
 // note closed and kept, then the library), and waits for that screen, so its
 // next line finds it there.
+import type { NoteKind } from '@shellnote/core'
 import { commands, inDesktopApp, type AppPlace, type By, type HomePlace, type ItemRef, type LibraryAt, type Places } from '@shellnote/editor'
 import type { Library, LibraryStore } from '@shellnote/library'
 import { deletedItems, folderPath, hidden } from '@shellnote/library/tree'
@@ -141,6 +142,7 @@ export function defineAppCommands(store: LibraryStore): void {
     return libraryScreen(places, by, false).then((home) => home.search(String(text)))
   })
   commands.define('library.sort', ['app'], async ({ by: date, order }, places, by) => (await libraryScreen(places, by, false)).sort(date as 'edited' | 'created' | undefined, order as 'newest' | 'oldest' | undefined))
+  commands.define('library.filter', ['app'], async ({ show }, places, by) => (await libraryScreen(places, by, false)).filter(show as NoteKind | 'all'))
   commands.define('bin.open', ['app'], async (_, places, by) => {
     await show(places, by, { bin: true })
     return 'Recently deleted'
@@ -156,12 +158,12 @@ export function defineAppCommands(store: LibraryStore): void {
   commands.define('bin.empty', ['app'], async (_, places, by) => (await libraryScreen(places, by)).emptyBin(by))
 
   // ----- notes -----
-  commands.define('note.new', ['app'], async ({ name, into }, places, by) => {
+  commands.define('note.new', ['app'], async ({ name, into, type }, places, by) => {
     const all = await list()
     const folder = folderOf(all, into)
     if (by === 'agent' && places.app.reloads()) throw new Error(RELOADS)
     const from = places.workspace ?? (await libraryScreen(places, by))
-    const made = await from.newNote(folder?.id ?? null)
+    const made = await from.newNote(folder?.id ?? null, type as NoteKind | undefined)
     // Named as it is made (a model asks for "a new note called Waves" in one go): renamed once it is open.
     if (by === 'agent' || name !== undefined) await commands.until('workspace', (workspace) => workspace.entry() === made.id && workspace.ready())
     if (name !== undefined) commands.places.workspace!.rename(String(name))
@@ -225,6 +227,15 @@ export function defineAppCommands(store: LibraryStore): void {
   commands.define('folder.delete', ['app'], async ({ folder }, places, by) => {
     const found = find(await list(), String(folder), ['folder'], false)
     return (await libraryScreen(places, by, false)).remove(refOf(found))
+  })
+  commands.define('folder.cover', ['app'], async ({ folder, on }, places, by) => {
+    const found = refOf(find(await list(), String(folder), ['folder'], false))
+    const home = await libraryScreen(places, by, false)
+    if (on === false) return home.folderCover(found.id, undefined)
+    if (by === 'agent') throw new Error("A cover is a picture the person chooses: the folder's menu, Cover picture.")
+    const file = await pickPicture()
+    if (!file) return 'no picture chosen'
+    return home.folderCover(found.id, file)
   })
 
   // ----- files -----

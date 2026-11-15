@@ -3,7 +3,7 @@
 // notes are kept. The browser keeps them in IndexedDB (the app's
 // indexeddb.ts). A folder of .shellnote files is kept through the same
 // interface (library.ts), so the library's folders are folders on disk.
-import type { Doc, PenProfile } from '@shellnote/core'
+import type { Doc, NoteKind, PenProfile } from '@shellnote/core'
 
 declare global {
   // The browser's handle to a file a person picked. Only the app's own screens use one; it is named here so that
@@ -30,6 +30,8 @@ export interface FolderEntry {
   parent: string | null
   created: number
   edited: number
+  /** It has a cover picture of the person's own (folderCover gives it). */
+  cover?: boolean
   /** When it went to Recently deleted; absent while it is in the library. */
   deleted?: number
 }
@@ -48,6 +50,12 @@ export interface NoteEntry {
   unsaved: boolean
   /** The file it was last saved to or opened from. */
   file?: { name: string; savedAt: number }
+  /** What it is for, from its file: text, sketch or mixed. Missing: mixed. */
+  kind?: NoteKind
+  /** Its cover picture, by hash, from its file. */
+  cover?: string
+  /** Its first words, as the library's list shows them (words.ts). */
+  snip?: string
   /** When it went to Recently deleted; absent while it is in the library. */
   deleted?: number
 }
@@ -111,8 +119,11 @@ export interface LibraryStore {
   open(id: string): Promise<OpenedNote>
   /** Keep a note as it is now. Its folder, and whether it is deleted, stay as the library has them. */
   save(note: SavingNote): Promise<NoteEntry>
-  /** A new note in a folder: an empty one called "Untitled", "Untitled 2" and so on, or a document given, such as an opened file. */
-  newNote(folder: string | null, from?: { doc: Doc; assets: Map<string, Blob>; file?: FileState | undefined }): Promise<NoteEntry>
+  /**
+   * A new note in a folder: an empty one called "Untitled", "Untitled 2" and so on, started as a note of `kind` when
+   * given (core's startAs), or a document given, such as an opened file.
+   */
+  newNote(folder: string | null, from?: { doc: Doc; assets: Map<string, Blob>; file?: FileState | undefined }, kind?: NoteKind): Promise<NoteEntry>
   /** A new folder called "Untitled folder", "Untitled folder 2" and so on. */
   newFolder(parent: string | null): Promise<FolderEntry>
   /** A note's title (an edit through core's apply) or a folder's name. */
@@ -132,6 +143,15 @@ export interface LibraryStore {
   /** A note's thumbnail: a small picture of its first page. */
   preview(id: string): Promise<Blob | undefined>
   setPreview(id: string, picture: Blob): Promise<void>
+  /**
+   * The notes whose words hold every word of a search (words.ts), Recently deleted left out. Each note's words are kept
+   * on this device and made again when it is saved.
+   */
+  findWords?(search: string): Promise<string[]>
+  /** A folder's cover picture, when it has one. */
+  folderCover?(id: string): Promise<Blob | undefined>
+  /** Give a folder a cover picture, or take it off (undefined). */
+  setFolderCover?(id: string, picture: Blob | undefined): Promise<void>
   /**
    * The person's pen profile (core's schema/profile.ts): the strokes the pen
    * learns their hand from. Kept with the library, not in any note, so the

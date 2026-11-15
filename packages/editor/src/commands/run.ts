@@ -4,7 +4,7 @@
 // command and its input, says plainly when it cannot run now, asks the person
 // first for what cannot be undone, and reports the app's state before and
 // after, so the model sees what changed instead of guessing.
-import { checkInput, COMMANDS, type CommandSpec, type PictureSource } from '@shellnote/core'
+import { checkInput, COMMANDS, type CommandSpec, type NoteKind, type PictureSource } from '@shellnote/core'
 import type { EditorStore } from '../store.js'
 
 /** The open note's screen, as the workspace gives it: what its own buttons do. */
@@ -17,8 +17,8 @@ export interface WorkspacePlace {
   save(as: boolean, by: By): Promise<string>
  /** Open a.shellnote file the person picks, into the library, and show it. */
   openFile(by: By): Promise<string>
-  /** A new note in a folder (null: the top of the library), and show it. */
-  newNote(into: string | null): Promise<NewNote>
+  /** A new note in a folder (null: the top of the library), started as a note of `kind` when given, and show it. */
+  newNote(into: string | null, kind?: NoteKind): Promise<NewNote>
   /** The note's title, as typed into its name. */
   rename(title: string): void
   /** Whether this window edits the note (another window may). */
@@ -98,13 +98,17 @@ export interface HomePlace {
   search(text: string): string
   /** Left out: as it is. */
   sort(by: 'edited' | 'created' | undefined, order: 'newest' | 'oldest' | undefined): string
-  newNote(into: string | null): Promise<NewNote>
+  /** Only one kind of note shown, or all of them; folders always show. */
+  filter(show: NoteKind | 'all'): string
+  newNote(into: string | null, kind?: NoteKind): Promise<NewNote>
   /** A person's new folder waits for its name, typed on its card; the agent's is named at once, or keeps its first name. */
   newFolder(into: string | null, name: string | undefined, by: By): Promise<string>
   openFile(by: By): Promise<string>
   rename(item: ItemRef, name: string): Promise<string>
   move(item: ItemRef, to: string | null): Promise<string>
   remove(item: ItemRef): Promise<string>
+  /** A folder's cover picture, the one the person chose; or taken off (undefined). */
+  folderCover(folder: string, picture: Blob | undefined): Promise<string>
   restore(item: ItemRef): Promise<string>
   /** A person is asked on screen; the agent's call was asked already. */
   deleteForever(item: ItemRef, by: By): Promise<string>

@@ -20,8 +20,9 @@
 //
 // The merging knows nothing of files, and the files nothing of notes
 // (files.ts), so a drive reached another way can use both as they are.
-import { apply, become, compare, contentId, createDoc, idFrom, includes, lineageText, merge, mergeOptions, newId, pack, parseDoc, PenProfile, sameContent, seenByBoth, settleMerged, unpack, validateDoc, ValidationError, type Doc, type Lineage, type Opened, type Seen } from '@shellnote/core'
+import { apply, become, compare, contentId, createDoc, idFrom, includes, lineageText, merge, mergeOptions, newId, pack, parseDoc, PenProfile, sameContent, seenByBoth, settleMerged, startAs, unpack, validateDoc, ValidationError, type Doc, type Lineage, type NoteKind, type Opened, type Seen } from '@shellnote/core'
 import { EXTENSION } from './names.js'
+import { holdsWords, noteSnip, noteWords } from './words.js'
 import { KEPT_DAYS, type Exchanged, type ExchangedNote, type FileState, type FolderEntry, type ItemRef, type Library, type LibraryStore, type NoteEntry, type OpenedNote, type OutsideChange, type SavingNote } from './store.js'
 import { canMove, contents, onlyUsedBy, uniqueName } from './tree.js'
 import type { FileInfo, Files } from './files.js'
@@ -48,6 +49,11 @@ interface NoteState {
   put?: number
   /** The file as last read or written: its size and time, and the fingerprint of what it held. */
   file?: { sig: string; cid: string }
+  /** What it is for, and its cover picture, from its file (version 5). */
+  kind?: NoteKind | undefined
+  cover?: string | undefined
+  /** Its first words, for the library's list (words.ts). */
+  snip?: string | undefined
   /** True while the copy holds what the file does not. */
   dirty?: true
 }
@@ -95,7 +101,29 @@ const DAY = 24 * 60 * 60 * 1000
 /** How many bytes of pictures are remembered between writes: 128 MiB. */
 const PICTURES_HELD = 128 * 2 ** 20
 
-const listing = (doc: Doc): Pick<NoteState, 'title' | 'pages' | 'assets' | 'rev'> => ({ title: doc.title, pages: doc.pages.length, assets: Object.keys(doc.asset).sort(), rev: doc.rev })
+const listing = (doc: Doc): Pick<NoteState, 'title' | 'pages' | 'assets' | 'rev' | 'kind' | 'cover' | 'snip'> => ({
+  title: doc.title,
+  pages: doc.pages.length,
+  assets: Object.keys(doc.asset).sort(),
+  rev: doc.rev,
+  kind: doc.kind,
+  cover: doc.cover,
+  snip: noteSnip(doc) || undefined,
+})
+
+/** Where each note's words are kept on this device, for the search of the words inside notes (words.ts). */
+const WORDS = 'words.json'
+
+/** A folder's cover: a picture named cover in it, of one of these kinds. */
+const COVER_TYPES: Readonly<Record<string, string>> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif', avif: 'image/avif' }
+const COVER_OF_TYPE: Readonly<Record<string, string>> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif', 'image/avif': 'avif' }
+/** The kind of picture a path is, by its extension, when it is named cover. */
+const coverType = (path: string): string | undefined => {
+  const extension = /^cover\.([A-Za-z]+)$/u.exec(nameOf(path))?.[1]?.toLowerCase()
+  return extension === undefined ? undefined : COVER_TYPES[extension]
+}
+/** A folder's cover picture: the one file in a folder, besides its notes, that is the library's. */
+const isCover = (path: string): boolean => !isHidden(path) && folderOf(path) !== '' && coverType(path) !== undefined
 
 export class FolderLibrary implements LibraryStore {
   readonly #shared: Files
@@ -109,6 +137,10 @@ export class FolderLibrary implements LibraryStore {
   readonly #docs = new Map<string, Doc>()
   readonly #files = new Map<string, FileSeen>()
   #folders: FileInfo[] = []
+  /** Each folder's cover picture, by the folder's path. */
+  #covers = new Map<string, string>()
+  /** Each note's words on this device, with the rev they were made at: read once, written after a search. */
+  #words: Map<string, { rev: number; words: string }> | undefined
   readonly #records = new Map<string, DeletedRecord>()
   #recordFiles = new Map<string, { sig: string; record: DeletedRecord }>()
   readonly #gone = new Map<string, number>()
@@ -615,6 +647,7 @@ export class FolderLibrary implements LibraryStore {
     }
     this.#recordFiles = told
     this.#folders = infos.filter((info) => info.folder && !isHidden(info.path) && info.path !== BIN)
+    this.#covers = new Map(infos.filter((info) => !info.folder && isCover(info.path)).map((info) => [folderOf(info.path), info.path]))
     const noteFiles = infos.filter((info) => !info.folder && isNote(info.path))
     const there = new Set(noteFiles.map((info) => info.path))
     for (const path of [...this.#files.keys()]) if (!there.has(path)) this.#files.delete(path)
@@ -705,13 +738,24 @@ export class FolderLibrary implements LibraryStore {
       unsaved: false,
       file: { name: nameOf(state.path), savedAt: state.edited },
       ...(binned(state.path) ? { deleted: record?.at ?? state.put ?? state.edited } : {}),
+      ...(state.kind ? { kind: state.kind } : {}),
+      ...(state.cover ? { cover: state.cover } : {}),
+      ...(state.snip ? { snip: state.snip } : {}),
     }
   }
 
   #folderEntry(info: FileInfo): FolderEntry {
     const record = binned(info.path) ? this.#records.get(nameOf(info.path)) : undefined
     const home = binned(info.path) ? (record && this.#folders.some((f) => f.path === record.from) ? record.from : '') : folderOf(info.path)
-    return { id: folderId(info.path)!, name: nameOf(info.path), parent: folderId(home), created: info.modified, edited: info.modified, ...(binned(info.path) ? { deleted: record?.at ?? info.modified } : {}) }
+    return {
+      id: folderId(info.path)!,
+      name: nameOf(info.path),
+      parent: folderId(home),
+      created: info.modified,
+      edited: info.modified,
+      ...(binned(info.path) ? { deleted: record?.at ?? info.modified } : {}),
+      ...(this.#covers.has(info.path) ? { cover: true } : {}),
+    }
   }
 
   #library(): Library {
@@ -827,7 +871,7 @@ export class FolderLibrary implements LibraryStore {
     })
   }
 
-  newNote(folder: string | null, from?: { doc: Doc; assets: Map<string, Blob>; file?: FileState | undefined }): Promise<NoteEntry> {
+  newNote(folder: string | null, from?: { doc: Doc; assets: Map<string, Blob>; file?: FileState | undefined }, kind?: NoteKind): Promise<NoteEntry> {
     return this.#act(async () => {
       const library = this.#library()
       const home = folder !== null && library.folders.some((f) => f.id === folder && !inBin(this.#folderPath(folder))) ? this.#folderPath(folder) : ''
@@ -837,7 +881,10 @@ export class FolderLibrary implements LibraryStore {
         const taken = new Set([...this.#notes.keys(), ...Object.keys(from.doc.block), ...from.doc.pages])
         doc = this.#notes.has(from.doc.id) ? { ...from.doc, id: newId((id) => taken.has(id)) } : from.doc
         for (const [hash, bytes] of from.assets) await this.#keepAssets([[hash, new Uint8Array(await bytes.arrayBuffer())]])
-      } else doc = createDoc({ title: uniqueName('Untitled', contents(library, folderId(home)).notes.map((n) => n.title)) })
+      } else {
+        doc = createDoc({ title: uniqueName('Untitled', contents(library, folderId(home)).notes.map((n) => n.title)) })
+        if (kind) doc = startAs(doc, kind)
+      }
       const state = await this.#newState(doc, home)
       await this.#keep(state, doc)
       await this.#write(state)
@@ -951,7 +998,7 @@ export class FolderLibrary implements LibraryStore {
       // Each note's file by itself, and the small files other programs leave; then the folder, when nothing else is in it.
       for (const info of await this.#shared.list()) {
         if (info.folder || !info.path.startsWith(`${path}/`)) continue
-        if (isNote(info.path) || isClutter(nameOf(info.path))) await this.#shared.remove(info.path)
+        if (isNote(info.path) || isClutter(nameOf(info.path)) || isCover(info.path)) await this.#shared.remove(info.path)
         else others = true
       }
     }
@@ -1016,6 +1063,69 @@ export class FolderLibrary implements LibraryStore {
     return this.#run(async () => {
       // A note deleted for good meanwhile gets no thumbnail back.
       if (this.#notes.has(id)) await this.#shared.write(previewPath(id), new Uint8Array(await picture.arrayBuffer()))
+    })
+  }
+
+  findWords(search: string): Promise<string[]> {
+    return this.#run(async () => {
+      if (!this.#words) {
+        const kept = (await this.#readJson(this.#local, WORDS)) as Record<string, { rev?: unknown; words?: unknown }> | undefined
+        this.#words = new Map()
+        for (const [id, item] of Object.entries(kept ?? {})) if (typeof item.rev === 'number' && typeof item.words === 'string') this.#words.set(id, { rev: item.rev, words: item.words })
+      }
+      const words = this.#words
+      let changed = false
+      const ids: string[] = []
+      for (const state of this.#notes.values()) {
+        if (binned(state.path)) continue
+        let kept = words.get(state.id)
+        // Made again when the note has changed since: as it is saved here, or as it came from another device.
+        if (!kept || kept.rev !== state.rev) {
+          try {
+            kept = { rev: state.rev, words: noteWords(await this.#doc(state.id)) }
+          } catch {
+            continue
+          }
+          words.set(state.id, kept)
+          changed = true
+        }
+        if (holdsWords(kept.words, search)) ids.push(state.id)
+      }
+      for (const id of [...words.keys()]) {
+        if (this.#notes.has(id)) continue
+        words.delete(id)
+        changed = true
+      }
+      if (changed) await this.#writeJson(this.#local, WORDS, Object.fromEntries(words))
+      return ids
+    })
+  }
+
+  folderCover(id: string): Promise<Blob | undefined> {
+    return this.#run(async () => {
+      const path = this.#covers.get(this.#folderPath(id))
+      const type = path === undefined ? undefined : coverType(path)
+      if (path === undefined || type === undefined) return undefined
+      try {
+        return new Blob([(await this.#shared.read(path)) as Uint8Array<ArrayBuffer>], { type })
+      } catch {
+        return undefined
+      }
+    })
+  }
+
+  setFolderCover(id: string, picture: Blob | undefined): Promise<void> {
+    return this.#act(async () => {
+      const folder = this.#folderPath(id)
+      const extension = picture ? COVER_OF_TYPE[picture.type] : undefined
+      if (picture && extension === undefined) throw new Error('A cover is a PNG, JPEG, WebP, GIF or AVIF picture.')
+      const was = this.#covers.get(folder)
+      if (was !== undefined) await this.#shared.remove(was)
+      this.#covers.delete(folder)
+      if (!picture || extension === undefined) return
+      const path = join(folder, `cover.${extension}`)
+      await this.#shared.write(path, new Uint8Array(await picture.arrayBuffer()))
+      this.#covers.set(folder, path)
     })
   }
 

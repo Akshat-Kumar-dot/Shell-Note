@@ -49,7 +49,7 @@ export function Rail({ store, screen }: RailProps) {
       <button type="button" className="sh-b" aria-label="Library" aria-pressed={screen !== 'other'} title="Library: your folders and notes" data-command="library.open" onClick={() => commands.press('library.open')}>
         <Library {...ICON} />
       </button>
-      <button type="button" className="sh-b rail-find" aria-label="Search" title="Search your notes and folders by name" onClick={find}>
+      <button type="button" className="sh-b rail-find" aria-label="Search" title="Search the titles and the words inside your notes" onClick={find}>
         <Search {...ICON} />
       </button>
       <button

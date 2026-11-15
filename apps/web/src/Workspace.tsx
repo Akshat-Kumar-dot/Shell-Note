@@ -5,7 +5,7 @@
 // button to edit it here instead. A sample note (?sample=…) is never kept. The AI works on what is chosen, through
 // the ✨ button or Ctrl+K; its answers and its log show in a panel beside the pages, and the log is kept beside the
 // note in the library, never in its file.
-import { textOf, ValidationError, type Doc, type LogEntry, type Selection } from '@shellnote/core'
+import { textOf, ValidationError, type Doc, type LogEntry, type Selection, type NoteKind } from '@shellnote/core'
 import { aiEdit, AiLayer, AskPanel, AssetStore, BarMenu, BarStrip, CHANGED_SINCE, checkDiagram, commands, EditorStore, MenuItem, MovableBar, NoteBar, undoEdit, type By, type NewNote, LogPanel, PageView, PrintView, useUndoKeys, EditorArea, programHost, showSideTab, tabWord, inDesktopApp, workspace, type AiHost, type AskAnswer, type LogItem } from '@shellnote/editor'
 import { openAICompatible } from '@shellnote/providers'
 import { Check, CircleAlert, CloudCheck, CornerDownLeft, Ellipsis, FileDown, FilePlus2, FolderOpen, HardDrive, Maximize2, ScrollText, TriangleAlert } from 'lucide-react'
@@ -22,7 +22,7 @@ import { NoteMenu } from './shell/NoteMenu.js'
 import { noteScreen, tabsAt, tabsEnd } from './shell/state.js'
 import type { LibraryStore } from '@shellnote/library'
 import type { Tabs } from './library/tabs.js'
-import { drawThumbnail } from './library/thumbnail.js'
+import { drawCover, drawThumbnail } from './library/thumbnail.js'
 import { unsaved } from '@shellnote/library/tree'
 import { type FileState } from './storage/cache.js'
 import { noteBytes, saveFile } from './storage/files.js'
@@ -170,8 +170,8 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
   useUndoKeys(store, editing)
   // The shell's rail: its buttons for the panel beside the note work while the note is edited here.
   useEffect(() => {
-    noteScreen.set({ mode: editing ? 'edit' : 'read', id: note, folder, title: doc.title })
-  }, [editing, note, folder, doc.title])
+    noteScreen.set({ mode: editing ? 'edit' : 'read', id: note, folder, title: doc.title, kind: doc.kind ?? 'mixed' })
+  }, [editing, note, folder, doc.title, doc.kind])
   useEffect(() => () => noteScreen.set(undefined), [])
   // The AI's answers and its log, shown in the side panel's Output, and Settings opened from the prompt box.
   const [answer, setAnswer] = useState<{ n: number; answer: AskAnswer }>()
@@ -256,14 +256,15 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
         )
       return queue
     }
-    // The thumbnail is a small picture of page 1, drawn from the note's blocks once edits have settled.
+    // The thumbnail is a small picture of page 1, drawn from the note's blocks once edits have settled; or its cover.
     const draw = async (): Promise<void> => {
       clearTimeout(drawTimer)
       const now = store.doc
       if (now.rev === drawn) return
       drawn = now.rev
       try {
-        const picture = await drawThumbnail(now, (hash) => store.assets.blob(hash))
+        const cover = now.cover === undefined ? undefined : store.assets.blob(now.cover)
+        const picture = cover ? await drawCover(cover) : await drawThumbnail(now, (hash) => store.assets.blob(hash))
         if (picture) await library.setPreview(note, picture)
       } catch (error) {
         console.warn('shellnote: the thumbnail was not drawn', error)
@@ -541,10 +542,10 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
   }
 
   /** A new note (note.new) in a folder, this one's for its button, and show it. */
-  const newNote = async (into: string | null): Promise<NewNote> => {
+  const newNote = async (into: string | null, kind?: NoteKind): Promise<NewNote> => {
     await flush()
     try {
-      const entry = await library.newNote(into)
+      const entry = await library.newNote(into, undefined, kind)
       tabs.libraryChanged()
       onOpen(entry.id)
       return { id: entry.id, title: entry.title }
@@ -588,7 +589,7 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
         close: () => own.current.leave(),
         save: (as) => own.current.save(as),
         openFile: (by) => own.current.openFile(by),
-        newNote: (into) => own.current.newNote(into),
+        newNote: (into, kind) => own.current.newNote(into, kind),
         rename: (title) => own.current.rename(title),
         editing: () => editingNow.current,
         entry: () => note,

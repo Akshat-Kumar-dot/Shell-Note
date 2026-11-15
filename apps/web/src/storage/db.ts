@@ -9,8 +9,8 @@
 import { inDesktopApp, tabWord } from '@shellnote/editor/host'
 
 const NAME = 'shellnote'
-const VERSION = 3
-const STORES = ['note', 'assets', 'notes', 'docs', 'previews', 'folders', 'meta', 'logs'] as const
+const VERSION = 4
+const STORES = ['note', 'assets', 'notes', 'docs', 'previews', 'folders', 'meta', 'logs', 'words'] as const
 export type StoreName = (typeof STORES)[number]
 
 const opened = new Map<string, Promise<IDBDatabase | undefined>>()

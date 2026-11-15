@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { MIXED } from '../../core/test/fixtures/index.js'
 import type { FolderEntry, Library, NoteEntry } from '../src/store.js'
 import { blank, canMove, contents, counts, daysLeft, deletedItems, entryFor, expired, folderPath, hidden, inside, isWithin, onlyUsedBy, search, sorted, uniqueName, unsaved } from '../src/tree.js'
+import { noteSnip } from '../src/words.js'
 
 const DAY = 24 * 60 * 60 * 1000
 const folder = (id: string, name: string, parent: string | null, edited = 0, deleted?: number): FolderEntry => ({ id, name, parent, created: edited, edited, ...(deleted === undefined ? {} : { deleted }) })
@@ -141,6 +142,9 @@ describe('a note’s entry', () => {
       unsaved: false,
       file: { name: 'waves.shellnote', savedAt: 9 },
       deleted: 7,
+      ...(MIXED.kind ? { kind: MIXED.kind } : {}),
+      ...(MIXED.cover ? { cover: MIXED.cover } : {}),
+      ...(noteSnip(MIXED) !== '' ? { snip: noteSnip(MIXED) } : {}),
     })
     expect(entryFor(MIXED, undefined, 100, undefined, 'math')).toMatchObject({ folder: 'math', created: 100, unsaved: true })
   })

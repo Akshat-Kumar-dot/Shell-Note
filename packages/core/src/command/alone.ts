@@ -11,7 +11,7 @@ import type { Finder } from './finder.js'
  * command puts it back. Never one that changes a note, the library, a file, the history, the AI or the pen's learning.
  */
 export const ALONE: ReadonlySet<string> = new Set([
-  'library.open', 'library.sort', 'bin.open',
+  'library.open', 'library.sort', 'library.filter', 'bin.open',
   'tool.choose', 'pen.set', 'highlighter.set', 'eraser.set',
   'screen.zoom', 'screen.page', 'screen.fullscreen',
   'panel.show', 'panel.hide', 'panel.full', 'bar.place', 'bar.float', 'bar.turn',

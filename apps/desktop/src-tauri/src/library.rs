@@ -155,6 +155,9 @@ enum Kind {
     Own,
     /// A small file other programs leave in any folder (`desktop.ini`), or what an interrupted write left.
     Clutter,
+    /// A folder's cover picture: a picture named `cover` (`cover.png`, `cover.jpg`, `cover.webp`...) in one of the
+    /// library's folders, the one file of a folder besides its notes that the library reads and writes.
+    Cover,
     /// Anything else the folder holds: the person's, never the library's.
     Other,
 }
@@ -198,15 +201,23 @@ fn kind_of(root: Root, path: &str) -> Kind {
             if (2..=3).contains(&parts.len()) && small { Kind::Own } else { Kind::Other }
         }
         Root::Shared => {
+            let plain = parts.iter().all(|part| !part.starts_with('.') && !part.starts_with("~$"));
             if is_clutter(last) {
                 Kind::Clutter
-            } else if lower.ends_with(NOTE) && lower.len() > NOTE.len() && parts.iter().all(|part| !part.starts_with('.') && !part.starts_with("~$")) {
+            } else if parts.len() >= 2 && plain && is_cover(&lower) {
+                Kind::Cover
+            } else if lower.ends_with(NOTE) && lower.len() > NOTE.len() && plain {
                 Kind::Note
             } else {
                 Kind::Other
             }
         }
     }
+}
+
+/// A folder's cover picture's name: `cover`, and a picture's extension.
+fn is_cover(lower: &str) -> bool {
+    matches!(lower, "cover.png" | "cover.jpg" | "cover.jpeg" | "cover.webp" | "cover.gif" | "cover.avif")
 }
 
 /// In the library's own hidden folder, or that folder itself.
@@ -315,10 +326,10 @@ pub fn library_info(app: AppHandle, root_name: String, path: String) -> Result<O
     Ok(fs::symlink_metadata(full).ok().map(|meta| entry(path, &meta)))
 }
 
-/// A note's bytes, or those of one of the library's own files: never another file of the folder.
+/// A note's bytes, or those of one of the library's own files or a folder's cover: never another file of the folder.
 fn read_at(root: Root, folder: &Path, path: &str) -> Result<Vec<u8>, String> {
     let full = inside(folder, path)?;
-    if !matches!(kind_of(root, path), Kind::Note | Kind::Own) {
+    if !matches!(kind_of(root, path), Kind::Note | Kind::Own | Kind::Cover) {
         return Err(NOT_THE_LIBRARYS.into());
     }
     let size = fs::metadata(&full).map_err(|error| error.to_string())?.len();
@@ -368,10 +379,10 @@ fn rename_over(from: &Path, to: &Path) -> std::io::Result<()> {
     }
 }
 
-/// A note, or one of the library's own files, written whole or not at all: never a file of another kind.
+/// A note, one of the library's own files, or a folder's cover, written whole or not at all: never a file of another kind.
 fn write_at(root: Root, folder: &Path, path: &str, bytes: &[u8]) -> Result<(), String> {
     let full = inside(folder, path)?;
-    if root == Root::Server || !matches!(kind_of(root, path), Kind::Note | Kind::Own) {
+    if root == Root::Server || !matches!(kind_of(root, path), Kind::Note | Kind::Own | Kind::Cover) {
         return Err(NOT_THE_LIBRARYS.into());
     }
     let parent = full.parent().ok_or("No folder to write in.")?;
@@ -476,7 +487,7 @@ fn remove_at(root: Root, folder: &Path, path: &str) -> Result<(), String> {
 /// mistake, or by a page gone wrong, can then be brought back, as a file removed in Explorer can. The library's own
 /// small files and this device's copies are not a person's to bring back, and go at once.
 fn recycled(root: Root, kind: Kind) -> bool {
-    root == Root::Shared && kind == Kind::Note
+    root == Root::Shared && matches!(kind, Kind::Note | Kind::Cover)
 }
 
 /// A file moved to Windows' Recycle Bin, with no question asked and nothing shown. Windows removes it outright where
@@ -524,7 +535,7 @@ fn remove_with(root: Root, folder: &Path, path: &str, bin: bool) -> Result<(), S
         return remove_empty(&full).map_err(|error| error.to_string());
     }
     let kind = kind_of(root, path);
-    if !matches!(kind, Kind::Note | Kind::Own | Kind::Clutter) {
+    if !matches!(kind, Kind::Note | Kind::Own | Kind::Clutter | Kind::Cover) {
         return Err(NOT_THE_LIBRARYS.into());
     }
     // To the Recycle Bin when it is a note; removed outright should Windows not take it there (a path too long for
@@ -650,6 +661,15 @@ mod tests {
             ("Folder/Thumbs.db", Clutter),
             ("Folder/.a.shellnote.tmp-412-7", Clutter),
             ("Folder/.a.shellnote.tmp-x-7", Other),
+            ("Folder/cover.png", Cover),
+            ("Folder/Sub/Cover.JPG", Cover),
+            ("Folder/cover.webp", Cover),
+            ("cover.png", Other),
+            ("Folder/cover.exe", Other),
+            ("Folder/cover.png.exe", Other),
+            ("Folder/covers.png", Other),
+            (".hidden/cover.png", Other),
+            (".shellnote/cover.png", Other),
             (".shellnote/library.json", Own),
             (".shellnote/pen-profile.json", Own),
             (".shellnote/previews/n1.webp", Own),

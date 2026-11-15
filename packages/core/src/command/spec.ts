@@ -79,6 +79,7 @@ export const FIELDS = {
   place: z.enum(['top', 'bottom', 'left', 'right']).describe('Where a bar is docked'),
   by: z.enum(['edited', 'created']).describe('Sort by the date last edited, or created'),
   order: z.enum(['newest', 'oldest']).describe('Which come first'),
+  show: z.enum(['all', 'text', 'sketch', 'mixed']).describe('Which notes the library shows: all of them, or only the text notes, the sketches or the mixed notes'),
   look: z.enum(['system', 'light', 'dark']).describe("The app's appearance; system follows Windows"),
   accent: z.enum(['graphite', 'blue', 'teal', 'green', 'amber', 'rose', 'red']).describe("The app's own colour, on its buttons and what is chosen; graphite is no colour"),
   type: z.enum(['text', 'sketch', 'mixed']).describe('What a note is for: text (typing), sketch (the pen) or mixed (both)'),

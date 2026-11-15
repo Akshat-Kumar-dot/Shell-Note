@@ -33,6 +33,13 @@ export const APP_COMMANDS: readonly CommandSpec[] = [
     example: { by: 'edited', order: 'newest' },
   },
   {
+    name: 'library.filter',
+    does: 'Show only one type of note in the library, the text notes, the sketches or the mixed notes, or every note again (all); folders always show',
+    says: ['show only the {show} notes in the library', 'filter the library by note type', 'show every type of note in the library', 'only show sketches in the library'],
+    input: inputs(['show']),
+    example: { show: 'sketch' },
+  },
+  {
     name: 'bin.open',
     does: 'Show Recently deleted, where deleted notes and folders wait',
     says: ['open recently deleted', 'show the bin', 'open the trash', 'show deleted notes', 'go to the recycle bin'],
@@ -65,9 +72,9 @@ export const APP_COMMANDS: readonly CommandSpec[] = [
   // ----- notes -----
   {
     name: 'note.new',
-    does: 'Make a new, empty note and open it, with its name when one is given',
-    says: ['new note', 'create a note', 'make a new note', 'start a blank note', 'add a note to the folder'],
-    input: inputs([], ['name', 'into']),
+    does: 'Make a new, empty note and open it, with its name when one is given; type= starts it as a text note (no page breaks), a sketch (a wide growing sheet of dots, the pen in hand) or a mixed note (pages)',
+    says: ['new note', 'create a note', 'make a new note', 'start a blank note', 'add a note to the folder', 'start a new {type} note'],
+    input: inputs([], ['name', 'into', 'type']),
     example: { name: 'Waves', into: 'Physics' },
   },
   {
@@ -175,6 +182,13 @@ export const APP_COMMANDS: readonly CommandSpec[] = [
     says: ['delete the folder', 'remove the folder', 'throw the folder away', 'send the folder to the bin'],
     input: inputs(['folder']),
     example: { folder: 'Unit 2' },
+  },
+  {
+    name: 'folder.cover',
+    does: "Choose a picture for a folder's cover (on: the picture chooser opens, for the person), kept in the folder as a picture named cover; or take the cover off (off)",
+    says: ['choose a cover picture for the folder', 'give the folder a cover', "take the folder's cover off", 'remove the cover of the folder'],
+    input: inputs(['folder', 'on']),
+    example: { folder: 'Unit 2', on: false },
   },
   // ----- files -----
   {

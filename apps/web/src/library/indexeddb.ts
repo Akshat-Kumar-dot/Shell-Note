@@ -2,11 +2,11 @@
 // action is one transaction over the stores it touches, so it happens whole
 // or not at all, and an error leaves everything as it was. Pictures' bytes are
 // shared by all notes, by hash, and go only when no note uses them any more.
-import { apply, createDoc, newId, parseDoc, PenProfile, type Doc } from '@shellnote/core'
+import { apply, createDoc, newId, parseDoc, PenProfile, startAs, type Doc, type NoteKind } from '@shellnote/core'
 import { loadWorkingCopy, type FileState } from '../storage/cache.js'
 import { get, keys, result, transact, type StoreName } from '../storage/db.js'
 import { migrateOldNote, type MigrationIO, type MigrationResult } from './migrate.js'
-import type { FolderEntry, ItemRef, Library, LibraryStore, NoteEntry, OpenedNote, SavingNote } from '@shellnote/library'
+import { holdsWords, noteWords, type FolderEntry, type ItemRef, type Library, type LibraryStore, type NoteEntry, type OpenedNote, type SavingNote } from '@shellnote/library'
 import { canMove, contents, deletedItems, entryFor, expired, inside, isOpenFolder, onlyUsedBy, uniqueName } from '@shellnote/library/tree'
 
 /** A note as kept in `docs`: the document, and the file it belongs to. */
@@ -51,8 +51,12 @@ function removeForGood(store: (name: StoreName) => IDBObjectStore, library: Libr
     store('docs').delete(id)
     store('previews').delete(id)
     store('logs').delete(id)
+    store('words').delete(id)
   }
-  for (const id of folders) store('folders').delete(id)
+  for (const id of folders) {
+    store('folders').delete(id)
+    store('previews').delete(coverKey(id))
+  }
 }
 
 /** The items given, with everything their folders hold. */
@@ -77,7 +81,10 @@ function undeleted<T extends { deleted?: number }>(entry: T): T {
   return copy
 }
 
-const ALL: readonly StoreName[] = ['notes', 'docs', 'previews', 'folders', 'assets', 'logs']
+const ALL: readonly StoreName[] = ['notes', 'docs', 'previews', 'folders', 'assets', 'logs', 'words']
+
+/** A folder's cover picture is kept with the notes' thumbnails, under its own key. */
+const coverKey = (folder: string): string => `folder:${folder}`
 
 export class BrowserLibrary implements LibraryStore {
   async list(): Promise<Library> {
@@ -99,9 +106,10 @@ export class BrowserLibrary implements LibraryStore {
 
   async save({ doc, blob, file }: SavingNote): Promise<NoteEntry> {
     const now = Date.now()
-    return transact(['notes', 'docs', 'assets'], async (store) => {
+    return transact(['notes', 'docs', 'assets', 'words'], async (store) => {
       const before = (await result(store('notes').get(doc.id))) as NoteEntry | undefined
       const entry = entryFor(doc, file, now, before)
+      store('words').put(noteWords(doc), doc.id)
       for (const hash of entry.assets) {
         if ((await result(store('assets').count(hash))) > 0) continue
         const bytes = blob(hash)
@@ -119,13 +127,15 @@ export class BrowserLibrary implements LibraryStore {
     })
   }
 
-  async newNote(folder: string | null, from?: { doc: Doc; assets: Map<string, Blob>; file?: FileState | undefined }): Promise<NoteEntry> {
+  async newNote(folder: string | null, from?: { doc: Doc; assets: Map<string, Blob>; file?: FileState | undefined }, kind?: NoteKind): Promise<NoteEntry> {
     const now = Date.now()
-    return transact(['notes', 'docs', 'assets', 'folders'], async (store) => {
+    return transact(['notes', 'docs', 'assets', 'folders', 'words'], async (store) => {
       const library = await read(store)
       const where = isOpenFolder(library, folder) ? folder : null
-      const doc = from ? ownId(from.doc, library) : createDoc({ title: uniqueName('Untitled', contents(library, where).notes.map((n) => n.title)) })
+      const blank = (): Doc => createDoc({ title: uniqueName('Untitled', contents(library, where).notes.map((n) => n.title)) })
+      const doc = from ? ownId(from.doc, library) : kind ? startAs(blank(), kind) : blank()
       const entry = entryFor(doc, from?.file, now, undefined, where)
+      store('words').put(noteWords(doc), doc.id)
       for (const [hash, bytes] of from?.assets ?? []) store('assets').put(bytes, hash)
       store('docs').put(record(doc, from?.file), doc.id)
       store('notes').put(entry, doc.id)
@@ -249,6 +259,54 @@ export class BrowserLibrary implements LibraryStore {
     await transact(['previews', 'notes'], async (store) => {
       // A note deleted for good meanwhile gets no thumbnail back.
       if ((await result(store('notes').count(id))) > 0) store('previews').put(picture, id)
+    })
+  }
+
+  async findWords(search: string): Promise<string[]> {
+    const ids: string[] = []
+    const library = await this.list()
+    for (const entry of library.notes) {
+      if (entry.deleted !== undefined) continue
+      let words = await get<string>('words', entry.id)
+      if (words === undefined) {
+        // A note kept before the words were: read once, and kept for the next search.
+        const kept = await get<DocRecord>('docs', entry.id)
+        let doc: Doc | undefined
+        try {
+          doc = kept ? parseDoc(kept.doc) : undefined
+        } catch {
+          doc = undefined
+        }
+        if (!doc) continue
+        words = noteWords(doc)
+        const made = words
+        await transact(['words'], async (store) => {
+          store('words').put(made, entry.id)
+        })
+      }
+      if (holdsWords(words, search)) ids.push(entry.id)
+    }
+    return ids
+  }
+
+  async folderCover(id: string): Promise<Blob | undefined> {
+    return get<Blob>('previews', coverKey(id))
+  }
+
+  async setFolderCover(id: string, picture: Blob | undefined): Promise<void> {
+    await transact(['previews', 'folders'], async (store) => {
+      const folder = (await result(store('folders').get(id))) as FolderEntry | undefined
+      if (!folder) throw new Error('That folder is not in the library any more.')
+      // A new cover is a change of the folder's: its time moves on, so every screen draws it again.
+      const rest: FolderEntry = { ...folder, edited: Date.now() }
+      delete rest.cover
+      if (picture) {
+        store('previews').put(picture, coverKey(id))
+        store('folders').put({ ...rest, cover: true }, id)
+      } else {
+        store('previews').delete(coverKey(id))
+        store('folders').put(rest, id)
+      }
     })
   }
 

@@ -1,13 +1,17 @@
-// One card on the home page: a folder, or a note with a picture of its first
-// page. A click or Enter opens it; its ⋯ button, a right-click, a long press
-// (touch or pen) or the menu key opens its menu; F2 renames it in place. The
-// parent moves the focus between cards with the arrow keys.
-import { Ellipsis, FileText, Folder } from 'lucide-react'
+// One note or folder on the library's screen: a card with its picture, or a line of the list. A click or Enter opens
+// it; its ⋯ button, a right-click, a long press (touch or pen) or the menu key opens its menu; F2 renames it in place.
+// The parent moves the focus between them with the arrow keys.
+import { Ellipsis, Folder } from 'lucide-react'
 import { tabWord } from '@shellnote/editor'
 import { useEffect, useRef, type KeyboardEvent, type PointerEvent } from 'react'
 import type { FolderEntry, NoteEntry } from '@shellnote/library'
+import { KIND_ICON, KIND_WORD, kindOf } from './kinds.js'
 
-export type CardItem = { kind: 'note'; entry: NoteEntry } | { kind: 'folder'; entry: FolderEntry }
+/** A note or a folder; a note a search found by the words inside it, not its title, is marked so. */
+export type CardItem = { kind: 'note'; entry: NoteEntry; words?: boolean } | { kind: 'folder'; entry: FolderEntry }
+
+/** How the library shows its notes and folders: as cards with their pictures, or as the lines of a list. */
+export type Look = 'cards' | 'list'
 
 export const nameOf = (item: CardItem): string => (item.kind === 'note' ? item.entry.title : item.entry.name)
 
@@ -16,9 +20,14 @@ const LONG_PRESS = 550
 
 export interface CardProps {
   item: CardItem
-  /** One line under the name: when it was edited, what a folder holds, where a search result is. */
+  look: Look
+  /** The line under a card's name, and what is said after its name: when a note was edited, what a folder holds, where a search's result is. */
   meta: string
-  thumbnail?: string
+  /** A line of the list: what its middle says (a note's first words), and its end (when). */
+  middle?: string
+  end?: string
+  /** Its picture: a note's first page or its cover, a folder's cover. */
+  picture?: string
   /** The card the arrow keys are on: the one Tab reaches. */
   active: boolean
   renaming: boolean
@@ -33,7 +42,7 @@ export interface CardProps {
   onFocus: () => void
 }
 
-export function Card({ item, meta, thumbnail, active, renaming, elsewhere, command, onOpen, onMenu, onRename, onKey, onFocus }: CardProps) {
+export function Card({ item, look, meta, middle, end, picture, active, renaming, elsewhere, command, onOpen, onMenu, onRename, onKey, onFocus }: CardProps) {
   const name = nameOf(item)
   const open = useRef<HTMLButtonElement>(null)
   const field = useRef<HTMLInputElement>(null)
@@ -70,11 +79,16 @@ export function Card({ item, meta, thumbnail, active, renaming, elsewhere, comma
     if (press.current) clearTimeout(press.current.timer)
   }
 
+  const kind = item.kind === 'note' ? kindOf(item.entry) : undefined
+  const Icon = kind ? KIND_ICON[kind] : Folder
+  const row = look === 'list'
+  const covered = item.entry.cover !== undefined && item.entry.cover !== false
   const unsaved = item.kind === 'note' && item.entry.unsaved
   const description = `${item.kind === 'note' ? 'Note' : 'Folder'}: ${name}. ${meta}${unsaved ? '. Not saved to a file' : ''}${elsewhere ? `. Open in another ${tabWord()}` : ''}`
+  const last = row ? (end ?? meta) : meta
 
   return (
-    <div role="listitem" className="card" data-kind={item.kind} data-id={item.entry.id}>
+    <div role="listitem" className="card" data-kind={item.kind} data-note={kind} data-covered={covered ? '' : undefined} data-id={item.entry.id}>
       <button
         ref={open}
         type="button"
@@ -107,52 +121,58 @@ export function Card({ item, meta, thumbnail, active, renaming, elsewhere, comma
         onPointerUp={endPress}
         onPointerCancel={endPress}
       >
-        <span className="card-art" aria-hidden>
-          {item.kind === 'folder' ? (
+        <span className="card-pic" aria-hidden>
+          {picture ? (
+            <img className="card-thumb" src={picture} alt="" draggable={false} />
+          ) : item.kind === 'folder' ? (
             <span className="card-folder">
-              <Folder size={44} strokeWidth={1.5} />
+              <Folder size={row ? 18 : 30} strokeWidth={1.5} />
             </span>
-          ) : thumbnail ? (
-            <img className="card-thumb" src={thumbnail} alt="" draggable={false} />
           ) : (
-            <span className="card-thumb card-thumb-empty">
-              <FileText size={28} strokeWidth={1.25} />
-            </span>
+            <span className="card-paper" />
           )}
         </span>
       </button>
-      <div className="card-text">
-        {renaming ? (
-          <input
-            ref={field}
-            className="card-rename"
-            aria-label={`New name for ${name}`}
-            defaultValue={name}
-            spellCheck={false}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter') onRename(event.currentTarget.value)
-              else if (event.key === 'Escape') {
-                event.preventDefault()
-                event.stopPropagation()
-                onRename(null)
-              }
-            }}
-            onBlur={(event) => onRename(event.currentTarget.value)}
-          />
-        ) : (
-          <span className="card-name" title={name}>
-            {name}
-          </span>
-        )}
-        <span className="card-meta">
-          {unsaved ? <span className="card-dot" title="Not saved to a .shellnote file yet" /> : null}
-          <span>{meta}</span>
-          {elsewhere ? <span className="card-badge">Open in another {tabWord()}</span> : null}
+      {renaming ? (
+        <input
+          ref={field}
+          className="card-rename"
+          aria-label={`New name for ${name}`}
+          defaultValue={name}
+          spellCheck={false}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') onRename(event.currentTarget.value)
+            else if (event.key === 'Escape') {
+              event.preventDefault()
+              event.stopPropagation()
+              onRename(null)
+            }
+          }}
+          onBlur={(event) => onRename(event.currentTarget.value)}
+        />
+      ) : (
+        <span className="card-name" title={name}>
+          {row ? null : <Icon size={15} aria-hidden />}
+          <span className="card-title">{name}</span>
         </span>
-      </div>
+      )}
+      {row ? (
+        <>
+          <span className="card-snip">{middle}</span>
+          <span className="card-kind">
+            <Icon size={15} aria-hidden />
+            {kind ? KIND_WORD[kind] : 'Folder'}
+          </span>
+        </>
+      ) : null}
+      <span className="card-meta">
+        {unsaved ? <span className="card-dot" title="Not saved to a .shellnote file yet" /> : null}
+        {last !== '' ? <span className="card-when">{last}</span> : null}
+        {elsewhere ? <span className="card-badge">Open in another {tabWord()}</span> : null}
+      </span>
       <button
         type="button"
-        className="card-more icon-button"
+        className="card-more sh-b"
         tabIndex={-1}
         aria-label={`Actions for ${name}`}
         title="Actions"
@@ -161,7 +181,7 @@ export function Card({ item, meta, thumbnail, active, renaming, elsewhere, comma
           onMenu(rect.left, rect.bottom + 4)
         }}
       >
-        <Ellipsis size={18} aria-hidden />
+        <Ellipsis size={17} aria-hidden />
       </button>
     </div>
   )

@@ -111,253 +111,577 @@ a {
   color: var(--ui-text);
 }
 
-/* ----- the home page: a sidebar, then the folder in view ----- */
+/* ----- the library's screen: its top, which notes show, then its folders and notes, as cards or a list ----- */
 
 .home {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   height: 100%;
+  background: var(--sh-surface);
+  color: var(--sh-text);
 }
-
-.home-main {
+.lib {
+  flex: 1 1 0;
+  min-height: 0;
   overflow: auto;
-  padding: 28px 40px 40px;
+  padding: 30px 40px 40px;
+}
+.lib-in {
+  max-width: 1040px;
+  margin: 0 auto;
 }
 
-.home-head {
+.lib-top {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: 12px;
+  margin-bottom: 18px;
 }
-.home-title,
-.crumbs {
+.lib-head {
+  min-width: 0;
+}
+.lib-head h1 {
   margin: 0;
+  overflow: hidden;
   font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.crumbs {
+.lib-crumbs {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 2px;
+  gap: 4px;
+  margin-bottom: 4px;
+  color: var(--sh-text-3);
+  font-size: 13px;
 }
-.crumbs a {
-  padding: 2px 6px;
-  border-radius: 8px;
-  color: var(--ui-text-3);
+.lib-crumbs a {
+  border-radius: 5px;
+  color: inherit;
   text-decoration: none;
 }
-.crumbs a:hover {
-  background: var(--ui-hover);
-  color: var(--ui-text);
+.lib-crumbs a:hover {
+  color: var(--sh-text);
+  text-decoration: underline;
 }
-.crumbs [aria-current='page'] {
-  color: var(--ui-text);
+.lib-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
-.crumb {
+
+/* The search: the titles and the words inside the notes. */
+.lib-find {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+  width: min(380px, 100%);
+  height: 38px;
+  padding: 0 6px 0 12px;
+  border: 1px solid var(--sh-line-2);
+  border-radius: 10px;
+  background: var(--sh-surface);
+  color: var(--sh-text-3);
+}
+.lib-find:focus-within {
+  border-color: var(--ui-hue);
+  box-shadow: 0 0 0 1px var(--ui-hue);
+}
+.lib-find input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--sh-text);
+  font: 13px/1.45 var(--ui-font);
+}
+.lib-find input::placeholder {
+  color: var(--sh-text-3);
+}
+.lib-find input::-webkit-search-cancel-button {
+  display: none;
+}
+.lib-find-clear {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--sh-text-3);
+  cursor: pointer;
+}
+.lib-find-clear:hover {
+  background: var(--sh-hover);
+  color: var(--sh-text);
+}
+.lib-top .lib-new {
+  height: max(38px, var(--sh-size));
+}
+.lib-empty-bin {
+  color: var(--ui-danger);
+}
+
+/* Which notes show, how they are sorted, and as cards or a list. */
+.lib-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.lib-kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.lib-f {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--sh-text-2);
+  font: 500 13px/1 var(--ui-font);
+  cursor: pointer;
+}
+.lib-f:hover {
+  background: var(--sh-hover);
+}
+.lib-f[aria-pressed='true'] {
+  background: var(--sh-chosen);
+  color: var(--sh-chosen-text);
+}
+.lib-sort {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  color: var(--ui-text-3);
+  margin-left: auto;
+  color: var(--sh-text-3);
+}
+.lib-sort select {
+  height: 30px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--sh-text-2);
+  font: 13px/1 var(--ui-font);
+  cursor: pointer;
+}
+.lib-sort select:hover {
+  background: var(--sh-hover);
+  color: var(--sh-text);
+}
+.lib-sort option {
+  background: var(--sh-surface);
+  color: var(--sh-text);
+}
+.lib-look {
+  display: flex;
+  gap: 2px;
+  margin-left: 8px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--sh-hover);
+}
+.lib-look .sh-b {
+  height: 26px;
+  min-width: 28px;
+  padding: 0;
+  border-radius: 6px;
+}
+.lib-look .sh-b[aria-pressed='true'] {
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
+}
+.lib-filters .lib-hint {
+  margin-right: auto;
+}
+@media (pointer: coarse) {
+  .lib-f,
+  .lib-sort select,
+  .lib-look .sh-b {
+    height: 40px;
+  }
 }
 
-.search {
+.lib-hint {
+  margin: 0;
+  color: var(--sh-text-2);
+}
+.lib-sec {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: min(320px, 100%);
-  min-height: 42px;
-  padding: 0 6px 0 14px;
-  border: 1px solid var(--ui-border);
-  border-radius: 12px;
-  background: var(--ui-surface);
-  color: var(--ui-text-3);
-  box-shadow: var(--ui-shadow-1);
+  margin: 20px 0 10px;
+  color: var(--sh-text-3);
+  font-size: 12px;
+  font-weight: 600;
 }
-.search:focus-within {
-  border-color: var(--ui-accent);
+.lib-items > section:first-child .lib-sec {
+  margin-top: 4px;
 }
-.search input {
-  flex: 1;
-  min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  color: var(--ui-text);
-  font: inherit;
-}
-.search input::-webkit-search-cancel-button {
-  display: none;
-}
-.search-clear {
-  width: 30px;
-  height: 30px;
-}
-
-.home-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 26px;
-}
-.home-hint {
+.lib-none {
   margin: 0;
-  color: var(--ui-text-2);
+  color: var(--sh-text-3);
 }
-.sort {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
-  color: var(--ui-text-2);
-}
-.sort select {
-  min-height: 40px;
-  padding: 0 10px;
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
-  background: var(--ui-surface);
-  color: var(--ui-text);
+.lib-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ui-accent-text);
   font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
 }
 
-/* ----- cards ----- */
+/* ----- a card: its picture, then its kind and name, then when ----- */
 
-.cards {
+.lib-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
-  gap: 28px 22px;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
 }
-
 .card {
   position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'pic pic'
+    'name more'
+    'meta more';
+  align-items: center;
   min-width: 0;
+  border: 1px solid var(--sh-line);
+  border-radius: 12px;
+  background: var(--sh-surface);
+  overflow: hidden;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
 }
-
+.card:hover {
+  border-color: var(--sh-line-2);
+  box-shadow: var(--sh-shadow);
+}
+.card:has(.card-open:focus-visible) {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
 .card-open {
+  grid-area: pic;
   display: block;
   width: 100%;
   padding: 0;
   border: 0;
-  border-radius: 14px;
-  background: transparent;
+  background: none;
   text-align: left;
   cursor: pointer;
   touch-action: manipulation;
   user-select: none;
   -webkit-touch-callout: none;
 }
-
-.card-art {
-  display: grid;
-  place-items: center;
-  aspect-ratio: 210 / 297;
+/* The whole card opens it: the button's press reaches over its name and its line too. */
+.card-open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
 }
-/* Presses go to the card's button itself: the thumbnail that replaces the placeholder as it loads must never swallow a click. */
-.card-art,
-.card-art * {
+.card-open:focus-visible {
+  outline: 0;
+}
+/* Presses go to the card's button itself: the picture that replaces the placeholder as it loads never swallows a click. */
+.card-pic,
+.card-pic * {
   pointer-events: none;
 }
-
+.card-pic {
+  display: block;
+  height: 124px;
+  border-bottom: 1px solid var(--sh-line);
+  overflow: hidden;
+}
+.card[data-kind='folder'] .card-pic {
+  height: 96px;
+}
 .card-thumb {
   display: block;
-  box-sizing: border-box;
   width: 100%;
   height: 100%;
-  border-radius: 10px;
   background: #fff;
-  box-shadow: var(--ui-shadow-card);
   object-fit: cover;
-  transition:
-    box-shadow 0.15s,
-    transform 0.15s;
+  object-position: top;
 }
-.card-thumb-empty {
-  display: grid;
-  place-items: center;
-  color: #b6bcc6;
-}
-
 .card-folder {
   display: grid;
   place-items: center;
   width: 100%;
   height: 100%;
-  border-radius: 14px;
-  background: var(--ui-folder);
-  color: var(--ui-accent);
-  box-shadow: var(--ui-shadow-1);
-  transition:
-    box-shadow 0.15s,
-    transform 0.15s;
+  background: color-mix(in srgb, var(--ui-hue) 9%, var(--sh-panel));
+  color: color-mix(in srgb, var(--ui-hue) 55%, var(--sh-text-3));
 }
-
-.card-open:hover .card-thumb,
-.card-open:hover .card-folder,
-.card-open:focus-visible .card-thumb,
-.card-open:focus-visible .card-folder {
-  box-shadow: var(--ui-shadow-2);
-  transform: translateY(-2px);
+/* A note whose picture is not drawn yet: lines of writing on white paper, a sketch's dots. */
+.card-paper {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  color: #1d1d1f;
 }
-
-.card-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  padding: 0 36px 0 2px;
+.card-paper::before {
+  content: '';
+  position: absolute;
+  inset: 16% 14%;
+  opacity: 0.9;
+  background:
+    linear-gradient(currentColor 0 0) 0 0 / 55% 7px no-repeat,
+    repeating-linear-gradient(transparent 0 9px, color-mix(in srgb, currentColor 28%, transparent) 9px 11px) 0 18px / 100% 100% no-repeat;
+}
+.card[data-note='sketch'] .card-paper::before {
+  inset: 0;
+  opacity: 1;
+  background: radial-gradient(circle, #c9d7e8 1.1px, transparent 1.5px) 0 0 / 14px 14px;
+}
+/* A text note has no paper: its small picture takes the screen's own colours, dark in dark. */
+.card[data-note='text'] .card-paper {
+  background: color-mix(in srgb, var(--sh-text) 5%, var(--sh-surface));
+  color: var(--sh-text-2);
+}
+:root[data-theme='dark'] .card[data-note='text']:not([data-covered]) .card-thumb {
+  filter: invert(0.88) hue-rotate(180deg);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .card[data-note='text']:not([data-covered]) .card-thumb {
+    filter: invert(0.88) hue-rotate(180deg);
+  }
 }
 .card-name {
-  overflow: hidden;
+  grid-area: name;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px 0 0 12px;
+  font-size: 14px;
   font-weight: 600;
-  white-space: nowrap;
+}
+.card-name svg {
+  flex: none;
+  color: var(--sh-text-3);
+}
+.card-title {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .card-meta {
+  grid-area: meta;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  color: var(--ui-text-3);
-  font-size: 12.5px;
+  min-width: 0;
+  padding: 2px 0 12px 12px;
+  color: var(--sh-text-3);
+  font-size: 12px;
+}
+.card-when {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .card-dot {
-  width: 8px;
-  height: 8px;
+  flex: none;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--ui-warn);
 }
 .card-badge {
   padding: 1px 6px;
   border-radius: 6px;
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent-text);
-  font-size: 11.5px;
+  background: var(--sh-chosen);
+  color: var(--sh-chosen-text);
+  font-size: 11px;
 }
+/* Its menu's button, over the card's own press: shown with the pointer on the card, and always where nothing hovers. */
 .card-more {
-  position: absolute;
-  right: -6px;
-  bottom: -2px;
+  grid-area: more;
+  z-index: 1;
+  margin-right: 6px;
+  opacity: 0;
+}
+.card:hover .card-more,
+.card:focus-within .card-more {
+  opacity: 1;
+}
+@media (hover: none) {
+  .card-more {
+    opacity: 1;
+  }
 }
 .card-rename {
+  grid-area: name;
+  z-index: 1;
   box-sizing: border-box;
+  width: calc(100% - 12px);
+  min-height: 30px;
+  margin: 8px 0 0 8px;
+  padding: 2px 6px;
+  border: 1px solid var(--ui-hue);
+  border-radius: 7px;
+  outline: 0;
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  font: 600 14px/1.45 var(--ui-font);
+}
+
+/* ----- a line of the list: its picture, name, first words, kind and when ----- */
+
+.lib-list {
+  border: 1px solid var(--sh-line);
+  border-radius: 12px;
+  background: var(--sh-surface);
+  overflow: hidden;
+}
+.lib-list .card {
+  grid-template-columns: 54px minmax(80px, 230px) minmax(0, 1fr) 86px minmax(84px, max-content) var(--sh-size);
+  grid-template-areas: 'pic name snip kind meta more';
+  column-gap: 14px;
+  height: 56px;
+  padding: 0 4px 0 14px;
+  border: 0;
+  border-top: 1px solid var(--sh-line);
+  border-radius: 0;
+  background: none;
+}
+.lib-list .card:first-child {
+  border-top: 0;
+}
+.lib-list .card:hover {
+  background: var(--sh-hover);
+  box-shadow: none;
+}
+.lib-list .card:has(.card-open:focus-visible) {
+  outline-offset: -2px;
+}
+.lib-list .card-open {
+  width: 54px;
+}
+.lib-list .card-pic,
+.lib-list .card[data-kind='folder'] .card-pic {
+  box-sizing: border-box;
+  width: 54px;
+  height: 38px;
+  border: 1px solid var(--sh-line);
+  border-radius: 6px;
+}
+.lib-list .card-paper::before {
+  inset: 18% 16%;
+  background:
+    linear-gradient(currentColor 0 0) 0 0 / 55% 3px no-repeat,
+    repeating-linear-gradient(transparent 0 4px, color-mix(in srgb, currentColor 30%, transparent) 4px 5px) 0 7px / 100% 100% no-repeat;
+}
+.lib-list .card[data-note='sketch'] .card-paper::before {
+  inset: 0;
+  background-size: 7px 7px;
+}
+.lib-list .card-name {
+  padding: 0;
+  font-weight: 500;
+}
+.lib-list .card-rename {
   width: 100%;
-  min-height: 32px;
-  padding: 2px 8px;
-  border: 1px solid var(--ui-accent);
-  border-radius: 8px;
-  background: var(--ui-surface);
-  color: var(--ui-text);
+  margin: 0;
+}
+.lib-list .card-snip {
+  grid-area: snip;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--sh-text-3);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lib-list .card-kind {
+  grid-area: kind;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--sh-text-2);
+  font-size: 12px;
+}
+.lib-list .card-kind svg {
+  flex: none;
+}
+.lib-list .card-meta {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  padding: 0;
+}
+.lib-list .card-more {
+  margin: 0;
+}
+
+/* ----- an empty library: a note of each kind to start ----- */
+
+.lib-starts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  width: min(640px, 100%);
+  margin-top: 12px;
+}
+.lib-start {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--sh-line);
+  border-radius: 12px;
+  background: var(--sh-surface);
+  color: var(--sh-text);
   font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lib-start:hover {
+  border-color: var(--sh-line-2);
+  background: var(--sh-hover);
+}
+.lib-start-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--sh-hover);
+}
+.lib-start b {
+  display: block;
   font-weight: 600;
+}
+.lib-start small {
+  color: var(--sh-text-3);
+  font-size: 12px;
 }
 
 /* ----- empty states and notes ----- */
@@ -387,20 +711,6 @@ a {
   border-radius: 24px;
   background: var(--ui-accent-soft);
   color: var(--ui-accent);
-}
-
-.keep-note {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  max-width: 680px;
-  margin: 48px 0 0;
-  color: var(--ui-text-3);
-  font-size: 12.5px;
-}
-.keep-note svg {
-  flex: none;
-  margin-top: 2px;
 }
 
 .notice {
@@ -820,18 +1130,36 @@ a {
   background: #c42b1c;
   color: #fff;
 }
-/* Narrow screens, such as a tablet held upright: less room round the cards. */
-@media (max-width: 760px) {
-  .home-main {
+/* Narrow screens, such as a tablet held upright: less room round the cards, the search on a line of its own, and the
+   list's lines down to the name and when. */
+@media (max-width: 779px) {
+  .lib {
     padding: 20px 16px 32px;
   }
-  .cards {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 22px 14px;
+  .lib-find {
+    order: 3;
+    width: 100%;
   }
-  .sort {
+  .lib-sort {
     margin-left: 0;
   }
+  .lib-cards {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+  }
+  .card-pic {
+    height: 104px;
+  }
+  .lib-list .card {
+    grid-template-columns: 54px minmax(0, 1fr) auto var(--sh-size);
+    grid-template-areas: 'pic name meta more';
+  }
+  .lib-list .card-snip,
+  .lib-list .card-kind {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
   /* The side panel covers the desk, with its close button. */
   .main > .nw-side {
     position: absolute;

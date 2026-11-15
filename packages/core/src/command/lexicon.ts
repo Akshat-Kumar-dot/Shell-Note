@@ -194,8 +194,9 @@ const ABORT = ['stop', 'abort', 'cancel the request', 'cancel', 'halt', 'interru
 
 export const VERBS: Readonly<Record<string, readonly string[]>> = {
   'library.open': [...SHOW, 'go to', 'go back to', 'back to', 'return to', 'take me to', 'browse', 'visit', 'enter', 'head to', 'navigate to', 'list', 'show all', 'switch to', 'jump to', 'get back to', 'return'],
-  'library.search': ['search', 'find', 'look for', 'look up', 'hunt for', 'locate', 'where is', 'filter', 'query', 'search for', 'seek', 'track down', 'dig up', 'fetch', 'which note'],
+  'library.search': ['search', 'find', 'look for', 'look up', 'hunt for', 'locate', 'where is', 'query', 'search for', 'seek', 'track down', 'dig up', 'fetch', 'which note'],
   'library.sort': ['sort', 'order', 'arrange', 'rank', 'organize', 'organise', 'reorder', 'list by', 'sort by', 'order by', 'arrange by', 'newest first', 'oldest first', 'latest first', 'recent first', 'reverse the order', 'put first'],
+  'library.filter': ['show only', 'only show', 'just show', 'filter by type', 'filter by kind', 'narrow to', 'limit to', 'restrict to', 'only the', 'just the', 'every type', 'all types'],
 
   'bin.open': [...SHOW, 'check', 'browse', 'go to', 'list', 'what is in', 'what did i delete', 'look in', 'go into', 'inspect'],
   'bin.restore': ['restore', 'recover', 'bring back', 'undelete', 'get back', 'retrieve', 'put back', 'unarchive', 'rescue', 'revive', 'reinstate', 'salvage', 'regain', 'return', 'pull out', 'take back out', 'save from'],
@@ -216,6 +217,7 @@ export const VERBS: Readonly<Record<string, readonly string[]>> = {
   'folder.rename': RENAME,
   'folder.move': MOVE,
   'folder.delete': REMOVE,
+  'folder.cover': ['cover', 'cover picture', 'cover image', 'folder picture'],
 
   'file.save': ['save', 'store', 'keep', 'write', 'write to disk', 'persist', 'back up', 'backup', 'save changes', 'save it', 'save the file', 'save my work', 'record'],
   'file.saveAs': ['save as', 'save a copy', 'save to a new file', 'export', 'save under', 'save elsewhere', 'save it as', 'copy to a file', 'save to a file', 'save as a new file', 'export as'],

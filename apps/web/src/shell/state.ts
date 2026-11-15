@@ -1,13 +1,15 @@
 // What the shell round every screen knows of the screen inside it: the note on screen, the notes open in tabs, and
 // the places a screen may put something of its own into the shell.
+import type { NoteKind } from '@shellnote/core'
 import { inDesktopApp, Shared } from '@shellnote/editor'
 
-/** The note on screen: being edited here or shown read-only; its place in the library (none for a sample) and its title as it is now. */
+/** The note on screen: being edited here or shown read-only; its place in the library (none for a sample), its title and its kind as they are now. */
 export interface NoteNow {
   mode: 'edit' | 'read'
   id: string | undefined
   folder: string | null
   title: string
+  kind: NoteKind
 }
 
 /** The note on screen; none on the library's screens, or while a note is still opening. */
@@ -33,11 +35,14 @@ export const tabsAt = (element: HTMLElement | null): void => {
 
 // ----- the notes open in tabs: each person's own, kept in their browser -----
 
-/** A note open in a tab, with its title as last seen. */
+/** A note open in a tab, with its title and its kind as last seen. */
 export interface OpenNote {
   id: string
   title: string
+  kind?: NoteKind
 }
+
+const KINDS: ReadonlySet<unknown> = new Set(['text', 'sketch', 'mixed'])
 
 const OPEN = 'shellnote:open-notes'
 const SHOWN = 'shellnote:shown-note'
@@ -46,7 +51,9 @@ function readOpen(): OpenNote[] {
   try {
     const saved = JSON.parse(localStorage.getItem(OPEN) ?? '[]') as unknown
     if (!Array.isArray(saved)) return []
-    return saved.filter((one): one is OpenNote => typeof one === 'object' && one !== null && typeof (one as OpenNote).id === 'string' && typeof (one as OpenNote).title === 'string')
+    return saved
+      .filter((one): one is OpenNote => typeof one === 'object' && one !== null && typeof (one as OpenNote).id === 'string' && typeof (one as OpenNote).title === 'string')
+      .map((one) => ({ id: one.id, title: one.title, ...(KINDS.has(one.kind) ? { kind: one.kind! } : {}) }))
   } catch {
     return []
   }
@@ -63,12 +70,12 @@ function keepOpen(next: OpenNote[]): void {
   openNotes.set(next)
 }
 
-/** A note shown: it has its tab, with the title it has now. */
-export function openTab(id: string, title: string): void {
+/** A note shown: it has its tab, with the title and the kind it has now. */
+export function openTab(id: string, title: string, kind: NoteKind): void {
   const now = openNotes.value
   const at = now.findIndex((one) => one.id === id)
-  if (at < 0) keepOpen([...now, { id, title }])
-  else if (now[at]!.title !== title) keepOpen(now.map((one) => (one.id === id ? { id, title } : one)))
+  if (at < 0) keepOpen([...now, { id, title, kind }])
+  else if (now[at]!.title !== title || now[at]!.kind !== kind) keepOpen(now.map((one) => (one.id === id ? { id, title, kind } : one)))
 }
 
 /** A tab closed. Gives the note to show in its place, the one after it or else the one before; none, the library. */
@@ -80,12 +87,12 @@ export function closeTab(id: string): string | undefined {
   return (now[at + 1] ?? now[at - 1])?.id
 }
 
-/** The tabs of notes no longer in the library go, and the others take the titles the library has. */
-export function tabsFollow(titles: ReadonlyMap<string, string>, onScreen?: string): void {
+/** The tabs of notes no longer in the library go, and the others take the titles and the kinds the library has. */
+export function tabsFollow(notes: ReadonlyMap<string, { title: string; kind: NoteKind }>, onScreen?: string): void {
   const now = openNotes.value
-  // The note on screen keeps its tab and the title it has now: the library may not have heard of either yet.
-  const next = now.filter((one) => one.id === onScreen || titles.has(one.id)).map((one) => (one.id === onScreen ? one : { id: one.id, title: titles.get(one.id)! }))
-  if (next.length !== now.length || next.some((one, i) => one.title !== now[i]!.title)) keepOpen(next)
+  // The note on screen keeps its tab, its title and its kind as they are now: the library may not have heard of them yet.
+  const next = now.filter((one) => one.id === onScreen || notes.has(one.id)).map((one) => (one.id === onScreen ? one : { id: one.id, ...notes.get(one.id)! }))
+  if (next.length !== now.length || next.some((one, i) => one.title !== now[i]!.title || one.kind !== now[i]!.kind)) keepOpen(next)
 }
 
 /** The screen last shown, a note's id or none for the library: where the desktop app, which has no address to type, starts again. */

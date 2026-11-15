@@ -4,6 +4,7 @@
 // page both use them, and unit tests check them (test/tree.test.ts).
 import type { Doc } from '@shellnote/core'
 import { KEPT_DAYS, type FileState, type FolderEntry, type ItemRef, type Library, type NoteEntry } from './store.js'
+import { noteSnip } from './words.js'
 
 const DAY = 24 * 60 * 60 * 1000
 
@@ -131,6 +132,7 @@ export function unsaved(doc: Doc, file: Pick<FileState, 'rev'> | undefined): boo
 
 /** A note's entry from its document, keeping where it is (folder, dates, deleted) from the entry it had. */
 export function entryFor(doc: Doc, file: FileState | undefined, now: number, before?: NoteEntry, folder: string | null = null): NoteEntry {
+  const snip = noteSnip(doc)
   return {
     id: doc.id,
     title: doc.title,
@@ -142,5 +144,8 @@ export function entryFor(doc: Doc, file: FileState | undefined, now: number, bef
     unsaved: unsaved(doc, file),
     ...(file ? { file: { name: file.name, savedAt: file.savedAt } } : {}),
     ...(before?.deleted !== undefined ? { deleted: before.deleted } : {}),
+    ...(doc.kind ? { kind: doc.kind } : {}),
+    ...(doc.cover ? { cover: doc.cover } : {}),
+    ...(snip !== '' ? { snip } : {}),
   }
 }

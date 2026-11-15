@@ -3,7 +3,7 @@
 // service may copy between their devices. Which one is decided once, as the
 // app starts; changing it starts the app's page again. Every screen and
 // command holds this one object, and never learns where the notes are.
-import type { Doc, PenProfile } from '@shellnote/core'
+import type { Doc, NoteKind, PenProfile } from '@shellnote/core'
 import { inDesktopApp } from '@shellnote/editor/host'
 import type { FileState } from '../storage/cache.js'
 import { DesktopFiles, libraryFolder } from './folder/desktopFiles.js'
@@ -77,8 +77,8 @@ export class ChosenLibrary implements LibraryStore {
   save(note: SavingNote): Promise<NoteEntry> {
     return this.#store.save(note)
   }
-  newNote(folder: string | null, from?: { doc: Doc; assets: Map<string, Blob>; file?: FileState | undefined }): Promise<NoteEntry> {
-    return this.#store.newNote(folder, from)
+  newNote(folder: string | null, from?: { doc: Doc; assets: Map<string, Blob>; file?: FileState | undefined }, kind?: NoteKind): Promise<NoteEntry> {
+    return this.#store.newNote(folder, from, kind)
   }
   newFolder(parent: string | null): Promise<FolderEntry> {
     return this.#store.newFolder(parent)
@@ -109,6 +109,15 @@ export class ChosenLibrary implements LibraryStore {
   }
   setPreview(id: string, picture: Blob): Promise<void> {
     return this.#store.setPreview(id, picture)
+  }
+  findWords(search: string): Promise<string[]> {
+    return this.#store.findWords ? this.#store.findWords(search) : Promise.resolve([])
+  }
+  folderCover(id: string): Promise<Blob | undefined> {
+    return this.#store.folderCover ? this.#store.folderCover(id) : Promise.resolve(undefined)
+  }
+  setFolderCover(id: string, picture: Blob | undefined): Promise<void> {
+    return this.#store.setFolderCover ? this.#store.setFolderCover(id, picture) : Promise.reject(new Error('This library keeps no folder covers.'))
   }
   penProfile(): Promise<PenProfile | undefined> {
     return this.#store.penProfile()
