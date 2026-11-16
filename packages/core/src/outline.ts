@@ -3,6 +3,7 @@
 // selection, so it is kept compact: id, kind, then the first few words.
 import { linearise, type Item } from './linearise.js'
 import { parseInline, plainText } from './markdown/inline.js'
+import { waysOut } from './board/lines.js'
 import type { Block, Doc, Id } from './schema/doc.js'
 
 export interface OutlineOptions {
@@ -62,8 +63,10 @@ function describe(block: Block, words: number): string {
       return `diagram ${preview(block.src, words) || '(empty)'}`
     case 'ink': {
       const n = block.strokes.length
-      return `ink ${block.text === undefined ? `(${n} stroke${n === 1 ? '' : 's'})` : `"${preview(block.text, words)}"`}`
+      return `ink ${block.text === undefined ? `(${n} stroke${n === 1 ? '' : 's'})` : `"${preview(block.text, words)}"`}${block.on === undefined ? '' : ` on ${block.on}`}`
     }
+    case 'node':
+      return `${block.shape} ${preview(plainText(parseInline(block.md)), words) || '(empty)'}${waysOut(block)}`
     case 'table': {
       // Its size, then the first row, which is usually the header.
       const first = block.rows[0]!.map((md) => plainText(parseInline(md))).join(' | ')

@@ -9,7 +9,8 @@
 import { distance } from '../ai/tier0.js'
 import type { Box } from '../ink/geometry.js'
 import { parseInline, plainText } from '../markdown/inline.js'
-import type { Block, Doc } from '../schema/doc.js'
+import { waysOut } from '../board/lines.js'
+import { isEndless, type Block, type Doc } from '../schema/doc.js'
 
 const ROLE: Record<string, string> = { p: 'paragraph', h1: 'heading 1', h2: 'heading 2', h3: 'heading 3', li: 'list item', oli: 'numbered item', todo: 'to-do', quote: 'quote' }
 
@@ -59,7 +60,9 @@ function whatOf(block: Block): string {
     case 'diagram':
       return `diagram · ${short(block.src)}`
     case 'ink':
-      return `handwriting, ${block.strokes.length} ${block.strokes.length === 1 ? 'stroke' : 'strokes'}${block.text ? ` · read as "${short(block.text)}"` : ''}`
+      return `handwriting, ${block.strokes.length} ${block.strokes.length === 1 ? 'stroke' : 'strokes'}${block.text ? ` · read as "${short(block.text)}"` : ''}${block.on === undefined ? '' : ` · on ${block.on}`}`
+    case 'node':
+      return `step, ${block.shape} · "${short(block.md)}"${block.to === undefined ? '' : ` ·${waysOut(block)}`}`
     case 'table':
       return `table, ${block.rows.length} ${block.rows.length === 1 ? 'row' : 'rows'}${block.rows[0] ? ` · ${short(block.rows[0].join(' | '))}` : ''}`
   }
@@ -96,7 +99,7 @@ export function blocksList(doc: Doc, only?: number, boxes?: ReadonlyMap<string, 
     if (only !== undefined && index + 1 !== only) return
     const about = aboutOf(doc, page)
     const size = doc.page[page]
-    out.push(`page ${index + 1} (${page})${size ? ` · ${mm(size.w)} × ${mm(size.h)} mm` : ''}${about ? ` · about "${about}"` : ''}`)
+    out.push(`page ${index + 1} (${page})${size ? (isEndless(size) ? ' · endless' : ` · ${mm(size.w)} × ${mm(size.h)} mm`) : ''}${about ? ` · about "${about}"` : ''}`)
     const placed = placedOn(doc, page)
     if (placed.length === 0) out.push('  empty')
     for (const block of placed) {
@@ -120,6 +123,8 @@ export function wordsOf(block: Block): string | undefined {
       return block.alt ?? block.caption
     case 'ink':
       return block.text
+    case 'node':
+      return plainText(parseInline(block.md))
     case 'math':
       return block.tex
     case 'diagram':

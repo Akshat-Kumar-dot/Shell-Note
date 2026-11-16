@@ -11,6 +11,7 @@ import {
   MAKE_ROOM_GAP,
   SCHEMA_VERSION,
   settle,
+  sized,
   splitStrokeAt,
   validateDoc,
   type Block,
@@ -174,8 +175,8 @@ describe('something taller than a whole writing area', () => {
     expect(rest.y + firstBelow[1]!).toBe(TOP)
     expect(top.x + lastAbove[0]!).toBe(rest.x + firstBelow[0]!)
     expect(lastAbove[2]).toBe(firstBelow[2])
-    expect(liesInOneBand(top, after.page.p1!)).toBe(true)
-    expect(liesInOneBand(rest, after.page.p2!)).toBe(true)
+    expect(liesInOneBand(top, sized(after.page.p1!))).toBe(true)
+    expect(liesInOneBand(rest, sized(after.page.p2!))).toBe(true)
   })
 
   it('is cut on each page it runs over', () => {
@@ -183,7 +184,7 @@ describe('something taller than a whole writing area', () => {
     const { after } = settled(doc, ['t'])
     expect(after.pages.length).toBeGreaterThanOrEqual(3)
     for (const block of Object.values(after.block)) {
-      if (isPlacedBlock(block)) expect(liesInOneBand(block, after.page[block.page]!)).toBe(true)
+      if (isPlacedBlock(block)) expect(liesInOneBand(block, sized(after.page[block.page]!))).toBe(true)
     }
   })
 
@@ -259,7 +260,7 @@ describe('settling any note', () => {
         for (const block of Object.values(after.block)) if (block.type === 'ink') now += block.strokes.reduce((n, s) => n + s.pts.length, 0)
         expect(now).toBeGreaterThanOrEqual(before)
         // No line runs through anything placed.
-        for (const block of Object.values(after.block)) if (isPlacedBlock(block)) expect(liesInOneBand(block, after.page[block.page]!)).toBe(true)
+        for (const block of Object.values(after.block)) if (isPlacedBlock(block)) expect(liesInOneBand(block, sized(after.page[block.page]!))).toBe(true)
         // Nothing is put over something it was not over before, as it lay then.
         const free = Object.values(after.block).filter((b): b is FreeBlock => 'page' in b)
         for (const a of free) {
@@ -276,7 +277,7 @@ describe('settling any note', () => {
         expect(settle(after, Object.keys(after.block))).toEqual([])
         expect(sameContent(apply(after, done.inverse).doc, doc)).toBe(true)
         // A cut leaves each part's body within its band.
-        for (const block of Object.values(after.block)) if (block.type === 'ink') expect(bodyOf(block).h).toBeLessThanOrEqual(after.page[block.page]!.h)
+        for (const block of Object.values(after.block)) if (block.type === 'ink') expect(bodyOf(block).h).toBeLessThanOrEqual(sized(after.page[block.page]!).h)
       }),
       { numRuns: 400 },
     )

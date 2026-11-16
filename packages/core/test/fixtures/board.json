@@ -1,0 +1,49 @@
+{
+  "v": 6,
+  "id": "b0",
+  "title": "How a post is published",
+  "kind": "board",
+  "rev": 3,
+  "pages": ["p1"],
+  "page": {
+    "p1": { "id": "p1", "endless": true, "bg": "dots", "free": ["n1", "n2", "n3", "n4", "f1", "k1"] }
+  },
+  "block": {
+    "n1": { "id": "n1", "r": 1, "type": "node", "page": "p1", "x": 0, "y": 0, "w": 4000, "h": 1600, "shape": "pill", "md": "Start", "to": [{ "node": "n2" }] },
+    "n2": { "id": "n2", "r": 1, "type": "node", "page": "p1", "x": 0, "y": 2600, "w": 4000, "h": 1600, "shape": "box", "md": "Write the **draft**", "to": [{ "node": "n3" }] },
+    "n3": {
+      "id": "n3",
+      "r": 2,
+      "type": "node",
+      "page": "p1",
+      "x": -500,
+      "y": 5200,
+      "w": 5000,
+      "h": 2800,
+      "shape": "diamond",
+      "md": "Passed?",
+      "color": "blue",
+      "to": [
+        { "node": "n4", "label": "yes" },
+        { "node": "n2", "label": "no", "path": "curved" }
+      ]
+    },
+    "n4": { "id": "n4", "r": 1, "type": "node", "page": "p1", "x": 0, "y": 9000, "w": 4000, "h": 1600, "shape": "pill", "md": "Publish" },
+    "f1": { "id": "f1", "r": 3, "type": "frame", "page": "p1", "x": 6500, "y": 0, "w": 6000, "h": 900, "kids": ["t1"] },
+    "t1": { "id": "t1", "r": 3, "type": "text", "parent": "f1", "role": "p", "indent": 0, "md": "Remember the deadline" },
+    "k1": {
+      "id": "k1",
+      "r": 3,
+      "type": "ink",
+      "page": "p1",
+      "x": -400,
+      "y": 5400,
+      "w": 1200,
+      "h": 600,
+      "strokes": [{ "pts": [0, 0, 128, 600, 300, 140, 1200, 600, 128], "color": "red", "width": "m" }],
+      "on": "n3"
+    }
+  },
+  "asset": {},
+  "rules": []
+}

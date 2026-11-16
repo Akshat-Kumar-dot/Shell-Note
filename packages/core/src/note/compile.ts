@@ -6,7 +6,7 @@
 import { diagramHint, diagramKind, mendFlowchart } from '../ai/mermaid.js'
 import { newId } from '../ids.js'
 import { parseInline, plainText } from '../markdown/inline.js'
-import type { AnyColor, Block, BlockType, Doc, Role } from '../schema/doc.js'
+import { sized, type AnyColor, type Block, type BlockType, type Doc, type Role } from '../schema/doc.js'
 import type { Op } from '../schema/ops.js'
 import { MARGIN } from '../units.js'
 import { texHint, texOf } from './maths.js'
@@ -435,7 +435,7 @@ export function compileNote(doc: Doc, command: string, input: NoteInput, context
       // rs1: a block in the text follows its column; one on the page has a size of its own.
       if (!('page' in block)) throw new Error(`${found.id} sits in the text and follows its column's width: block: move block=${found.id} to=… places it on the page, where it can be resized (a table is resized where it is).`)
       if (block.type === 'ink') throw new Error(`${found.id} is handwriting: its strokes keep their size.`)
-      const page = doc.page[block.page]!
+      const page = sized(doc.page[block.page]!)
       const w = spanned(block.w, span, page.w - 2 * MARGIN)
       // A picture, a formula, a diagram keeps its shape; a box only its width (its height is its text's).
       const h = block.type === 'frame' ? block.h : Math.max(100, Math.round((block.h * w) / Math.max(1, block.w)))
@@ -457,14 +457,14 @@ export function compileNote(doc: Doc, command: string, input: NoteInput, context
       if (parts.length === 0) throw new Error('No words: write them on the lines under the command, then a line end.')
       const n = input.page ?? context.page
       const pageId = doc.pages[n - 1] ?? doc.pages[0]!
-      const sheet = doc.page[pageId]!
+      const sheet = sized(doc.page[pageId]!)
       let w = Math.round((sheet.w - 2 * MARGIN) / 2)
       // Beside a block: as wide as the room beside it, up to half the page; below: as wide as it.
       if (input.beside !== undefined || input.below !== undefined) {
         const found = referTo(doc, (input.beside ?? input.below)!, context)
         if (!found.ok) throw new Error(found.why)
         const { box, page } = boxOfBlock(doc, found.id, context)
-        const near = doc.page[page]!
+        const near = sized(doc.page[page]!)
         w = input.beside !== undefined ? Math.min(w, Math.max(near.w - MARGIN - (box.x + box.w + 300), box.x - 300 - MARGIN)) : box.w
         if (w < 3000) throw new Error(`There is no room beside ${found.id} for a box: below= puts one under it, to= in a part of the page.`)
       }
@@ -481,7 +481,7 @@ export function compileNote(doc: Doc, command: string, input: NoteInput, context
       if (input.after !== undefined && input.before !== undefined) throw new Error('Give after=… or before=…, not both.')
       const at = input.after !== undefined ? pageIndex(doc, input.after) + 1 : input.before !== undefined ? pageIndex(doc, input.before) : input.at === 'top' ? 0 : doc.pages.length
       // Its size and paper are those of the page before it (the first page's, at the front).
-      const like = doc.page[doc.pages[Math.max(0, Math.min(at, doc.pages.length) - 1)] ?? doc.pages[0]!]!
+      const like = sized(doc.page[doc.pages[Math.max(0, Math.min(at, doc.pages.length) - 1)] ?? doc.pages[0]!]!)
       const id = fresh()
       // As a new note's page: one empty text frame inside the margins, so text can be written on it.
       const frame: Frame = { id: fresh(), r: 0, type: 'frame', page: id, x: MARGIN, y: MARGIN, w: Math.max(0, like.w - 2 * MARGIN), h: 0, kids: [] }

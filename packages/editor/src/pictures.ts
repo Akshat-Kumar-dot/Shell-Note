@@ -3,7 +3,7 @@
 // that shows it. Pasted or picked with the caret in a frame, a picture goes
 // into the text there. Dropped on text, it goes in where it was dropped.
 // Anywhere else it is placed on the page, free to move.
-import { apply, currentPage, freeSpace, idTaken, MARGIN, newId, type Block, type Doc, type Frame, type Id, type Op, type Page } from '@shellnote/core'
+import { apply, currentPage, freeSpace, idTaken, MARGIN, newId, type Block, type Doc, type Frame, type Id, type Op, sized, sizedPage, type SizedPage } from '@shellnote/core'
 import { NodeSelection, type EditorState } from '@tiptap/pm/state'
 import type { NewPicture } from './assets.js'
 import { activeEditor } from './frame/active.js'
@@ -24,7 +24,7 @@ const UNKNOWN = { w: 8000, h: 6000 }
 const FAN = 500
 
 /** A new picture's size on a page: its pixels at 96 to the inch, shrunk to fit the page's width and half its height. */
-export function pictureSize(meta: NewPicture['meta'], page: Pick<Page, 'w' | 'h'>): { w: number; h: number } {
+export function pictureSize(meta: NewPicture['meta'], page: Pick<SizedPage, 'w' | 'h'>): { w: number; h: number } {
   const own = meta.w !== undefined && meta.h !== undefined
   const w = own ? meta.w! * UNITS_PER_PX : UNKNOWN.w
   const h = own ? meta.h! * UNITS_PER_PX : UNKNOWN.h
@@ -52,7 +52,7 @@ export function pictureOps(doc: Doc, pictures: readonly NewPicture[], spot: Pict
     if ('frame' in spot) {
       step.push({ op: 'add', block: { id, r: 0, type: 'image', parent: spot.frame, asset: picture.hash } as Block, at: start + i })
     } else {
-      const page = doc.page[spot.page]!
+      const page = sized(doc.page[spot.page]!)
       const own = pictureSize(picture.meta, page)
       const shrink = spot.fit ? Math.min(1, spot.fit.w / own.w, spot.fit.h / own.h) : 1
       const w = Math.max(1, Math.round(own.w * shrink))
@@ -70,7 +70,7 @@ export function pictureOps(doc: Doc, pictures: readonly NewPicture[], spot: Pict
 }
 
 /** Where a box of w × h centred on (x, y) goes: there, moved onto the page where it would stick out. */
-function centredOn(page: Page, x: number, y: number, w: number, h: number): { x: number; y: number } {
+function centredOn(page: SizedPage, x: number, y: number, w: number, h: number): { x: number; y: number } {
   return {
     x: Math.round(Math.max(0, Math.min(x - w / 2, page.w - w))),
     y: Math.round(Math.max(0, Math.min(y - h / 2, page.h - h))),
@@ -91,7 +91,7 @@ function withHeights(doc: Doc, heights: Readonly<Record<Id, number>>): Doc {
 
 /** The height of each frame on a page as drawn, in document units, when the page is on screen. */
 export function drawnHeights(doc: Doc, pageId: Id): Record<Id, number> {
-  const page = doc.page[pageId]
+  const page = sizedPage(doc.page[pageId])
   const sheet = document.querySelector<HTMLElement>(`.nw-page[data-page="${CSS.escape(pageId)}"]`)
   if (!page || !sheet) return {}
   const unitsPerPx = page.w / sheet.getBoundingClientRect().width
@@ -166,7 +166,7 @@ export async function addPictures(store: EditorStore, files: readonly Blob[], sp
   }
   const doc = store.doc
   // The frame or page may have gone while the pictures were read.
-  const there = 'frame' in spot ? doc.block[spot.frame]?.type === 'frame' : doc.page[spot.page] !== undefined
+  const there = 'frame' in spot ? doc.block[spot.frame]?.type === 'frame' : sizedPage(doc.page[spot.page]) !== undefined
   if (pictures.length === 0 || !there) return []
   const ops = pictureOps(doc, pictures, spot, 'page' in spot ? drawnHeights(doc, spot.page) : {})
   store.apply(ops, { origin: 'pictures' })

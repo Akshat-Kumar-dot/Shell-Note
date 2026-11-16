@@ -1,6 +1,7 @@
 // Page overflow: text that runs past the bottom margin continues in a frame
 // on the next page, linked with `next`, and the caret goes with it. Undo
 // takes back the push with the typing that caused it.
+import type { SizedPage } from '@shellnote/core'
 import { expect, test, type Page } from './fixtures.js'
 
 type Frame = { id: string; page: string; kids: string[]; next?: string; h: number }
@@ -67,7 +68,7 @@ test('“Add a page” under the last page adds one like it, its size and its pa
   const [one, two] = await page.evaluate(() => {
     const doc = window.__shellnote!.doc
     return doc.pages.map((id) => {
-      const sheet = doc.page[id]!
+      const sheet = doc.page[id] as SizedPage
       return { w: sheet.w, h: sheet.h, bg: sheet.bg ?? null, free: sheet.free.length }
     })
   })
@@ -103,7 +104,10 @@ test('a page goes in between two pages or before the first, and a page is delete
   // Like the page above it: its size and its paper, and nothing on it.
   const [above, added] = await page.evaluate(() => {
     const doc = window.__shellnote!.doc
-    return doc.pages.slice(0, 2).map((id) => ({ w: doc.page[id]!.w, h: doc.page[id]!.h, bg: doc.page[id]!.bg ?? null, free: doc.page[id]!.free.length }))
+    return doc.pages.slice(0, 2).map((id) => {
+      const sheet = doc.page[id] as SizedPage
+      return { w: sheet.w, h: sheet.h, bg: sheet.bg ?? null, free: sheet.free.length }
+    })
   })
   expect(added).toEqual({ ...above, free: 0 })
 

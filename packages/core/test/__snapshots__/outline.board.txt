@@ -1,0 +1,9 @@
+How a post is published
+page 1/1 p1
+n1 pill Start → n2
+f1 frame
+  t1 p Remember the deadline
+n2 box Write the draft → n3
+n3 diamond Passed? → n4 yes, n2 no
+k1 ink (1 stroke) on n3
+n4 pill Publish

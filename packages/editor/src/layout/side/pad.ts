@@ -1,7 +1,7 @@
 // The scratch pad's data: what the AI made, kept per note in the person's
 // browser until it is put into the note, and where it goes then. Apart from the list's drawing (made.tsx), so the
 // commands (pad.put, pad.remove) need nothing drawn.
-import { answerOps, idTaken, MARGIN, newId, type Id } from '@shellnote/core'
+import { answerOps, idTaken, MARGIN, newId, type Id, sizedPage } from '@shellnote/core'
 import type { EditorStore } from '../../store.js'
 import { Shared } from '../../video/state.js'
 
@@ -84,7 +84,7 @@ export function emptyPartInView(store: EditorStore): Room | undefined {
     const seen = Math.min(box.bottom, window.innerHeight) - Math.max(box.top, 0)
     if (seen > 0 && (!best || seen > best.seen)) best = { sheet, seen }
   }
-  const page = best && store.doc.page[best.sheet.dataset.page ?? '']
+  const page = best && sizedPage(store.doc.page[best.sheet.dataset.page ?? ''])
   if (!best || !page) return undefined
   const box = best.sheet.getBoundingClientRect()
   let bottom = MARGIN
@@ -99,7 +99,7 @@ export function emptyPartInView(store: EditorStore): Room | undefined {
 
 /** A room at a point dropped on a page: from there to the right margin, 80 mm down at most. */
 export function roomAt(store: EditorStore, page: Id, x: number, y: number): Room | undefined {
-  const p = store.doc.page[page]
+  const p = sizedPage(store.doc.page[page])
   if (!p) return undefined
   const left = Math.max(MARGIN, Math.min(p.w - MARGIN - 4000, Math.round(x)))
   const top = Math.max(MARGIN, Math.min(p.h - MARGIN - 2000, Math.round(y)))

@@ -15,7 +15,7 @@
 //   from the side named `first`.
 // Which side is `first` must be the same on every device, so the same two
 // versions merge into the same note wherever it is done.
-import type { Block, Doc, Frame, Id, Page } from '../schema/doc.js'
+import { isEndless, MAX_LINKS, type Block, type Doc, type Frame, type Id, type Link, type Page } from '../schema/doc.js'
 import { has } from '../util.js'
 import { same, sameBlock, stable } from './diff.js'
 import { mergeList, mergeText } from './text.js'
@@ -71,6 +71,25 @@ export function idFrom(text: string): Id {
     b = Math.floor(b / 62)
   }
   return id
+}
+
+/**
+ * A node's links, changed on both sides, link by link: one a side made or changed stays, one a side took away goes;
+ * the same link changed on both is the first side's.
+ */
+function mergeLinks(first: readonly Link[] | undefined, second: readonly Link[] | undefined, base: readonly Link[] | undefined, known: boolean): Link[] {
+  const inBase = (node: Id): Link | undefined => base?.find((link) => link.node === node)
+  const out: Link[] = []
+  for (const link of first ?? []) {
+    const other = second?.find((it) => it.node === link.node)
+    if (other) out.push(three(link, other, inBase(link.node), known).value)
+    else if (!known || !same(link, inBase(link.node))) out.push(link)
+  }
+  for (const link of second ?? []) {
+    if (first?.some((it) => it.node === link.node)) continue
+    if (!known || !same(link, inBase(link.node))) out.push(link)
+  }
+  return out.slice(0, MAX_LINKS)
 }
 
 /** One value from three: what only one side changed, or `undefined` in `clash` when both did, differently. */
@@ -184,6 +203,12 @@ export function merge(mine: Doc, theirs: Doc, options: MergeOptions): Merged {
 
     for (const key of new Set([...Object.keys(fw), ...Object.keys(fl)])) {
       if (SKIPPED.has(key)) continue
+      if (key === 'to' && out.type === 'node') {
+        const links = mergeLinks(fw.to as Link[] | undefined, fl.to as Link[] | undefined, b?.to as Link[] | undefined, b !== undefined)
+        if (links.length > 0) out.to = links
+        else delete out.to
+        continue
+      }
       const chosen = three(fw[key], fl[key], b?.[key], b !== undefined)
       if (!chosen.clash) {
         if (chosen.value === undefined) delete out[key]
@@ -251,6 +276,26 @@ export function merge(mine: Doc, theirs: Doc, options: MergeOptions): Merged {
     else delete block[kept.id]
   }
 
+  // A board's links and ink: a link joins two nodes that are there, on one page; ink whose node went, and which
+  // stays because its own side changed it, belongs to no node.
+  const nodeOn = (id: Id, page: Id): boolean => {
+    const target = has(block, id) ? block[id] : undefined
+    return target?.type === 'node' && target.page === page
+  }
+  for (const kept of Object.values(block)) {
+    if (kept.type === 'node' && kept.to !== undefined) {
+      const links = kept.to.filter((link) => link.node !== kept.id && nodeOn(link.node, kept.page))
+      if (links.length === kept.to.length) continue
+      const node: Fields = { ...kept, to: links }
+      if (links.length === 0) delete node.to
+      block[kept.id] = node as Block
+    } else if (kept.type === 'ink' && kept.on !== undefined && !nodeOn(kept.on, kept.page)) {
+      const ink: Fields = { ...kept }
+      delete ink.on
+      block[kept.id] = ink as Block
+    }
+  }
+
   // Pages: one only one side has stays when that side made it, or something on it stays.
   const used = new Set<Id>()
   for (const kept of Object.values(block)) if ('page' in kept) used.add(kept.page)
@@ -261,7 +306,13 @@ export function merge(mine: Doc, theirs: Doc, options: MergeOptions): Merged {
     const l = has(L.page, id) ? L.page[id] : undefined
     if (w && l) {
       const b = base && has(base.page, id) ? base.page[id] : undefined
-      page[id] = { id, w: three(w.w, l.w, b?.w, b !== undefined).value, h: three(w.h, l.h, b?.h, b !== undefined).value, bg: three(w.bg, l.bg, b?.bg, b !== undefined).value, free: [] }
+      const bg = three(w.bg, l.bg, b?.bg, b !== undefined).value
+      // A board's endless page has no size to merge; a page is never endless on one side only.
+      if (isEndless(w) || isEndless(l)) page[id] = { ...w, bg, free: [] }
+      else {
+        const was = b && !isEndless(b) ? b : undefined
+        page[id] = { id, w: three(w.w, l.w, was?.w, was !== undefined).value, h: three(w.h, l.h, was?.h, was !== undefined).value, bg, free: [] }
+      }
     } else if (keepPage(id, w ? W : L)) page[id] = { ...(w ?? l)!, free: [] }
   }
   // A note keeps a page: the first side's first, should every page have gone.

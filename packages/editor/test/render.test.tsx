@@ -1,5 +1,5 @@
 // The read-only views, rendered to HTML in Node with React's server renderer.
-import { parseInline, type Frame, type Page } from '@shellnote/core'
+import { parseInline, type Frame, type SizedPage } from '@shellnote/core'
 import type { ReactElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
@@ -52,7 +52,7 @@ describe('a frame', () => {
 
 describe('a page', () => {
   it('draws its free blocks back to front, each in its box', () => {
-    const out = html(<PageBox page={MIXED.page.w1 as Page} doc={MIXED} assets={{}} />)
+    const out = html(<PageBox page={MIXED.page.w1 as SizedPage} doc={MIXED} assets={{}} />)
     expect(out).toMatch(/^<div class="nw-page" data-page="w1" data-bg="ruled" style="width:210mm;height:297mm">/)
     const order = [...out.matchAll(/data-(?:free="(\w+)"|id="(fa|fb)")/g)].map((m) => m[1] ?? m[2])
     expect(order).toEqual(['fa', 'fb', 'math', 'diagram', 'ink'])

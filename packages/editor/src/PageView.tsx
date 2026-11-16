@@ -10,7 +10,7 @@
 // + that puts a new page there, and the page's delete; under the last page, a round + adds one at the end. In the
 // seamless view (seamless.ts) the same pages are one sheet: no gaps and no page buttons, the margins between two pages
 // folded away, a faint tick at the side where a page ends, and room under the last page to write on.
-import { idTaken, newId, type Doc, type FreeBlock, type Here, type Id, type Selection } from '@shellnote/core'
+import { idTaken, newId, type Doc, type FreeBlock, type Here, type Id, type Selection, sized, sizedPage } from '@shellnote/core'
 import { Plus, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -76,7 +76,7 @@ function blockUnder(doc: Doc, target: Element): Id | undefined {
 /** A rectangle on the screen as an area of the page drawn in `sheet`, kept on the page. */
 function areaOf(doc: Doc, pageId: Id, sheet: Element, box: ScreenRect): Area {
   const rect = sheet.getBoundingClientRect()
-  const page = doc.page[pageId]!
+  const page = sized(doc.page[pageId]!)
   const x = (clientX: number): number => Math.round(Math.min(page.w, Math.max(0, ((clientX - rect.left) / rect.width) * page.w)))
   const y = (clientY: number): number => Math.round(Math.min(page.h, Math.max(0, ((clientY - rect.top) / rect.height) * page.h)))
   return { page: pageId, x: x(box.left), y: y(box.top), w: x(box.right) - x(box.left), h: y(box.bottom) - y(box.top) }
@@ -88,7 +88,7 @@ function areaOf(doc: Doc, pageId: Id, sheet: Element, box: ScreenRect): Area {
  */
 function insertPage(store: EditorStore, at: number, desk: HTMLElement | null): void {
   const doc = store.doc
-  const like = doc.page[doc.pages[Math.max(0, at - 1)]!]!
+  const like = sized(doc.page[doc.pages[Math.max(0, at - 1)]!]!)
   const id = newId((candidate) => idTaken(store.doc, candidate))
   store.apply([{ op: 'page', add: { id, w: like.w, h: like.h, bg: like.bg, free: [] }, at }], { origin: 'toolbar' })
   requestAnimationFrame(() => desk?.querySelector(`.nw-page-slot[data-index="${at}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }))
@@ -100,7 +100,21 @@ function insertPage(store: EditorStore, at: number, desk: HTMLElement | null): v
  * and asks for a redraw only when the band changes, so scrolling inside a band costs no render. With no store the note
  * is only shown; with one, `render` gives each block its editor, and the effects below take pictures and presses.
  */
-export function PageView({ doc: given, zoom, onZoom, assets = NO_ASSETS, store, topSpace = 0, heading }: PageViewProps) {
+export function PageView(props: PageViewProps) {
+  const { store, doc: given } = props
+  const doc = useSyncExternalStore(store?.subscribe ?? NO_STORE, () => (store ? store.doc : given))
+  // A board is one endless page, which the view of pages cannot draw: it is said, never drawn wrong.
+  if (doc.kind === 'board') {
+    return (
+      <p className="nw-board" role="note">
+        This note is a board. This version of ShellNote cannot show boards yet.
+      </p>
+    )
+  }
+  return <Pages {...props} />
+}
+
+function Pages({ doc: given, zoom, onZoom, assets = NO_ASSETS, store, topSpace = 0, heading }: PageViewProps) {
   const doc = useSyncExternalStore(store?.subscribe ?? NO_STORE, () => (store ? store.doc : given))
   const pictures = useSyncExternalStore(store?.assets.subscribe ?? NO_STORE, () => store?.assets.snapshot() ?? assets)
   const render = useCallback<FreeRenderer>(
@@ -118,7 +132,7 @@ export function PageView({ doc: given, zoom, onZoom, assets = NO_ASSETS, store, 
   // In the seamless view, what of each page is folded away; each slot is as tall as what shows.
   const folds = useMemo(() => (seamless ? foldsOf(doc) : undefined), [seamless, doc])
   const gap = seamless ? 0 : PAGE_GAP
-  const heights = doc.pages.map((id, i) => px(doc.page[id]!.h - (folds ? folds[i]!.top + folds[i]!.bottom : 0), zoom))
+  const heights = doc.pages.map((id, i) => px(sized(doc.page[id]!).h - (folds ? folds[i]!.top + folds[i]!.bottom : 0), zoom))
   const key = heights.join(',')
   // Which pages to draw, worked out as the view is drawn from where it was last scrolled to, so
   // a page just added near the screen is drawn at once: text pushed onto it can take the caret there.
@@ -206,7 +220,7 @@ export function PageView({ doc: given, zoom, onZoom, assets = NO_ASSETS, store, 
       if (!event.defaultPrevented && carriesMade(event)) {
         event.preventDefault()
         const sheet = (event.target as Element).closest<HTMLElement>('.nw-page')
-        const page = sheet?.dataset.page === undefined ? undefined : store.doc.page[sheet.dataset.page]
+        const page = sheet?.dataset.page === undefined ? undefined : sizedPage(store.doc.page[sheet.dataset.page])
         if (!sheet || !page) return
         const rect = sheet.getBoundingClientRect()
         const room = roomAt(store, page.id, ((event.clientX - rect.left) / rect.width) * page.w, ((event.clientY - rect.top) / rect.height) * page.h)
@@ -217,7 +231,7 @@ export function PageView({ doc: given, zoom, onZoom, assets = NO_ASSETS, store, 
       if (event.defaultPrevented || !carriesFiles(event)) return
       event.preventDefault()
       const sheet = (event.target as Element).closest<HTMLElement>('.nw-page')
-      const page = sheet?.dataset.page === undefined ? undefined : store.doc.page[sheet.dataset.page]
+      const page = sheet?.dataset.page === undefined ? undefined : sizedPage(store.doc.page[sheet.dataset.page])
       const files = pictureFiles(event.dataTransfer)
       if (!sheet || !page || files.length === 0) return
       const rect = sheet.getBoundingClientRect()
@@ -430,7 +444,7 @@ export function PageView({ doc: given, zoom, onZoom, assets = NO_ASSETS, store, 
     }
     event.preventDefault()
     const at = areaOf(store.doc, pageId, sheet, { left: event.clientX, top: event.clientY, right: event.clientX, bottom: event.clientY })
-    setDraft({ key: ++drafts.current, page: pageId, ...frameSpotAt(store.doc.page[pageId]!, at.x, at.y) })
+    setDraft({ key: ++drafts.current, page: pageId, ...frameSpotAt(sized(store.doc.page[pageId]!), at.x, at.y) })
   }
 
   // The box of a Select, kept on the page until something else is selected.
@@ -452,12 +466,12 @@ export function PageView({ doc: given, zoom, onZoom, assets = NO_ASSETS, store, 
             gap,
             '--nw-page-gap': `${PAGE_GAP}px`,
             '--nw-top-space': `${lead}px`,
-            ...(seamless ? { '--nw-sheet-w': `${px(doc.page[doc.pages[0]!]!.w, zoom)}px` } : {}),
+            ...(seamless ? { '--nw-sheet-w': `${px(sized(doc.page[doc.pages[0]!]!).w, zoom)}px` } : {}),
           } as CSSProperties
         }
       >
         {doc.pages.map((id, i) => {
-          const page = doc.page[id]!
+          const page = sized(doc.page[id]!)
           const shown = i >= band.first && i <= band.last
           const folded = folds ? px(folds[i]!.top, zoom) : 0
           return (
@@ -531,6 +545,6 @@ export function PageView({ doc: given, zoom, onZoom, assets = NO_ASSETS, store, 
 
 /** Under the last page of the seamless view, a third of a page of the same paper, to write on: what is put there goes on a new page. */
 function SpareRoom({ doc, zoom }: { doc: Doc; zoom: number }) {
-  const last = doc.page[doc.pages[doc.pages.length - 1]!]!
+  const last = sized(doc.page[doc.pages[doc.pages.length - 1]!]!)
   return <div className="nw-spare" data-for={last.id} data-bg={last.bg} aria-hidden style={{ width: px(last.w, zoom), height: px(Math.round(last.h / 3), zoom), '--nw-zoom': zoom } as CSSProperties} />
 }

@@ -171,6 +171,13 @@
   overflow: auto;
   background: var(--ui-desk);
 }
+/* A board, where the view of pages would be. */
+.nw-board {
+  margin: 0;
+  padding: 4rem 1.5rem;
+  text-align: center;
+  color: var(--nw-gray);
+}
 /* The Select tool draws a box over anything on the page, so the pointer is a crosshair everywhere and no text is picked up. */
 .nw-desk[data-tool='select'],
 .nw-desk[data-tool='select'] * {

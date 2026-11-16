@@ -14,13 +14,13 @@ function withPicture(): Doc {
 }
 
 describe('file format version 5', () => {
-  it('is the version written', () => {
-    expect(SCHEMA_VERSION).toBe(5)
+  it('is followed by version 6, which only adds (the board)', () => {
+    expect(SCHEMA_VERSION).toBe(6)
   })
 
   it('opens a version 4 note unchanged but for its version', () => {
     const old = { ...structuredClone(PHYSICS), v: 4 }
-    expect(parseDoc(old)).toEqual({ ...PHYSICS, v: 5 })
+    expect(parseDoc(old)).toEqual({ ...PHYSICS, v: SCHEMA_VERSION })
   })
 
   it('writes an older note’s file with nothing new in it', () => {
@@ -45,7 +45,7 @@ describe('file format version 5', () => {
   })
 
   it('refuses a kind or a view it does not know', () => {
-    expectError(() => apply(PHYSICS, [{ op: 'update', id: PHYSICS.id, set: { kind: 'board' } }]), 'bad_shape')
+    expectError(() => apply(PHYSICS, [{ op: 'update', id: PHYSICS.id, set: { kind: 'poster' } }]), 'bad_shape')
     expectError(() => apply(PHYSICS, [{ op: 'update', id: PHYSICS.id, set: { view: 'scroll' } }]), 'bad_shape')
   })
 

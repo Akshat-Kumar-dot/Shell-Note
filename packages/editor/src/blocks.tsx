@@ -3,7 +3,7 @@
 // so the editable frames produce the same attributes and look the same.
 // Diagrams are drawn by Mermaid (diagram.ts), handwriting by ink/render.ts;
 // math is a placeholder until its phase.
-import { listNumbering, parseInline, type AnyColor, type Block, type ChildBlock, type Doc, type Frame, type FreeBlock, type Inline, type InkBlock, type ListMark, type Page, type TableBlock, type TextBlock } from '@shellnote/core'
+import { listNumbering, parseInline, type AnyColor, type Block, type ChildBlock, type Doc, type Frame, type FreeBlock, type Inline, type InkBlock, type ListMark, type TableBlock, type TextBlock, sizedPage, type SizedPage } from '@shellnote/core'
 import { Fragment, memo, useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { colourProps, isColourCode } from './colours.js'
 import { drawDiagram } from './diagram.js'
@@ -329,7 +329,10 @@ export function PlacedView({ block, doc, assets }: { block: Exclude<FreeBlock, {
     case 'image':
       return <ImageView block={block} doc={doc} assets={assets} />
     case 'ink':
-      return <InkView block={block} page={doc.page[block.page] ?? A4} />
+      return <InkView block={block} page={sizedPage(doc.page[block.page]) ?? A4} />
+    case 'node':
+      // A node belongs to a board, which a page view never draws.
+      return null
   }
 }
 
@@ -337,7 +340,7 @@ export function PlacedView({ block, doc, assets }: { block: Exclude<FreeBlock, {
  * One page at its real size, with its free blocks drawn back to front, by
  * `render` when it is given; then `children`, such as a Select box, on top.
  */
-export function PageBox({ page, doc, assets, render, children }: { page: Page; doc: Doc; assets: AssetUrls; render?: FreeRenderer | undefined; children?: ReactNode }) {
+export function PageBox({ page, doc, assets, render, children }: { page: SizedPage; doc: Doc; assets: AssetUrls; render?: FreeRenderer | undefined; children?: ReactNode }) {
   return (
     <div className="nw-page" data-page={page.id} data-bg={page.bg} style={{ width: mm(page.w), height: mm(page.h) }}>
       {page.free.map((id) => {

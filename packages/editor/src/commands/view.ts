@@ -1,6 +1,6 @@
 // The view, the panels and choosing blocks, as commands (app control, step
 // 3a): each does what its button did, and the buttons now call them.
-import { blockDetail, blockOf, blocksList, type Box, type Doc, type PenButton, type TypingButton } from '@shellnote/core'
+import { blockDetail, blockOf, blocksList, type Box, type Doc, type PenButton, type TypingButton, sized, sizedPage } from '@shellnote/core'
 import { clampZoom, stepZoom } from '../geometry.js'
 import { placesReset, putButton, resetCustom, setAppLook, type AppLook } from '../layout/custom.js'
 import { dockPanel, workspace as layout, resetWorkspace, setBar, setSideOpen, type BarId } from '../layout/state.js'
@@ -113,7 +113,7 @@ export function defineView(commands: Commands): void {
     const doc = note.store.doc
     const pageId = doc.pages[(page as number) - 1]
     if (pageId === undefined) throw new Error(`The note has ${doc.pages.length} ${doc.pages.length === 1 ? 'page' : 'pages'}: no page ${String(page)}.`)
-    const size = doc.page[pageId]!
+    const size = sized(doc.page[pageId]!)
     const units = (mm: unknown): number => Math.round((mm as number) * 100)
     const left = Math.min(size.w - 1, units(x))
     const top = Math.min(size.h - 1, units(y))
@@ -153,7 +153,7 @@ export function drawnBoxes(doc: Doc): Map<string, Box & { page: string }> {
   if (typeof document === 'undefined') return boxes
   for (const pageId of doc.pages) {
     const sheet = document.querySelector<HTMLElement>(`.nw-page[data-page="${CSS.escape(pageId)}"]`)
-    const page = doc.page[pageId]
+    const page = sizedPage(doc.page[pageId])
     if (!sheet || !page) continue
     const drawn = sheet.getBoundingClientRect()
     if (drawn.width === 0) continue

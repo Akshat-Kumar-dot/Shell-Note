@@ -4,7 +4,7 @@
 // by line at the page's own sizes, with its marks (textLayout.ts), pictures
 // from their bytes, tables as grids, handwriting as its strokes, and a diagram
 // as a box: enough to know a page at a glance.
-import { toRuns, type Block, type Color, type Doc, type TextBlock } from '@shellnote/core'
+import { sizedPage, toRuns, type Block, type Color, type Doc, type TextBlock } from '@shellnote/core'
 import { NAMED_HEX } from '@shellnote/editor'
 import { fontStyle, layoutRuns, LINE, SIZE_FACTOR, tableColumns, type Line, type Look } from './textLayout.js'
 
@@ -35,9 +35,12 @@ export async function drawCover(picture: Blob): Promise<Blob | undefined> {
   }
 }
 
-/** Draw page 1 of a note as a small picture. Resolves to undefined when the browser cannot draw one. */
+/**
+ * Draw page 1 of a note as a small picture. Resolves to undefined when the browser cannot draw one, and for a board,
+ * whose endless page has no first sheet to draw.
+ */
 export async function drawThumbnail(doc: Doc, blob: (hash: string) => Blob | undefined): Promise<Blob | undefined> {
-  const page = doc.page[doc.pages[0] ?? '']
+  const page = sizedPage(doc.page[doc.pages[0] ?? ''])
   if (!page) return undefined
   const scale = THUMB_WIDTH / page.w
   const canvas = document.createElement('canvas')

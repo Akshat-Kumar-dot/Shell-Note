@@ -1,6 +1,6 @@
 # File format
 
-Version 5. Written and read by `pack`, `unpack`, `toFiles` and `fromFiles` in [packages/core/src/io/container.ts](../packages/core/src/io/container.ts).
+Version 6. Written and read by `pack`, `unpack`, `toFiles` and `fromFiles` in [packages/core/src/io/container.ts](../packages/core/src/io/container.ts).
 
 ## Layout
 
@@ -21,7 +21,7 @@ Anything else inside a zip is skipped and never read.
 
 ```json
 {
-  "v": 5,
+  "v": 6,
   "id": "d1",
   "title": "Physics lecture 4",
   "kind": "mixed",
@@ -45,12 +45,12 @@ Anything else inside a zip is skipped and never read.
 | `v` | Schema version. Every schema change raises it and ships a migration. |
 | `id` | The document's id. Ids are unique across the document, its pages and its blocks. |
 | `title` | The title. |
-| `kind` | From version 5, and only when set: what the note is for, `text`, `sketch` or `mixed`. It chooses the tools shown first, the paper of new pages and the note's picture in the library; it never changes what the note holds. Missing: `mixed`. |
+| `kind` | From version 5, and only when set: what the note is for, `text`, `sketch` or `mixed`. It chooses the tools shown first, the paper of new pages and the note's picture in the library; it never changes what the note holds. Missing: `mixed`. From version 6 also `board`, which is made as a board and stays one (see Boards). |
 | `view` | From version 5, and only when set: how the pages are shown, `pages` (one below another, with a gap) or `seamless` (one sheet with no breaks, the margins between two pages folded away). The pages are the same either way. Missing: `pages`. |
 | `cover` | From version 5, and only when set: the hash of the note's cover picture, one of its own assets. |
 | `rev` | Goes up by one with each change. Edits from an AI or MCP name the `rev` they were based on. |
 | `pages` | Page order. |
-| `page` | Each page: size in units of 0.01 mm (A4 is 21000 × 29700), background, and `free`, its free blocks from back to front. |
+| `page` | Each page: size in units of 0.01 mm (A4 is 21000 × 29700), background, and `free`, its free blocks from back to front. A board's one page has `"endless": true` in place of a size (see Boards). |
 | `asset` | Metadata of each image, keyed by content hash. |
 | `rules` | The user's notebook rules, one short line each. |
 | `pen` | From version 3, and only when the note sets any: the pen switches this note sets for itself, over each person's own defaults (see Ink). |
@@ -134,6 +134,7 @@ An empty caption is removed rather than stored as `""`.
 | 3 | 13 October 2026 | The pen: a stroke may have a pen kind, a colour code, the widths `xs` and `xl`, tilt and a snapped shape; a note may hold its own pen switches, `pen`. Nothing in version 2 changes meaning. |
 | 4 | 25 October 2026 | Other programs written beside: `programs` on the document, each with its file and title and the words of each place seen; a stroke may keep its moment beside one (`pm`: which program, when, its place, and a small picture). Nothing in version 3 changes meaning. |
 | 5 | 15 November 2026 | A note may say what it is for (`kind`), how its pages are shown (`view`) and which picture is its cover (`cover`). A note without them is a mixed note shown as pages, as before. Nothing in version 4 changes meaning. |
+| 6 | 16 November 2026 | The board: a kind of note with one endless page; `node` blocks, each with the nodes it points to (`to`); ink that belongs to a node (`on`). Nothing in version 5 changes meaning. |
 | 2 | 10 October 2026 | Words may be underlined, `[words]{.underline}`; written small below or above the line, `H[2]{.sub}O`, `x[2]{.sup}`; or given a size or font of their own, `[words]{size=l}`, `[words]{font=lora}` (Pandoc's span form). A table may hold its column widths, its width and its look (`cols`, `width`, `look`). |
 
 Opening a file of an older version moves it to the current one in memory (`migrate` in [packages/core/src/schema/migrate.ts](../packages/core/src/schema/migrate.ts)); it is saved in the current version. From 1 to 2, text that only looked like one of the new spans, which version 1 read as plain text, is written again with its brackets escaped, so it still reads as text; all other text keeps its exact form. An app refuses a file of a newer version than its own, saying to update the app.
@@ -166,6 +167,36 @@ A table block sits in a frame and holds its cells row by row:
 People size a table and choose its look; the AI does not. A table's width is `width`, not `w`, which on a block placed on a page is a size in 0.01 mm.
 
 The Markdown export writes a table as a pipe table, the same form a model writes one in; widths and looks have no Markdown form and are left out.
+
+## Boards
+
+A board (version 6) is a note of kind `board`. It has one page, and that page is endless:
+
+```json
+"p1": {"id":"p1","endless":true,"bg":"dots","free":["n1","n2","k1"]}
+```
+
+An endless page has no `w` and no `h`. Blocks lie on it at any whole number of 0.01 mm, below zero too, and nothing on it is ever moved to a next page. Only a board has an endless page, a board has no second page, and a note never changes to or from a board.
+
+A flowchart on a board is made of `node` blocks. A node is placed on the page like a picture, and holds a shape, its words, and the nodes it points to:
+
+```json
+"n1": {"id":"n1","r":1,"type":"node","page":"p1","x":0,"y":0,"w":4000,"h":1600,"shape":"pill","md":"Start","to":[{"node":"n2"}]},
+"n2": {"id":"n2","r":2,"type":"node","page":"p1","x":-500,"y":2600,"w":5000,"h":2800,"shape":"diamond","md":"Passed?","color":"blue","to":[{"node":"n3","label":"yes"},{"node":"n1","label":"no","path":"curved"}]}
+```
+
+| Field | Meaning |
+|---|---|
+| `shape` | One of the fourteen shapes a Mermaid flowchart writes with brackets: `box`, `round`, `pill`, `subroutine`, `cylinder`, `circle`, `double-circle`, `flag`, `diamond`, `hexagon`, `slant`, `slant-back`, `trapezoid`, `trapezoid-down`. |
+| `md` | The node's words: inline Markdown, as a text block's. |
+| `color` | Only when set: a named colour or a colour code, as on text. |
+| `to` | Only when the node points somewhere: its links, at most 64. Each names a `node` of the same page, never the node itself, and each node once. |
+
+A link is kept on the node it leaves, so it has no id of its own: it is named by its two nodes. Besides `node` it may hold `label` (its words: one line, at most 200 characters), `path` (`straight` or `curved`; missing: in right angles), `line` (`dotted` or `thick`; missing: a plain line) and `head` (`none`; missing: an arrow). The path itself is never stored: it is drawn from the two nodes each time, so a node that moves brings its links.
+
+No operation is special to a board. A node is added, moved and removed like any block placed on a page; its words are spliced like a paragraph's; a link is made or taken away by an `update` of its node's `to`. Removing a node also takes the links other nodes had to it and the ink written on it, and undo puts them back.
+
+An ink block on a board may hold `on`, the id of the node it was written on: it moves with that node and goes when the node does. Everything else on a board is a block as on any page: a box of text is a frame with its paragraphs, a drawing is ink, a picture is a picture.
 
 ## Ink
 

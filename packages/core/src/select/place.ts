@@ -1,6 +1,6 @@
 // Placement rules. The AI never outputs coordinates or
 // sizes: code finds a place for a free block.
-import type { Doc, FreeBlock, Id } from '../schema/doc.js'
+import { isEndless, type Doc, type FreeBlock, type Id } from '../schema/doc.js'
 import { MARGIN } from '../units.js'
 
 /** Space left between blocks placed one under another: 5 mm. */
@@ -16,7 +16,8 @@ export interface Spot {
 
 /**
  * The first free space at or below `y` in the column [x, x + w) of a page,
- * tall enough for `h`. Undefined when it would run past the bottom margin.
+ * tall enough for `h`. Undefined when it would run past the bottom margin. A board's endless page has no margins:
+ * there is always room further down.
  */
 export function freeSpace(doc: Doc, page: Id, x: number, y: number, w: number, h: number, ignore: Id[] = []): Spot | undefined {
   const sheet = doc.page[page]
@@ -26,7 +27,8 @@ export function freeSpace(doc: Doc, page: Id, x: number, y: number, w: number, h
     .map((id) => doc.block[id] as FreeBlock)
     .filter((b) => b.x < x + w && x < b.x + b.w)
     .sort((a, b) => a.y - b.y)
-  let top = Math.max(y, MARGIN)
+  const endless = isEndless(sheet)
+  let top = endless ? y : Math.max(y, MARGIN)
   for (let moved = true; moved; ) {
     moved = false
     for (const b of others) {
@@ -38,7 +40,7 @@ export function freeSpace(doc: Doc, page: Id, x: number, y: number, w: number, h
       }
     }
   }
-  return top + h <= sheet.h - MARGIN ? { page, x, y: top, w, h } : undefined
+  return endless || top + h <= sheet.h - MARGIN ? { page, x, y: top, w, h } : undefined
 }
 
 /**

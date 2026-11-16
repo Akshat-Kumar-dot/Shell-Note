@@ -6,7 +6,7 @@
 // boxes the editor measured where the page is drawn (core has no DOM).
 import type { Box } from '../ink/geometry.js'
 import { wordsOf } from '../command/page.js'
-import type { Block, Doc } from '../schema/doc.js'
+import { isEndless, type Block, type Doc } from '../schema/doc.js'
 
 /** A block's box as drawn, and the page it is drawn on (a frame's text can flow on to the next page). */
 export type Drawn = Box & { page?: string }
@@ -32,6 +32,8 @@ export function kindOf(block: Block): string {
       return 'handwriting'
     case 'table':
       return 'table'
+    case 'node':
+      return 'step'
     case 'frame':
       return 'text frame'
   }
@@ -128,7 +130,9 @@ function boxOf(block: Block, drawn: ReadonlyMap<string, Drawn> | undefined): Box
 export function pageFacts(doc: Doc, page: number, drawn?: ReadonlyMap<string, Drawn>): PageFacts {
   if (page < 1 || page > doc.pages.length) throw new Error(`The note has ${doc.pages.length} ${doc.pages.length === 1 ? 'page' : 'pages'}: no page ${page}.`)
   const id = doc.pages[page - 1]!
-  const size = doc.page[id] ?? { w: 21000, h: 29700 }
+  const own = doc.page[id]
+  if (own && isEndless(own)) throw new Error('This note is a board: its one page is endless, with no top, bottom or edges to place by.')
+  const size = own ?? { w: 21000, h: 29700 }
   // On this page: what is placed on it (frames and free blocks), top to bottom then left to right.
   const placed = Object.values(doc.block)
     .filter((block) => 'page' in block && block.page === id)

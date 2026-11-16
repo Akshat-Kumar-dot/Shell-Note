@@ -2,7 +2,7 @@
 // thing, and every block sits in exactly one place. apply() keeps these rules
 // one operation at a time; this checks a document read from outside (a file,
 // another program) and backs the property tests.
-import type { Block, Doc } from '../schema/doc.js'
+import { isEndless, type Block, type Doc } from '../schema/doc.js'
 import { has } from '../util.js'
 
 const MAX_PROBLEMS = 50
@@ -73,6 +73,25 @@ export function structureProblems(doc: Doc): string[] {
     }
     if (block.type === 'image' && !has(doc.asset, block.asset)) {
       problem(`image ${block.id} uses asset ${block.asset}, which does not exist`)
+    }
+  }
+
+  // A board (version 6) is one endless page, and only a board has one. Its nodes sit on it; a link joins two nodes of
+  // the page; ink written on a node names one of its page.
+  const endless = doc.pages.filter((id) => has(doc.page, id) && isEndless(doc.page[id]!))
+  if (doc.kind === 'board' && (doc.pages.length !== 1 || endless.length !== 1)) problem('a board has one page, and it is endless')
+  if (doc.kind !== 'board' && endless.length > 0) problem(`page ${endless[0]} is endless, and the note is not a board`)
+  const nodeOn = (id: string, page: string): boolean => {
+    const target = has(doc.block, id) ? doc.block[id] : undefined
+    return target?.type === 'node' && target.page === page
+  }
+  for (const block of Object.values(doc.block)) {
+    if (block.type === 'node') {
+      const page = has(doc.page, block.page) ? doc.page[block.page] : undefined
+      if (page && !isEndless(page)) problem(`node ${block.id} is on page ${block.page}, which is not a board's endless page`)
+      for (const link of block.to ?? []) if (!nodeOn(link.node, block.page)) problem(`node ${block.id} points to ${link.node}, which is not a node of its page`)
+    } else if (block.type === 'ink' && block.on !== undefined && !nodeOn(block.on, block.page)) {
+      problem(`ink ${block.id} is on ${block.on}, which is not a node of its page`)
     }
   }
 

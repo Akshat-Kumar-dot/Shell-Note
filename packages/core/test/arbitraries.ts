@@ -3,7 +3,7 @@
 // the document as it is at that moment. Ids are counted, not random, so a
 // failing case replays and shrinks the same way every time.
 import fc from 'fast-check'
-import { apply, idTaken, type Block, type Doc, type Op } from '../src/index.js'
+import { apply, idTaken, isEndless, type Block, type Doc, type Op } from '../src/index.js'
 import { has, splitsCharacter } from '../src/util.js'
 
 export interface Seed {
@@ -34,6 +34,7 @@ const ROLES = ['p', 'h1', 'h2', 'h3', 'li', 'oli', 'todo', 'quote'] as const
 const COLORS = ['ink', 'gray', 'red', 'orange', 'yellow', 'green', 'blue', 'purple'] as const
 const SIZES = ['s', 'm', 'l', 'xl'] as const
 const BGS = ['blank', 'ruled', 'grid', 'dots'] as const
+const SHAPES = ['box', 'round', 'pill', 'subroutine', 'cylinder', 'circle', 'double-circle', 'flag', 'diamond', 'hexagon', 'slant', 'slant-back', 'trapezoid', 'trapezoid-down'] as const
 
 function pick<T>(list: readonly T[], n: number): T | undefined {
   return list.length === 0 ? undefined : list[n % list.length]
@@ -90,7 +91,17 @@ export function planOp(namer: Namer, doc: Doc, s: Seed): Op | undefined {
     return { page: page.id, x: pos(s.b), y: pos(s.c), w: len(s.d), h: len(s.d + s.a) }
   }
 
-  switch (s.kind % 15) {
+  // A board's own: its endless page, and the nodes on it.
+  const board = pages.find(isEndless)
+  const nodes = blocks.filter((b) => b.type === 'node')
+  /** Links from a seed to up to three other nodes, each once; a label, a path and a line on some. */
+  const linksFrom = (self: string | undefined): Record<string, unknown>[] => {
+    const others = nodes.filter((n) => n.id !== self)
+    const chosen = [...new Set([s.a, s.b, s.c].slice(0, s.d % 4).map((n) => pick(others, n)?.id))].filter((id): id is string => id !== undefined)
+    return chosen.map((id, i) => ({ node: id, ...(s.flag && i === 0 && s.text.trim() !== '' ? { label: s.text.replace(/[\r\n]/gu, ' ') } : {}), ...(i === 1 ? { path: s.c % 2 === 0 ? 'curved' : 'straight' } : {}), ...(i === 2 ? { line: 'dotted', head: 'none' } : {}) }))
+  }
+
+  switch (s.kind % 18) {
     case 0: {
       const frame = pick(frames, s.a)
       if (!frame) return undefined
@@ -139,14 +150,15 @@ export function planOp(namer: Namer, doc: Doc, s: Seed): Op | undefined {
     }
     case 6: {
       const page = pick(pages, s.a)!
-      const set = pick([{ bg: pick(BGS, s.c)! }, { w: 1 + len(s.c) }, { h: 1 + len(s.d) }], s.b)!
+      // An endless page has no size to set.
+      const set = isEndless(page) ? { bg: pick(BGS, s.c)! } : pick([{ bg: pick(BGS, s.c)! }, { w: 1 + len(s.c) }, { h: 1 + len(s.d) }], s.b)!
       return { op: 'update', id: page.id, set }
     }
     case 7:
       return { op: 'update', id: doc.id, set: s.flag ? { title: s.text } : { rules: s.text ? [s.text] : [] } }
     case 8: {
       const block = pick(
-        blocks.filter((b) => b.type !== 'frame' && b.type !== 'ink'),
+        blocks.filter((b) => b.type !== 'frame' && b.type !== 'ink' && b.type !== 'node'),
         s.a,
       )
       const frame = pick(frames, s.b)
@@ -171,7 +183,7 @@ export function planOp(namer: Namer, doc: Doc, s: Seed): Op | undefined {
         { id: doc.id, field: 'title', text: doc.title },
       ]
       for (const b of blocks) {
-        if (b.type === 'text') targets.push({ id: b.id, field: 'md', text: b.md })
+        if (b.type === 'text' || b.type === 'node') targets.push({ id: b.id, field: 'md', text: b.md })
         if (b.type === 'math') targets.push({ id: b.id, field: 'tex', text: b.tex })
         if (b.type === 'diagram') targets.push({ id: b.id, field: 'src', text: b.src })
         if (b.type === 'image' || b.type === 'table') targets.push({ id: b.id, field: 'caption', text: b.caption ?? '' })
@@ -198,6 +210,8 @@ export function planOp(namer: Namer, doc: Doc, s: Seed): Op | undefined {
       const page = pick(pages, s.a)!
       switch (s.b % 3) {
         case 0: {
+          // A board is one page.
+          if (board) return undefined
           const added = { id: namer.id(doc), w: 21000, h: 29700, bg: pick(BGS, s.c)!, free: [] }
           return { op: 'page', add: added, at: s.d % (pages.length + 1) }
         }
@@ -211,6 +225,30 @@ export function planOp(namer: Namer, doc: Doc, s: Seed): Op | undefined {
       const unused = assets.filter((hash) => !blocks.some((b) => b.type === 'image' && b.asset === hash))
       if (s.flag && unused.length > 0) return { op: 'asset', hash: pick(unused, s.a)!, meta: null }
       return { op: 'asset', hash: namer.hash(doc), meta: { mime: 'image/png', w: 1 + len(s.c), h: 1 + len(s.d), bytes: s.a } }
+    }
+    case 15: {
+      // A node, added with its links: to nodes there already.
+      if (!board) return undefined
+      const to = linksFrom(undefined)
+      const block = { id: namer.id(doc), r: 0, type: 'node', page: board.id, x: pos(s.b), y: pos(s.c), w: len(s.d), h: len(s.d + s.a), shape: pick(SHAPES, s.a)!, md: s.text, ...(s.c % 3 === 0 ? { color: pick(COLORS, s.d)! } : {}), ...(to.length > 0 ? { to } : {}) } as Block
+      return { op: 'add', block }
+    }
+    case 16: {
+      // A node's links, set whole: none takes them away.
+      const node = pick(nodes, s.a)
+      if (!node) return undefined
+      const to = linksFrom(node.id)
+      return { op: 'update', id: node.id, set: { to: to.length > 0 ? to : s.flag ? [] : null } }
+    }
+    case 17: {
+      // Ink given to a node, or taken from it.
+      const ink = pick(
+        blocks.filter((b) => b.type === 'ink' && board !== undefined && b.page === board.id),
+        s.a,
+      )
+      const node = pick(nodes, s.b)
+      if (!ink) return undefined
+      return { op: 'update', id: ink.id, set: { on: node && !s.flag ? node.id : null } }
     }
     default: {
       const frame = pick(frames, s.a)
@@ -260,6 +298,8 @@ function fieldsFor(block: Block, s: Seed, assets: string[]): Record<string, unkn
       return [...size, { text: optional(s.text) }]
     case 'table':
       return [{ rows: cellsFrom(s) }, { head: s.flag ? null : true }, { alt: optional(s.text) }, { caption: optional(s.text) }]
+    case 'node':
+      return [...size, { shape: pick(SHAPES, s.c) }, { md: s.text }, { color: s.flag ? null : pick(COLORS, s.d) }]
   }
 }
 

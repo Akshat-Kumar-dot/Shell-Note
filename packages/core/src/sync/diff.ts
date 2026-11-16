@@ -4,7 +4,7 @@
 // on each device by its own apply(), so two notes are the same when everything
 // else in them is.
 import { apply, type Applied } from '../apply.js'
-import type { Block, Doc, Id } from '../schema/doc.js'
+import { isEndless, type Block, type Doc, type Id } from '../schema/doc.js'
 import type { Op } from '../schema/ops.js'
 import { has } from '../util.js'
 import { ValidationError } from '../validate/errors.js'
@@ -62,8 +62,9 @@ const FIELDS: Record<Block['type'], readonly string[]> = {
   math: ['tex', 'value'],
   image: ['asset', 'alt', 'caption'],
   diagram: ['src'],
-  ink: ['text'],
+  ink: ['text', 'on'],
   table: ['rows', 'head', 'alt', 'caption', 'cols', 'width', 'look'],
+  node: ['shape', 'md', 'color', 'to'],
 }
 
 /** `set` for an `update`: each field that differs, null for one that is gone. */
@@ -139,11 +140,23 @@ export function difference(from: Doc, to: Doc): Op[] {
     const list = listOf(block)
     list.splice(list.indexOf(block.id), 1)
   }
+  /** The ink that belongs to a node, as the operations so far leave it: a node taken out takes it along. */
+  const onNode = new Map<Id, Id>()
   const drop = (id: Id): void => {
     const block = here.get(id)
     if (!block) return
     take(block)
     for (const kid of kids.get(id) ?? []) here.delete(kid)
+    if (block.type === 'node') {
+      for (const [ink, node] of onNode) {
+        const held = node === id ? here.get(ink) : undefined
+        if (!held) continue
+        take(held)
+        here.delete(ink)
+        onNode.delete(ink)
+      }
+    }
+    onNode.delete(id)
     kids.delete(id)
     here.delete(id)
     ops.push({ op: 'remove', id })
@@ -162,6 +175,14 @@ export function difference(from: Doc, to: Doc): Op[] {
     if (block.type !== 'frame' || block.next === undefined) continue
     const after = to.block[block.id]
     if (!after || after.type !== 'frame' || after.next !== block.next) ops.push({ op: 'update', id: block.id, set: { next: null } })
+  }
+  // Ink that leaves its node, or goes to another, is let go of now and given its node last: a node taken out takes
+  // the ink still on it, and this ink stays.
+  for (const block of Object.values(from.block)) {
+    if (block.type !== 'ink' || block.on === undefined) continue
+    const after = to.block[block.id]
+    if (after?.type === 'ink' && after.on !== block.on) ops.push({ op: 'update', id: block.id, set: { on: null } })
+    else onNode.set(block.id, block.on)
   }
   // A block never changes its type: one that did is another block with the same id, taken out and added again.
   for (const block of Object.values(from.block)) {
@@ -262,7 +283,8 @@ export function difference(from: Doc, to: Doc): Op[] {
   for (const id of to.pages) {
     const before = from.page[id]
     if (!before) continue
-    const set = fieldsToSet(before, to.page[id]!, ['w', 'h', 'bg'])
+    // A board's endless page has no size.
+    const set = fieldsToSet(before, to.page[id]!, isEndless(before) ? ['bg'] : ['w', 'h', 'bg'])
     if (Object.keys(set).length > 0) ops.push({ op: 'update', id, set })
   }
   const set = fieldsToSet(from, to, DOC_FIELDS)

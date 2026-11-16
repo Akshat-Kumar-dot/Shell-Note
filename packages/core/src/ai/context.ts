@@ -8,6 +8,7 @@
 //   and the request itself.
 import { parseInline, plainText } from '../markdown/inline.js'
 import { pipeTable } from '../markdown/table.js'
+import { waysOut } from '../board/lines.js'
 import type { Block, Doc } from '../schema/doc.js'
 import { ALIGNS, FONTS, INTO, ACTIONS, KINDS, SIZES, type OpSet, type Scope, type Shape } from '../schema/protocol.js'
 import { Color } from '../schema/doc.js'
@@ -179,6 +180,8 @@ export function blockLine(block: Block, max: number): string {
       return block.text === undefined ? `ink (${block.strokes.length} strokes)` : `ink "${cut(block.text)}"`
     case 'table':
       return `table ${cut(pipeTable(block.rows, block.head === true))}`
+    case 'node':
+      return `${block.shape} ${cut(block.md) || '(empty)'}${waysOut(block)}`
     case 'frame':
       return 'frame'
   }

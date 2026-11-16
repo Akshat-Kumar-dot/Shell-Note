@@ -12,9 +12,10 @@ import { isWellFormed } from '../util.js'
  * a colour code, five widths, tilt and a snapped shape, and a note its own
  * pen switches. Version 4, 25 October 2026: other programs written beside.
  * Version 5, 15 November 2026: a note's kind, how its pages are shown, and its
- * cover picture.
+ * cover picture. Version 6, 16 November 2026: the board, a note of one endless page; its nodes, each with the nodes
+ * it points to; ink that belongs to a node.
  */
-export const SCHEMA_VERSION = 5
+export const SCHEMA_VERSION = 6
 
 /**
  * The most blocks a note holds. Every block of a note is checked as it is opened, so a file with very many (a small
@@ -192,7 +193,54 @@ const ink = z.strictObject({
   ...free,
   strokes: z.array(Stroke),
   text: Str.optional(),
+  /** The node of a board this ink was written on (version 6): it moves with the node, and goes when the node does. */
+  on: Id.optional(),
 })
+
+/**
+ * The shapes a board's node may have (version 6): the fourteen a Mermaid flowchart writes with a pair of brackets
+ * (board/shape.ts has each one's brackets), so a flowchart written in Mermaid is kept as it was written.
+ */
+export const NodeShape = z.enum(['box', 'round', 'pill', 'subroutine', 'cylinder', 'circle', 'double-circle', 'flag', 'diamond', 'hexagon', 'slant', 'slant-back', 'trapezoid', 'trapezoid-down'])
+export type NodeShape = z.infer<typeof NodeShape>
+
+/** The most nodes one node points to, and the most characters a link's words hold. */
+export const MAX_LINKS = 64
+export const MAX_LABEL = 200
+
+/**
+ * A link, kept on the node it leaves (version 6): the node it points to, and its words if it has any. Its path is
+ * never kept: it is drawn from the two nodes each time (board/route.ts), in right angles unless `path` says
+ * otherwise, as an arrow unless `head` says none, as a plain line unless `line` says dotted or thick.
+ */
+export const Link = z.strictObject({
+  node: Id,
+  label: Str.min(1)
+    .max(MAX_LABEL)
+    .refine((label) => !/[\r\n]/u.test(label), { error: "A link's words are one line." })
+    .optional(),
+  path: z.enum(['straight', 'curved']).optional(),
+  line: z.enum(['dotted', 'thick']).optional(),
+  head: z.literal('none').optional(),
+})
+export type Link = z.infer<typeof Link>
+
+/**
+ * A node of a board (version 6): a shape with words in it, placed on the board's page, and the nodes it points to.
+ * A node with no way out has no `to`. Its words are inline Markdown, as a paragraph's.
+ */
+const node = z
+  .strictObject({
+    ...base,
+    type: z.literal('node'),
+    ...free,
+    shape: NodeShape,
+    md: Str,
+    color: AnyColor.optional(),
+    to: z.array(Link).min(1, { error: 'A node that points nowhere has no "to": leave it out.' }).max(MAX_LINKS).optional(),
+  })
+  .refine((block) => !Array.isArray(block.to) || block.to.every((link) => link?.node !== block.id), { error: 'A node does not point to itself.' })
+  .refine((block) => !Array.isArray(block.to) || new Set(block.to.map((link) => link?.node)).size === block.to.length, { error: 'A node points to another once: one link for each pair.' })
 
 /** One cell of a table: inline Markdown, like a text block's md, on one line. */
 const Cell = Str.refine((cell) => !/[\r\n]/u.test(cell), { error: 'A table cell is one line: it holds no line breaks.' })
@@ -246,6 +294,7 @@ export const Block = z.union([
   diagramChild,
   ink,
   table,
+  node,
 ])
 export type Block = z.infer<typeof Block>
 export type BlockType = Block['type']
@@ -255,6 +304,7 @@ export type Frame = z.infer<typeof frame>
 export type TextBlock = z.infer<typeof text>
 export type TableBlock = z.infer<typeof table>
 export type InkBlock = z.infer<typeof ink>
+export type NodeBlock = z.infer<typeof node>
 
 /** The schema for each block type, by placement. A missing entry means "not allowed". */
 export const BLOCK_SHAPES: Record<BlockType, { free?: z.ZodType; child?: z.ZodType }> = {
@@ -265,17 +315,53 @@ export const BLOCK_SHAPES: Record<BlockType, { free?: z.ZodType; child?: z.ZodTy
   diagram: { free: diagramFree, child: diagramChild },
   ink: { free: ink },
   table: { child: table },
+  node: { free: node },
 }
 
-export const Page = z.strictObject({
+const Paper = z.enum(['blank', 'ruled', 'grid', 'dots'])
+
+/** A page with a size: every page but a board's. */
+export const SizedPage = z.strictObject({
   id: Id,
   w: z.int().positive(),
   h: z.int().positive(),
-  bg: z.enum(['blank', 'ruled', 'grid', 'dots']),
+  bg: Paper,
   /** Free blocks on this page, back to front. */
   free: z.array(Id),
 })
+export type SizedPage = z.infer<typeof SizedPage>
+
+/**
+ * A board's page (version 6): endless every way, so it has no width and no height, and its blocks sit at any whole
+ * number of 0.01 mm, below zero too.
+ */
+export const EndlessPage = z.strictObject({
+  id: Id,
+  endless: z.literal(true),
+  bg: Paper,
+  /** Free blocks on this page, back to front. */
+  free: z.array(Id),
+})
+export type EndlessPage = z.infer<typeof EndlessPage>
+
+export const Page = z.union([SizedPage, EndlessPage])
 export type Page = z.infer<typeof Page>
+
+/** Whether a page is a board's: endless, with no size. */
+export function isEndless(page: Page): page is EndlessPage {
+  return 'endless' in page
+}
+
+/** A page with a size, or none: for a page that may not be there, or is a board's. */
+export function sizedPage(page: Page | undefined): SizedPage | undefined {
+  return page !== undefined && !isEndless(page) ? page : undefined
+}
+
+/** A page's size. An endless page has none: code that lays out by a page's edges is never given one. */
+export function sized(page: Page): SizedPage {
+  if (isEndless(page)) throw new Error(`Page ${page.id} is a board's endless page: it has no width or height.`)
+  return page
+}
 
 /** Metadata of an image. The bytes live outside the JSON, keyed by content hash. */
 export const Asset = z.strictObject({
@@ -395,9 +481,10 @@ export type Clip = z.infer<typeof Clip>
 
 /**
  * What a note is for (version 5): typing (text), the pen (sketch), or both (mixed). It chooses the tools shown first,
- * the paper of new pages and the library's picture; it never changes what the note holds.
+ * the paper of new pages and the library's picture; it never changes what the note holds. A board (version 6) is
+ * made as one and stays one: its one page is endless, where the others' pages have a size.
  */
-export const NoteKind = z.enum(['text', 'sketch', 'mixed'])
+export const NoteKind = z.enum(['text', 'sketch', 'mixed', 'board'])
 export type NoteKind = z.infer<typeof NoteKind>
 
 /**

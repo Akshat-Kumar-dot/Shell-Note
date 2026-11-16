@@ -5,10 +5,11 @@ import {
   Asset,
   BLOCK_SHAPES,
   DocFields,
+  EndlessPage,
   Hash,
   Id,
-  Page,
   SCHEMA_VERSION,
+  SizedPage,
   type Block,
   type BlockType,
   type Doc,
@@ -84,7 +85,8 @@ function rejectUndefined(objects: unknown[], where: string): void {
 
 export function checkPage(value: unknown): Doc['page'][string] {
   const where = isRecord(value) && typeof value.id === 'string' ? `Page ${value.id}` : 'Page'
-  parseWith(Page, value, where)
+  // A board's page says endless, every other page its size: checked as the one it says it is, for a clearer hint.
+  parseWith<unknown>(isRecord(value) && has(value, 'endless') ? EndlessPage : SizedPage, value, where)
   return value as Doc['page'][string]
 }
 

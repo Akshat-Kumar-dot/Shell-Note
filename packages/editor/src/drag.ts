@@ -2,7 +2,6 @@
 // box a drag started with and how far the pointer went, in document units, to
 // the box it gives. The block stays on its page, and a resized picture or
 // diagram keeps its shape.
-import type { Page } from '@shellnote/core'
 
 export interface Box {
   x: number
@@ -18,7 +17,7 @@ export const CORNERS: readonly Corner[] = ['nw', 'ne', 'sw', 'se']
 /** The smallest a resize makes a block: 5 mm on its shorter side. */
 export const MIN_SIDE = 500
 
-type Sheet = Pick<Page, 'w' | 'h'>
+type Sheet = Pick<SizedPage, 'w' | 'h'>
 
 /** The box moved by (dx, dy), kept on the page. */
 export function moveBox(box: Box, dx: number, dy: number, page: Sheet): Box {
@@ -52,4 +51,5 @@ export function resizeBox(box: Box, corner: Corner, dx: number, dy: number, page
 /** value, kept between low and high; at low when the range is empty. */
 function within(value: number, low: number, high: number): number {
   return Math.max(low, Math.min(value, high))
-}
+}import { type SizedPage } from '@shellnote/core'
+

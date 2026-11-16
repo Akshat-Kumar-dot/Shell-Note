@@ -3,7 +3,7 @@
 // are folded away where they hold nothing, so typed lines run on and the page line is never seen. Where something
 // lies in a margin, that much of it shows, so nothing is ever hidden. Under the last page there is room to write; what
 // is put there goes on a new page (core's settle).
-import { bodyOf, isPlacedBlock, marginOf, type Doc } from '@shellnote/core'
+import { bodyOf, isPlacedBlock, marginOf, type Doc, sized } from '@shellnote/core'
 
 /** How much of a page's top and bottom is folded away, in its units. */
 export interface Fold {
@@ -18,7 +18,7 @@ const MARK_HEIGHT = 600
 export function foldsOf(doc: Doc): Fold[] {
   const last = doc.pages.length - 1
   return doc.pages.map((id, i) => {
-    const page = doc.page[id]!
+    const page = sized(doc.page[id]!)
     const margin = marginOf(page)
     let top = i === 0 ? 0 : margin
     let bottom = i === last ? 0 : margin

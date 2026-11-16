@@ -2,6 +2,7 @@
 // drags it elsewhere, onto the next page too, in one undo step; a column's
 // border and the table's corner resize it; the bar gives it a look; Delete
 // removes it; and all of it is kept after a reload.
+import type { SizedPage } from '@shellnote/core'
 import { expect, test, type Page } from './fixtures.js'
 import { zoom } from './shell.js'
 
@@ -84,7 +85,7 @@ test('⊕ drags the table above a line, and onto the next page, each in one undo
   // A second page, as text running over the first would make, seen at half size.
   await page.evaluate(() => {
     const { doc, store } = window.__shellnote!
-    const first = doc.page[doc.pages[0]!]!
+    const first = doc.page[doc.pages[0]!] as SizedPage
     store.apply([
       { op: 'page', add: { id: 'p2', w: first.w, h: first.h, bg: 'blank', free: [] } },
       { op: 'add', block: { id: 'f2', r: 0, type: 'frame', page: 'p2', x: 2000, y: 2000, w: first.w - 4000, h: 0, kids: [] } },

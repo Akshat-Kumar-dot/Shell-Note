@@ -5,7 +5,7 @@
 import { parseInline, plainText, serializeInline } from '../markdown/inline.js'
 import { markRange, replaceRange, textLength, type MarkChange } from '../markdown/range.js'
 import { parsePipeTable } from '../markdown/table.js'
-import { type Block, type Doc, type Frame, type FreeBlock, type Id, type InkBlock, type Role, type TextBlock } from '../schema/doc.js'
+import { sized, type Block, type Doc, type Frame, type FreeBlock, type Id, type InkBlock, type Role, type TextBlock } from '../schema/doc.js'
 import type { Op } from '../schema/ops.js'
 import type { AiOp, AiOpOf, MarkOp, StyleOp } from '../schema/protocol.js'
 import { besideFree, type Spot } from '../select/place.js'
@@ -200,6 +200,11 @@ function rewrite(op: AiOpOf<'rewrite'>, input: CompileInput): Op[] {
       return content === (block.alt ?? '') ? [] : [{ op: 'update', id: block.id, set: { alt: content === '' ? null : content } }]
     case 'ink':
       return content === (block.text ?? '') ? [] : [{ op: 'update', id: block.id, set: { text: content === '' ? null : content } }]
+    case 'node': {
+      // A node's words, whole: as a paragraph's.
+      const md = tidy(content)
+      return md === block.md ? [] : [spliceFor(block.id, 'md', block.md, md)]
+    }
     case 'table': {
       // The whole table comes back as a pipe table (v1.1). New columns get equal widths.
       const { rows, head } = table(content)
@@ -377,7 +382,7 @@ function nextPageSpot(input: CompileInput, ref: FreeBlock, h: number): Spot & { 
   const index = doc.pages.indexOf(ref.page)
   const next = doc.pages[index + 1]
   if (next !== undefined) return { page: next, x: ref.x, y: MARGIN, w: ref.w, h }
-  const page = doc.page[ref.page]!
+  const page = sized(doc.page[ref.page]!)
   const id = input.newId()
   return {
     page: id,

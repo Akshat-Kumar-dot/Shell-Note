@@ -230,7 +230,7 @@ function contentKind(doc: Doc, op: AiOp): ContentKind | undefined {
     case 'rewrite': {
       const block = doc.block[op.id]
       if (!block || block.type === 'frame') return undefined
-      return block.type === 'image' ? 'alt' : block.type === 'ink' ? 'text' : block.type
+      return block.type === 'image' ? 'alt' : block.type === 'ink' || block.type === 'node' ? 'text' : block.type
     }
     case 'insert':
       return op.kind

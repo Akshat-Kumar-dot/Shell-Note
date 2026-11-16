@@ -3,7 +3,7 @@
 // edit checkable and undoable with no extra code.
 import { Draft } from './draft.js'
 import { idTaken } from './ids.js'
-import { BLOCK_SHAPES, DocFields, MAX_BLOCKS, type Block, type BlockType, type Doc, type Frame, type Id } from './schema/doc.js'
+import { BLOCK_SHAPES, DocFields, isEndless, MAX_BLOCKS, type Block, type BlockType, type Doc, type Frame, type Id, type NodeBlock } from './schema/doc.js'
 import { checkOp, type MoveTo, type Op, type OpOf } from './schema/ops.js'
 import { has, isWellFormed, splitsCharacter } from './util.js'
 import { CONTENT_FIELDS, checkContent, type ContentField, type ContentValidators } from './validate/content.js'
@@ -45,7 +45,9 @@ export function apply(doc: Doc, ops: readonly Op[], options: ApplyOptions = {}):
       throw error instanceof ValidationError && ops.length > 1 ? error.inOp(index) : error
     }
   })
-  // Last, and once: the fields set anywhere in the transaction are checked as they finally stand.
+  // Last, and once: a board's nodes, links and ink, then the fields set anywhere in the transaction, are checked as
+  // they finally stand. So a chart's nodes may be added in any order, each with its links.
+  checkBoard(draft)
   if (options.validators) checkContent(draft.doc, draft.edited, options.validators)
   // The last operation undone first: each inverse assumes the document as its own operation left it.
   return { doc: draft.doc, inverse: undo.reverse().flat(), changed: [...draft.changed] }
@@ -124,6 +126,7 @@ function add(draft: Draft, op: OpOf<'add'>): Op[] {
 function removeBlock(draft: Draft, id: Id): { readd: Op[]; relink: Op[] } {
   const block = needBlock(draft, id)
   draft.checkFresh(id)
+  if (block.type === 'node') return removeNode(draft, block)
   const at = indexIn(draft, block)
   detach(draft, block)
   draft.dropBlock(id)
@@ -151,6 +154,38 @@ function removeBlock(draft: Draft, id: Id): { readd: Op[]; relink: Op[] } {
   return { readd, relink }
 }
 
+/**
+ * Remove a node of a board. What belongs to it goes with it: the ink written on it, and the links other nodes had
+ * to it. `readd` puts the node and its ink back where they lay, front to back; `relink` gives the other nodes their
+ * links again.
+ */
+function removeNode(draft: Draft, node: NodeBlock): { readd: Op[]; relink: Op[] } {
+  const page = draft.page(node.page) ?? missing('page', node.page)
+  const going: { block: Block; at: number }[] = [{ block: node, at: page.free.indexOf(node.id) }]
+  const relink: Op[] = []
+  for (const id in draft.doc.block) {
+    const other = draft.block(id)
+    if (!other || other.id === node.id) continue
+    if (other.type === 'ink' && other.on === node.id) {
+      // Ink changed since the edit was prepared stops the whole removal, as a frame's child does.
+      draft.checkFresh(other.id)
+      going.push({ block: other, at: page.free.indexOf(other.id) })
+    } else if (other.type === 'node' && other.to?.some((link) => link.node === node.id)) {
+      const kept = other.to.filter((link) => link.node !== node.id)
+      const { to, ...rest } = other
+      draft.putBlock(kept.length > 0 ? { ...rest, to: kept } : rest)
+      relink.push({ op: 'update', id: other.id, set: { to } })
+    }
+  }
+  // From the end of the page's list, so that putting them back in list order restores every index.
+  going.sort((a, b) => b.at - a.at)
+  for (const { block } of going) {
+    detach(draft, block)
+    draft.dropBlock(block.id)
+  }
+  return { readd: going.reverse().map(({ block, at }): Op => ({ op: 'add', block, at })), relink }
+}
+
 // ----- update ---------------------------------------------------------------
 
 const BLOCK_FIELDS: Record<BlockType, readonly string[]> = {
@@ -159,10 +194,13 @@ const BLOCK_FIELDS: Record<BlockType, readonly string[]> = {
   math: ['tex', 'value'],
   image: ['asset', 'alt', 'caption'],
   diagram: ['src'],
-  ink: ['text'],
+  ink: ['text', 'on'],
   table: ['rows', 'head', 'alt', 'caption', 'cols', 'width', 'look'],
+  node: ['shape', 'md', 'color', 'to'],
 }
 const PAGE_FIELDS = ['w', 'h', 'bg']
+/** A board's endless page has no size to set. */
+const ENDLESS_FIELDS = ['bg']
 const DOC_FIELDS = ['title', 'kind', 'view', 'cover', 'rules', 'pen', 'media', 'clips', 'programs']
 
 const MOVED = 'Use move to change where a block is.'
@@ -179,6 +217,9 @@ const BLOCK_ELSEWHERE: Record<string, string> = {
 }
 const PAGE_ELSEWHERE: Record<string, string> = {
   id: 'Ids never change.',
+  endless: "A board's page is endless and every other page has a size: neither becomes the other.",
+  w: "A board's page is endless: it has no width.",
+  h: "A board's page is endless: it has no height.",
   free: 'Use add, remove and move to change what is on a page.',
 }
 const DOC_ELSEWHERE: Record<string, string> = {
@@ -205,6 +246,10 @@ function update(draft: Draft, op: OpOf<'update'>): Op[] {
       op.set,
     )
     const fields = parseWith(DocFields, next, 'The document')
+    // A board's one page is endless and the other kinds' pages have a size, so a board is made as one and stays one.
+    if ((fields.kind === 'board') !== (kind === 'board')) {
+      fail('bad_field', kind === 'board' ? 'A board stays a board: its page is endless, and a note of another kind has pages with a size.' : 'A note does not become a board: a board is made as one, with its one endless page.')
+    }
     checkMedia(draft, fields.media ?? [], fields.clips ?? [])
     // A cover is one of the note's own pictures, so it travels with the note.
     if (fields.cover !== undefined && !draft.asset(fields.cover)) missing('asset', fields.cover)
@@ -224,7 +269,7 @@ function update(draft: Draft, op: OpOf<'update'>): Op[] {
 
   const page = draft.page(op.id)
   if (page) {
-    checkFields(op.set, PAGE_FIELDS, PAGE_ELSEWHERE, `Page ${page.id}`)
+    checkFields(op.set, isEndless(page) ? ENDLESS_FIELDS : PAGE_FIELDS, PAGE_ELSEWHERE, `Page ${page.id}`)
     const { next, undo } = patch(page, op.set)
     draft.putPage(checkPage(next))
     return [{ op: 'update', id: page.id, set: undo }]
@@ -239,6 +284,8 @@ function update(draft: Draft, op: OpOf<'update'>): Op[] {
   if (block.type === 'math' && has(set, 'tex') && !has(set, 'value') && block.value !== undefined) set.value = null
   // Only to-do items can be ticked, so a block that stops being one loses its tick.
   if (block.type === 'text' && block.done && has(set, 'role') && set.role !== 'todo' && !has(set, 'done')) set.done = null
+  // A node that points nowhere has no `to`: an empty list takes it away.
+  if (block.type === 'node' && Array.isArray(set.to) && set.to.length === 0) set.to = null
   const { next, undo } = patch(block, set)
   // An ink block can hold thousands of strokes, which update cannot change: skip re-checking each point.
   checkBlock(block.type === 'ink' ? { ...next, strokes: [] } : next)
@@ -364,7 +411,7 @@ function detach(draft: Draft, block: Block): void {
 // ----- splice and stroke ----------------------------------------------------
 
 /** The text fields a splice can edit, by block type. A caption may be missing: it reads as empty. */
-const TEXT_FIELDS: Partial<Record<BlockType, readonly ContentField[]>> = { text: ['md'], math: ['tex'], diagram: ['src'], image: ['caption'], table: ['caption'] }
+const TEXT_FIELDS: Partial<Record<BlockType, readonly ContentField[]>> = { text: ['md'], math: ['tex'], diagram: ['src'], image: ['caption'], table: ['caption'], node: ['md'] }
 
 function splice(draft: Draft, op: OpOf<'splice'>): Op[] {
   let current: string
@@ -441,6 +488,8 @@ function page(draft: Draft, op: OpOf<'page'>): Op[] {
       fail('duplicate_id', `The id ${added.id} is already used in this document. Choose a new id.`, { got: added.id })
     }
     if (added.free.length > 0) fail('not_empty', `Page ${added.id}: add a page with an empty free list, then add its blocks.`)
+    if (draft.doc.kind === 'board') fail('bad_doc', 'A board is one endless page: it takes no second page. There is room on it in every direction.')
+    if (isEndless(added)) fail('bad_doc', 'Only a board has an endless page, and a board is made with it: add a page with a width and a height.')
     const at = op.at ?? pages.length
     checkIndex(at, pages.length, 'The page list')
     draft.putPage(added)
@@ -499,6 +548,32 @@ function asset(draft: Draft, op: OpOf<'asset'>): Op[] {
 }
 
 // ----- shared checks --------------------------------------------------------
+
+/**
+ * A board's rules, on what a transaction changed, as it finally stands: a node sits on an endless page; a link names
+ * a node of the same page; ink written on a node names one of its page. (A node pointing to itself or to another
+ * twice is refused by its shape.)
+ */
+function checkBoard(draft: Draft): void {
+  for (const id of draft.changed) {
+    const block = draft.block(id)
+    if (block?.type === 'node') {
+      const page = draft.page(block.page)
+      if (!page || !isEndless(page)) fail('wrong_type', `Node ${id}: a node sits on a board's endless page, and page ${block.page} has a size. In a note of pages, a flowchart is a diagram.`)
+      for (const link of block.to ?? []) needNodeOn(draft, link.node, block.page, `Node ${id} points to ${link.node}`, 'A link joins two nodes of the board: use a node id.')
+    } else if (block?.type === 'ink' && block.on !== undefined) {
+      needNodeOn(draft, block.on, block.page, `Ink ${id} is on ${block.on}`, 'Ink belongs to a node of its own page, or to none: set on to a node id, or to null.')
+    }
+  }
+}
+
+/** The node `id` on `page`, or a refusal that starts with what named it. */
+function needNodeOn(draft: Draft, id: Id, page: Id, what: string, fix: string): void {
+  const target = draft.block(id)
+  if (!target) fail('unknown_id', `${what}, which does not exist. ${fix}`, { got: id })
+  if (target.type !== 'node') fail('bad_ref', `${what}, which has type ${target.type}, not node. ${fix}`, { got: id })
+  if (target.page !== page) fail('bad_ref', `${what}, which is on another page. ${fix}`, { got: id })
+}
 
 /** The note's videos and their marks: ids unique and new to the document, a file's asset there, a mark on a video and a page that exist. */
 function checkMedia(draft: Draft, media: readonly { id: Id; kind: string; asset?: string }[], clips: readonly { id: Id; media: Id; page: Id }[]): void {

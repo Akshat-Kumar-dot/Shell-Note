@@ -8,7 +8,7 @@
 // into the box is placed in the Select box, with no model at all. A request
 // can be spoken (the browser's own speech recognition, while the microphone
 // is pressed), and a model that can see pictures can be sent one with it.
-import { instantPreview, logLine, MARGIN, NO_VISION, type Instant, type LogEntry, type Model, type Selection, type StepProgress } from '@shellnote/core'
+import { instantPreview, logLine, MARGIN, NO_VISION, type Instant, type LogEntry, type Model, type Selection, type StepProgress, sizedPage } from '@shellnote/core'
 import { ArrowUp, ImagePlus, LoaderCircle, Mic, Settings2, Sparkles, Square, X, Zap } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -256,7 +256,7 @@ export function AiLayer({ store, host, enabled }: { store: EditorStore; host: Ai
     const { ceiling, floor } = deskView(desk)
     const shown = rect.bottom > ceiling && rect.top < floor
     // The middle of the page's right margin: the ✨ button never covers the text, whatever is under the choice.
-    const page = sheet?.dataset.page === undefined ? undefined : store.doc.page[sheet.dataset.page]
+    const page = sheet?.dataset.page === undefined ? undefined : sizedPage(store.doc.page[sheet.dataset.page])
     const paper = sheet?.getBoundingClientRect()
     const gutter = page && paper ? paper.right - (MARGIN * paper.width) / page.w / 2 : rect.right + 24
     const view = desk.getBoundingClientRect()

@@ -7,7 +7,7 @@
 // was drawn, to be resized from its corners. On release it moves as one undo
 // step, and stays chosen. The desk scrolls when the pointer nears its top or
 // bottom, so it can go to a page out of view; Escape gives the drag up.
-import { idTaken, newId, type Block, type Doc, type Frame, type Id, type Op } from '@shellnote/core'
+import { idTaken, newId, type Block, type Doc, type Frame, type Id, type Op, sized, sizedPage } from '@shellnote/core'
 import { frameSpotAt } from './geometry.js'
 import type { EditorStore } from './store.js'
 
@@ -105,7 +105,7 @@ export function startObjectDrag(store: EditorStore, id: Id, down: PointerEvent):
 function drawnSize(doc: Doc, figure: Element, drop: Drop): { w: number; h: number } | undefined {
   if (!('page' in drop)) return undefined
   const sheet = document.querySelector(`.nw-page[data-page="${CSS.escape(drop.page)}"]`)
-  const page = doc.page[drop.page]
+  const page = sizedPage(doc.page[drop.page])
   if (!sheet || !page) return undefined
   const perPx = page.w / sheet.getBoundingClientRect().width
   const box = figure.getBoundingClientRect()
@@ -136,7 +136,7 @@ export function dropAt(doc: Doc, id: Id, x: number, y: number): { drop: Drop; li
     return { drop: { frame: frame.id, at }, line: { left: box.left, top, width: box.width } }
   }
   const sheet = hits.map((el) => el.closest<HTMLElement>('.nw-page[data-page]')).find((el) => el !== null)
-  const page = sheet ? doc.page[sheet.dataset.page!] : undefined
+  const page = sheet ? sizedPage(doc.page[sheet.dataset.page!]) : undefined
   if (!sheet || !page) return undefined
   const rect = sheet.getBoundingClientRect()
   const spot = frameSpotAt(page, Math.round(((x - rect.left) / rect.width) * page.w), Math.round(((y - rect.top) / rect.height) * page.h))
@@ -164,7 +164,7 @@ export function moveOps(doc: Doc, id: Id, drop: Drop, size?: { w: number; h: num
     ops.push({ op: 'move', id, to: { parent: to, at: drop.at } })
   } else if (object.type === 'diagram') {
     // The size it was drawn at (or as wide as a frame there, three fifths as tall), shrunk to fit the page if need be, keeping its shape; dropped near an edge, it comes in from it.
-    const page = doc.page[drop.page]!
+    const page = sized(doc.page[drop.page]!)
     const want = size ?? { w: drop.w, h: Math.round(drop.w * 0.6) }
     const fit = Math.min(1, page.w / want.w, page.h / want.h)
     const w = Math.max(1, Math.round(want.w * fit))

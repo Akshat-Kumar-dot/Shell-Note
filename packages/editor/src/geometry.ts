@@ -1,7 +1,7 @@
 // From document units to the screen. A page is drawn at its real size in CSS
 // millimetres and scaled as a whole for zoom, so positions inside a page need
 // no arithmetic: x = 2000 is simply left: 20mm.
-import { MARGIN, type Asset, type Page } from '@shellnote/core'
+import { MARGIN, type Asset, type SizedPage } from '@shellnote/core'
 
 /** Document units (0.01 mm) as a CSS length. */
 export const mm = (units: number): string => `${units / 100}mm`
@@ -83,7 +83,7 @@ const HALF_LINE = 300
  * first line on the point, reaching to the right margin, at least 50 mm wide
  * and on the page.
  */
-export function frameSpotAt(page: Page, x: number, y: number): { x: number; y: number; w: number } {
+export function frameSpotAt(page: SizedPage, x: number, y: number): { x: number; y: number; w: number } {
   const w = Math.max(MIN_FRAME_WIDTH, page.w - MARGIN - x)
   return { x: Math.max(0, Math.min(x, page.w - w)), y: Math.max(0, y - HALF_LINE), w }
 }

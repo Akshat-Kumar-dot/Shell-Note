@@ -7,6 +7,8 @@ export interface NewDoc {
   /** A4 unless given. A custom size is in units of 0.01 mm. */
   size?: PageSize | { w: number; h: number }
   bg?: Page['bg']
+  /** A board: one endless page, with nothing on it yet. Its paper is dots unless given; a size is not taken. */
+  board?: boolean
 }
 
 /** A new document: one page holding one empty text frame, as wide as the margins. */
@@ -18,6 +20,20 @@ export function createDoc(options: NewDoc = {}): Doc {
     return value
   }
   const [docId, pageId, frameId] = [id(), id(), id()]
+  if (options.board) {
+    return {
+      v: SCHEMA_VERSION,
+      id: docId,
+      title: options.title ?? 'Untitled',
+      kind: 'board',
+      rev: 0,
+      pages: [pageId],
+      page: { [pageId]: { id: pageId, endless: true, bg: options.bg ?? 'dots', free: [] } },
+      block: {},
+      asset: {},
+      rules: [],
+    }
+  }
   const size = typeof options.size === 'object' ? options.size : PAGE_SIZES[options.size ?? 'A4']
   return {
     v: SCHEMA_VERSION,

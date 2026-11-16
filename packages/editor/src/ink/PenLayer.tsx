@@ -71,6 +71,7 @@ import {
   type Stroke,
   type Taught,
   type TimedPt,
+  sizedPage,
 } from '@shellnote/core'
 import { useEffect, useRef, useSyncExternalStore, type RefObject } from 'react'
 import { clampZoom, px } from '../geometry.js'
@@ -154,7 +155,7 @@ function sheetAt(doc: Doc, target: EventTarget | null): Sheet | undefined {
   // Under the last page of the seamless view, its room to write in stands for that page, past its foot.
   const el = target instanceof Element ? (target.closest<HTMLElement>('.nw-page') ?? sheetOfSpare(target)) : null
   const id = el?.dataset.page
-  const page = id === undefined ? undefined : doc.page[id]
+  const page = id === undefined ? undefined : sizedPage(doc.page[id])
   if (!el || !page) return undefined
   const rect = el.getBoundingClientRect()
   return { id: page.id, scale: page.w / rect.width, left: rect.left, top: rect.top }

@@ -1,7 +1,7 @@
 // Sample notes, for development and the end-to-end tests: ?sample=… in the
 // address opens one of core's sample notes. A sample is not kept in the
 // browser, so it never takes the place of the note being worked on.
-import { apply, createDoc, MARGIN, parseDoc, type Block, type Doc, type Op } from '@shellnote/core'
+import { apply, createDoc, MARGIN, parseDoc, sized, type Block, type Doc, type Op } from '@shellnote/core'
 import mixed from '../../../packages/core/test/fixtures/mixed.json' with { type: 'json' }
 import physics from '../../../packages/core/test/fixtures/physics.json' with { type: 'json' }
 
@@ -23,7 +23,7 @@ export function sampleDoc(search: string): Doc | undefined {
 function manyPages(count: number): Doc {
   let doc = createDoc({ title: `${count} pages` })
   const first = doc.pages[0]!
-  const { w, h } = doc.page[first]!
+  const { w, h } = sized(doc.page[first]!)
   const heading = (id: string, parent: string, n: number): Op => ({
     op: 'add',
     block: { id, r: 0, type: 'text', parent, role: 'h1', indent: 0, md: `Page ${n}` } as Block,

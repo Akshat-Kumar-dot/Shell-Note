@@ -20,7 +20,7 @@ import { idTaken } from '../ids.js'
 import { boxOfFlat, overlaps, type Box } from '../ink/geometry.js'
 import { editInk, JOIN_GAP, shifted } from '../ink/group.js'
 import { strokeBox } from '../ink/hit.js'
-import type { Block, Doc, FreeBlock, Id, InkBlock, Page, Stroke } from '../schema/doc.js'
+import { isEndless, sized, type Block, type Doc, type FreeBlock, type Id, type InkBlock, type SizedPage, type Stroke } from '../schema/doc.js'
 import type { Op } from '../schema/ops.js'
 import { sameBlock } from '../sync/diff.js'
 import { idFrom } from '../sync/merge.js'
@@ -33,12 +33,12 @@ export const MAKE_ROOM_GAP = 200
 const MOST_STEPS = 5000
 
 /** A page's margin: 20 mm, or a quarter of a page shorter than 80 mm, so that every page keeps a writing area. */
-export function marginOf(page: Pick<Page, 'h'>): number {
+export function marginOf(page: Pick<SizedPage, 'h'>): number {
   return Math.min(MARGIN, Math.floor(page.h / 4))
 }
 
 /** The top and bottom of a page's writing area, in its units. */
-export function writingArea(page: Pick<Page, 'h'>): { top: number; bottom: number } {
+export function writingArea(page: Pick<SizedPage, 'h'>): { top: number; bottom: number } {
   const margin = marginOf(page)
   return { top: margin, bottom: page.h - margin }
 }
@@ -82,7 +82,7 @@ export function bodyOf(block: PlacedBlock): Box {
  * True when a thing lies on its page clear of the line to the next page: above the bottom margin (the top margin and
  * the writing area are one room), or wholly in the bottom margin.
  */
-export function liesInOneBand(block: PlacedBlock, page: Pick<Page, 'h'>): boolean {
+export function liesInOneBand(block: PlacedBlock, page: Pick<SizedPage, 'h'>): boolean {
   const { y, h } = bodyOf(block)
   const margin = marginOf(page)
   const bottom = y + h
@@ -109,7 +109,7 @@ function together(a: PlacedBlock, b: PlacedBlock): boolean {
 }
 
 /** These things and what goes with them on their page, and what goes with that, and so on. */
-function withTheirs(doc: Doc, page: Page, seeds: readonly PlacedBlock[]): PlacedBlock[] {
+function withTheirs(doc: Doc, page: SizedPage, seeds: readonly PlacedBlock[]): PlacedBlock[] {
   const unit = [...seeds]
   const held = new Set(seeds.map((block) => block.id))
   const others: PlacedBlock[] = []
@@ -188,7 +188,7 @@ function makeRoom(doc: Doc, pageId: Id, landed: readonly PlacedBlock[], top: num
 }
 
 /** Things reaching up over the top line of their page, put down onto its writing area. */
-function downOnItsPage(doc: Doc, page: Page, up: readonly PlacedBlock[]): Op[] {
+function downOnItsPage(doc: Doc, page: SizedPage, up: readonly PlacedBlock[]): Op[] {
   const area = writingArea(page)
   let unit = withTheirs(doc, page, up)
   if (heightOf(unit) > area.bottom - area.top) unit = [...up]
@@ -198,10 +198,10 @@ function downOnItsPage(doc: Doc, page: Page, up: readonly PlacedBlock[]): Op[] {
 
 /** Things lying across the bottom line of the page at `index`, put onto the next page's writing area. */
 function ontoNextPage(doc: Doc, index: number, wrong: readonly PlacedBlock[], fresh: (seed: string) => Id): Op[] {
-  const page = doc.page[doc.pages[index]!]!
+  const page = sized(doc.page[doc.pages[index]!]!)
   const ops: Op[] = []
   const after = doc.pages[index + 1]
-  let next = after === undefined ? undefined : doc.page[after]
+  let next = after === undefined || doc.page[after] === undefined ? undefined : sized(doc.page[after])
   if (!next) {
     next = { id: fresh(`${page.id}:next`), w: page.w, h: page.h, bg: page.bg, free: [] }
     ops.push({ op: 'page', add: next, at: index + 1 })
@@ -346,6 +346,8 @@ export function settle(doc: Doc, touched: Iterable<Id>): Op[] {
   for (const id of touched) if (isPlacedBlock(doc.block[id])) watch.add(id)
   const out: Op[] = []
   if (watch.size === 0) return out
+  // A board's page is endless: it has no line to the next page, so nothing on it ever lies across one.
+  if (doc.pages.some((id) => doc.page[id] !== undefined && isEndless(doc.page[id]))) return out
   let work = doc
   const fresh = (seed: string): Id => {
     for (let n = 0; ; n++) {
@@ -356,7 +358,7 @@ export function settle(doc: Doc, touched: Iterable<Id>): Op[] {
   let steps = 0
   for (let index = 0; index < work.pages.length && steps <= MOST_STEPS; index++) {
     for (;;) {
-      const page = work.page[work.pages[index]!]!
+      const page = sized(work.page[work.pages[index]!]!)
       const wrong: PlacedBlock[] = []
       for (const id of page.free) {
         const block = work.block[id]
@@ -391,7 +393,7 @@ export function settleMerged(before: Doc, merged: Doc): Doc {
     if (!isPlacedBlock(block)) continue
     const was = before.page[block.page]
     const now = merged.page[block.page]
-    if (!sameBlock(before.block[id], block) || !was || !now || was.w !== now.w || was.h !== now.h) touched.push(id)
+    if (!sameBlock(before.block[id], block) || !was || !now || isEndless(was) || isEndless(now) || was.w !== now.w || was.h !== now.h) touched.push(id)
   }
   try {
     const ops = settle(merged, touched)

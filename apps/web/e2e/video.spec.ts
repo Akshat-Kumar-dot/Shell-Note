@@ -2,6 +2,7 @@
 // the test needs no network, or a video file of one's own; beside the note, above or below it with the note moved
 // aside, or floating over it; one player throughout; Play and the pause key; an edge dragged, its size kept.
 import { readFileSync } from 'node:fs'
+import type { SizedPage } from '@shellnote/core'
 import { expect, inApp, test, type Page } from './fixtures.js'
 import { player, standInForYouTube } from './youtube.js'
 import { chooseTool, expectVideoAt, openPart, openVideoMenu, videoPlace } from './shell.js'
@@ -374,7 +375,7 @@ test('a hard part marked from the panel becomes a ▶ right of the writing: a ta
   await page.mouse.up()
   const per = await page.evaluate(() => {
     const doc = window.__shellnote!.doc
-    return doc.page[doc.pages[0]!]!.w / document.querySelector('.nw-page')!.getBoundingClientRect().width
+    return (doc.page[doc.pages[0]!] as SizedPage).w / document.querySelector('.nw-page')!.getBoundingClientRect().width
   })
   await expect.poll(async () => ((await clips()) as { y: number }[])[0]!.y - before).toBeGreaterThan(100 * per - 30)
   expect(((await clips()) as { y: number }[])[0]!.y - before).toBeLessThan(100 * per + 30)

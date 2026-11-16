@@ -3,7 +3,7 @@
 // flows in its frame, which widens or narrows with the column. Ink, pictures, formulas and diagrams are scaled down
 // when the writing area shrinks, never up. Then whatever lies across a page's line moves on (settle.ts).
 import { apply } from '../apply.js'
-import type { Clip, Doc, FreeBlock, InkBlock, Page, Stroke } from '../schema/doc.js'
+import { isEndless, type Clip, type Doc, type FreeBlock, type InkBlock, type SizedPage, type Stroke } from '../schema/doc.js'
 import type { Op } from '../schema/ops.js'
 import { marginOf, settle } from './settle.js'
 
@@ -25,7 +25,7 @@ export function sheetSize(sheet: Sheet, turn: Turn): { w: number; h: number } {
 }
 
 /** Which sheet a page is, and which way up; no sheet for a size of its own. */
-export function sheetOf(page: Pick<Page, 'w' | 'h'>): { sheet: Sheet | undefined; turn: Turn } {
+export function sheetOf(page: Pick<SizedPage, 'w' | 'h'>): { sheet: Sheet | undefined; turn: Turn } {
   const turn: Turn = page.w > page.h ? 'across' : 'upright'
   const long = Math.max(page.w, page.h)
   const short = Math.min(page.w, page.h)
@@ -65,6 +65,8 @@ export function resizeOps(doc: Doc, size: { w: number; h: number }): Op[] {
   const clips: Clip[] = [...(doc.clips ?? [])]
   for (const id of doc.pages) {
     const page = doc.page[id]!
+    // A board's endless page has no size to change.
+    if (isEndless(page)) continue
     if (page.w === size.w && page.h === size.h) continue
     const from = marginOf(page)
     const to = marginOf(size)

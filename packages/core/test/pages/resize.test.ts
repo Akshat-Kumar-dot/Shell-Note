@@ -1,7 +1,7 @@
 // A note's page size and which way up its pages are: what each page holds fits the new page, the margins stay,
 // typed text keeps its size, and drawings and pictures are made smaller when the writing area is, never bigger.
 import { describe, expect, it } from 'vitest'
-import { apply, isPlacedBlock, liesInOneBand, resizeOps, SCHEMA_VERSION, sheetOf, sheetSize, validateDoc, type Block, type Doc, type FreeBlock, type InkBlock } from '../../src/index.js'
+import { apply, isPlacedBlock, liesInOneBand, resizeOps, SCHEMA_VERSION, sheetOf, sheetSize, sized, validateDoc, type Block, type Doc, type FreeBlock, type InkBlock } from '../../src/index.js'
 import { sameContent } from '../../src/sync/diff.js'
 
 function note(blocks: Block[], size = { w: 21000, h: 29700 }): Doc {
@@ -49,7 +49,7 @@ describe('changing the page size', () => {
     const k = after.block.k as InkBlock
     expect(k.strokes[0]!.pts).toEqual([0, 0, 128, Math.round(6000 * s), Math.round(2000 * s), 128])
     expect(k.strokes[0]!.color).toBe('blue')
-    for (const block of Object.values(after.block)) if (isPlacedBlock(block)) expect(liesInOneBand(block, after.page[block.page]!)).toBe(true)
+    for (const block of Object.values(after.block)) if (isPlacedBlock(block)) expect(liesInOneBand(block, sized(after.page[block.page]!))).toBe(true)
   })
 
   it('to a bigger sheet: nothing grows, and the column widens', () => {
@@ -64,7 +64,7 @@ describe('changing the page size', () => {
     const after = apply(doc, resizeOps(doc, sheetSize('A4', 'across'))).doc
     for (const id of after.pages) expect(after.page[id]).toMatchObject({ w: 29700, h: 21000 })
     expect(at(after, 'f').w).toBe(29700 - 4000)
-    for (const block of Object.values(after.block)) if (isPlacedBlock(block)) expect(liesInOneBand(block, after.page[block.page]!)).toBe(true)
+    for (const block of Object.values(after.block)) if (isPlacedBlock(block)) expect(liesInOneBand(block, sized(after.page[block.page]!))).toBe(true)
   })
 
   it('is one change that undo takes back exactly, and nothing when the pages are that size already', () => {

@@ -6,7 +6,7 @@
 // pull text or blocks back when room frees up. These changes follow from the
 // person's own, so they join the same undo step: one undo takes back the
 // typing and the push together, and the page does not push again.
-import { idTaken, MARGIN, newId, type Doc, type Frame, type Id, type Op } from '@shellnote/core'
+import { idTaken, MARGIN, newId, type Doc, type Frame, type Id, type Op, sized } from '@shellnote/core'
 import { useEffect } from 'react'
 import { flushSync } from 'react-dom'
 import { focusAt, frameEditors } from './frame/active.js'
@@ -26,7 +26,7 @@ const SLACK = 100
 export function overflowOps(doc: Doc, frameId: Id, bottoms: ReadonlyMap<Id, number>): Op[] {
   const frame = doc.block[frameId]
   if (frame?.type !== 'frame') return []
-  const page = doc.page[frame.page]!
+  const page = sized(doc.page[frame.page]!)
   const limit = page.h - MARGIN
   const from = frame.kids.findIndex((id, i) => i > 0 && (bottoms.get(id) ?? 0) > limit)
   if (from === -1) return []
@@ -76,7 +76,7 @@ const KEEP_GAP = 500
 export function roomOps(doc: Doc, frameId: Id, h: number): Op[] {
   const frame = doc.block[frameId]
   if (frame?.type !== 'frame' || h <= frame.h) return []
-  const page = doc.page[frame.page]!
+  const page = sized(doc.page[frame.page]!)
   const sideBySide = (a: { x: number; w: number }, b: { x: number; w: number }): boolean => a.x < b.x + b.w && b.x < a.x + a.w
   const below = page.free
     .flatMap((id) => {
@@ -104,7 +104,7 @@ function measure(doc: Doc, frame: Frame): { height: number; bottoms: Map<Id, num
   const element = document.querySelector<HTMLElement>(`.nw-frame[data-id="${CSS.escape(frame.id)}"]`)
   const sheet = element?.closest('.nw-page')?.getBoundingClientRect()
   if (!element || !sheet || sheet.width === 0) return undefined
-  const scale = doc.page[frame.page]!.w / sheet.width
+  const scale = sized(doc.page[frame.page]!).w / sheet.width
   const bottoms = new Map<Id, number>()
   for (const kid of frame.kids) {
     const drawn = element.querySelector(`[data-id="${CSS.escape(kid)}"]`)

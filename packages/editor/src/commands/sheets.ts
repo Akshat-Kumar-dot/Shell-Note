@@ -1,6 +1,6 @@
 // A note's kind, how its pages are shown and their size, as commands: each does what its line in the note's menu
 // does, and the menu calls them. Each is one change of the note, which Undo takes back.
-import { resizeOps, sheetOf, sheetSize, type Doc, type Sheet, type Turn } from '@shellnote/core'
+import { resizeOps, sheetOf, sheetSize, type Doc, type Sheet, type Turn, sized, sizedPage } from '@shellnote/core'
 import type { EditorStore } from '../store.js'
 import type { Commands } from './run.js'
 import { chooseTool } from './tools.js'
@@ -10,7 +10,7 @@ const SHEET_NAMES: Record<string, Sheet> = { a4: 'A4', a5: 'A5', a6: 'A6', lette
 
 /** The note's pages as its first page has them: its sheet (none for a size of its own) and which way up. */
 export function pagesOf(doc: Doc): { sheet: Sheet | undefined; turn: Turn } {
-  const first = doc.page[doc.pages[0]!]
+  const first = sizedPage(doc.page[doc.pages[0]!])
   return first ? sheetOf(first) : { sheet: 'A4', turn: 'upright' }
 }
 
@@ -41,7 +41,7 @@ export function defineSheets(commands: Commands): void {
   commands.define('page.size', ['note'], ({ sheet, turn }, { note }) => {
     if (sheet === undefined && turn === undefined) throw new Error('Give a size (a4, a5, a6 or letter), or a way up (upright or across).')
     const doc = note.store.doc
-    const first = doc.page[doc.pages[0]!]!
+    const first = sized(doc.page[doc.pages[0]!]!)
     const now = sheetOf(first)
     const named = sheet === undefined ? now.sheet : SHEET_NAMES[sheet as string]
     const way = (turn as Turn | undefined) ?? now.turn

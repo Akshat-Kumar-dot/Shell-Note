@@ -4,7 +4,7 @@
 // with the parts that have room: a block never lands on another. Resizing is for what is placed on the page,
 // boxes and tables: a block in the text follows its column.
 import type { Box } from '../ink/geometry.js'
-import type { Asset, Block, Doc } from '../schema/doc.js'
+import { isEndless, type Asset, type Block, type Doc } from '../schema/doc.js'
 import { MARGIN } from '../units.js'
 import type { Drawn } from './picture.js'
 
@@ -81,7 +81,8 @@ function steps(from: number, to: number, order: 'up' | 'down' | number): number[
  */
 export function spotIn(doc: Doc, pageId: string, word: PlaceWord, size: Size, others: readonly Box[]): { x: number; y: number } | undefined {
   const page = doc.page[pageId]
-  if (!page) return undefined
+  // A board's endless page has no parts: no top right, no bottom.
+  if (!page || isEndless(page)) return undefined
   const { across, down } = thirds(word)
   const right = page.w - MARGIN - size.w
   const bottom = page.h - MARGIN - size.h
@@ -110,7 +111,7 @@ export function roomyPlaces(doc: Doc, pageId: string, size: Size, others: readon
  */
 export function spotNear(doc: Doc, pageId: string, near: Box, side: 'beside' | 'below', size: Size, others: readonly Box[]): { x: number; y: number } | undefined {
   const page = doc.page[pageId]
-  if (!page) return undefined
+  if (!page || isEndless(page)) return undefined
   const right = page.w - MARGIN - size.w
   const bottom = page.h - MARGIN - size.h
   if (right < MARGIN || bottom < MARGIN) return undefined
@@ -138,7 +139,8 @@ function pictureSize(meta: Asset | undefined, page: Size): Size {
 export function sizeOutOfText(doc: Doc, block: Block, drawn: ReadonlyMap<string, Drawn> | undefined, pageId: string): Size {
   const seen = drawn?.get(block.id)
   if (seen && seen.w > 0 && seen.h > 0) return { w: Math.round(seen.w), h: Math.round(seen.h) }
-  const page = doc.page[pageId] ?? { w: 21000, h: 29700 }
+  const own = doc.page[pageId]
+  const page = own && !isEndless(own) ? own : { w: 21000, h: 29700 }
   if (block.type === 'image') return pictureSize(doc.asset[block.asset], page)
   return block.type === 'math' ? { w: 8000, h: 1500 } : { w: 12000, h: 8000 }
 }

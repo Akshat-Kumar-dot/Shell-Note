@@ -20,8 +20,8 @@ function written(...strokes: Stroke[]): Doc {
 const stroke = (extra: Partial<Stroke> = {}): Stroke => ({ pts: [0, 0, 128, 500, 40, 140], color: 'ink', width: 'm', ...extra })
 
 describe('file format version 4', () => {
-  it('is followed by version 5, which only adds (a note’s kind, view and cover)', () => {
-    expect(SCHEMA_VERSION).toBe(5)
+  it('is followed by versions 5 and 6, which only add (a note’s kind, view and cover; the board)', () => {
+    expect(SCHEMA_VERSION).toBe(6)
   })
 
   it('opens a version 3 note unchanged but for its version', () => {

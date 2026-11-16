@@ -63,7 +63,7 @@ const SHOWS: readonly [Show, string, LucideIcon | undefined][] = [
   ['mixed', 'Mixed', Layers],
 ]
 /** Each kind of note, as a filter says it. */
-const SHOW_WORDS: Readonly<Record<NoteKind, string>> = { text: 'text notes', sketch: 'sketches', mixed: 'mixed notes' }
+const SHOW_WORDS: Readonly<Record<NoteKind, string>> = { text: 'text notes', sketch: 'sketches', mixed: 'mixed notes', board: 'boards' }
 /** The notes shown, kept while the app is open: going into a folder keeps them. */
 let shownLast: Show = 'all'
 /** No notes found by their words: one list, so what is drawn from it is not made again. */

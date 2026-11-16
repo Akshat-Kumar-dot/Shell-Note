@@ -3,7 +3,7 @@
 // the line. Dots, lines and arrows get none. A line ends where the pen rested 4 s or a new line began: written on
 // again later, it shows that time too. And ▶ marks, the hard parts the person marked (the note's `clips`): a tap
 // plays that part and pauses at its end; dragged, it moves; × or Delete takes it out; one undo step each.
-import { editInk, pointsOf, rowsOf, type Clip, type Doc, type Id, type InkBlock, type Page, type Stroke } from '@shellnote/core'
+import { editInk, pointsOf, rowsOf, type Clip, type Doc, type Id, type InkBlock, type Stroke, sizedPage, type SizedPage } from '@shellnote/core'
 import { useRef, useSyncExternalStore, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react'
 import { mm } from '../geometry.js'
 import type { EditorStore } from '../store.js'
@@ -212,7 +212,7 @@ const CLIP_GAP = 400
 function pageInView(doc: Doc): { page: Id; y: number } | undefined {
   let best: { page: Id; y: number; seen: number } | undefined
   for (const sheet of document.querySelectorAll<HTMLElement>('.nw-page[data-page]')) {
-    const page = doc.page[sheet.dataset.page ?? '']
+    const page = sizedPage(doc.page[sheet.dataset.page ?? ''])
     const box = sheet.getBoundingClientRect()
     const [top, bottom] = [Math.max(box.top, 0), Math.min(box.bottom, window.innerHeight)]
     if (!page || bottom <= top || box.height <= 0) continue
@@ -240,12 +240,12 @@ export function clipPlace(doc: Doc, media: Id, to: number): { page: Id; x: numbe
   const clamp = (value: number, least: number, most: number): number => Math.round(Math.max(least, Math.min(most, value)))
   if (found) {
     const { block, index } = found
-    const page = doc.page[block.page]
+    const page = sizedPage(doc.page[block.page])
     const row = rowsIn(block).find((r) => r.indices.includes(index))
     if (page && row) return { page: page.id, x: clamp(block.x + row.right + CLIP_GAP, 0, page.w - CLIP_ROOM.right), y: clamp(block.y + (row.top + row.bottom) / 2, CLIP_ROOM.edge, page.h - CLIP_ROOM.edge) }
   }
   const shown = pageInView(doc) ?? (doc.pages[0] === undefined ? undefined : { page: doc.pages[0], y: 3000 })
-  const page = shown && doc.page[shown.page]
+  const page = shown && sizedPage(doc.page[shown.page])
   return page && shown && { page: page.id, x: page.w - CLIP_ROOM.right - 600, y: clamp(shown.y, CLIP_ROOM.edge, page.h - CLIP_ROOM.edge) }
 }
 
@@ -262,7 +262,7 @@ function ClipMark({ store, clip }: { store: EditorStore; clip: Clip }) {
     if (event.button !== 0) return
     const mark = event.currentTarget.parentElement
     const sheet = event.currentTarget.closest<HTMLElement>('.nw-page')
-    const page = store.doc.page[clip.page]
+    const page = sizedPage(store.doc.page[clip.page])
     if (!mark || !sheet || !page) return
     const per = page.w / sheet.getBoundingClientRect().width
     const start = { x: event.clientX, y: event.clientY }
@@ -322,7 +322,7 @@ function ClipMark({ store, clip }: { store: EditorStore; clip: Clip }) {
 }
 
 /** The marks on one page, for the note's videos: ⏱ beside lines, and ▶ hard parts. */
-export function VideoMarks({ store, doc, page }: { store: EditorStore; doc: Doc; page: Page }) {
+export function VideoMarks({ store, doc, page }: { store: EditorStore; doc: Doc; page: SizedPage }) {
   const shown = useSyncExternalStore(timesShown.subscribe, timesShown.snapshot)
   const videos = new Set((doc.media ?? []).map((m) => m.id))
   if (videos.size === 0) return null

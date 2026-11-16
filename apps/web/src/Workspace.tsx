@@ -71,7 +71,7 @@ let sessions = 0
 
 /** A session for a document, its pictures' bytes loaded into the editor's store. */
 /** A note's kind, and its paper, as the status line says them. */
-const KIND_WORDS = { text: 'Text', sketch: 'Sketch', mixed: 'Mixed' } as const
+const KIND_WORDS = { text: 'Text', sketch: 'Sketch', mixed: 'Mixed', board: 'Board' } as const
 const PAPER_WORDS = { blank: 'Blank', ruled: 'Lines', grid: 'Squares', dots: 'Dots' } as const
 
 export async function sessionFor(doc: Doc, assets: ReadonlyMap<string, Blob>, place: { note: string | undefined; folder: string | null; file: FileState | undefined }): Promise<Session> {

@@ -6,6 +6,7 @@
 // handwriting says once it has been read. Never the strokes of handwriting,
 // nor a picture's bytes.
 import { pipeTable } from './markdown/table.js'
+import { waysOut } from './board/lines.js'
 import type { Block, Doc, Id } from './schema/doc.js'
 import { ValidationError } from './validate/errors.js'
 
@@ -24,6 +25,8 @@ export function blockContent(block: Block): string {
       return block.alt ?? ''
     case 'ink':
       return block.text ?? ''
+    case 'node':
+      return block.md
     case 'frame':
       return ''
   }
@@ -48,8 +51,10 @@ function about(block: Block): string {
       return `image${block.alt === undefined ? ' (no description)' : ''}${block.caption === undefined ? '' : ` caption: ${block.caption}`}`
     case 'ink': {
       const n = block.strokes.length
-      return `ink ${n} stroke${n === 1 ? '' : 's'}${block.text === undefined ? ' (not read)' : ''}`
+      return `ink ${n} stroke${n === 1 ? '' : 's'}${block.text === undefined ? ' (not read)' : ''}${block.on === undefined ? '' : ` on ${block.on}`}`
     }
+    case 'node':
+      return `${block.shape}${block.color === undefined ? '' : ` color=${block.color}`}${waysOut(block)}`
     case 'frame':
       return `frame${block.kids.length === 0 ? ' (empty)' : ` holding ${block.kids.join(', ')}`}${block.next === undefined ? '' : `, continues in ${block.next}`}`
   }

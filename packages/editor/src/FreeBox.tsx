@@ -6,6 +6,7 @@
 // shape, and a picture takes a caption, which Enter goes to. The page shows a
 // drag as it happens, and core hears of it once, when the button is let go,
 // so each move or resize is one undo step.
+import { sized } from '@shellnote/core'
 import type { Doc, FreeBlock, Op } from '@shellnote/core'
 import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent, type PointerEvent } from 'react'
 import { ImageView, PlacedView, type AssetUrls } from './blocks.js'
@@ -34,7 +35,7 @@ const SLOP = 3
 /** The arrow keys nudge by 1 mm, or by 10 mm with Shift. */
 const NUDGE = 100
 const ARROWS: Readonly<Record<string, readonly [number, number]>> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }
-const NAMES: Readonly<Record<Placed['type'], string>> = { image: 'Picture', math: 'Formula', diagram: 'Diagram', ink: 'Handwriting' }
+const NAMES: Readonly<Record<Placed['type'], string>> = { image: 'Picture', math: 'Formula', diagram: 'Diagram', ink: 'Handwriting', node: 'Step' }
 
 export function FreeBox({ block, doc, store, urls }: { block: Placed; doc: Doc; store: EditorStore; urls: AssetUrls }) {
   const selection = useSyncExternalStore(store.subscribeSelection, store.selectionSnapshot)
@@ -42,7 +43,7 @@ export function FreeBox({ block, doc, store, urls }: { block: Placed; doc: Doc; 
   const [live, setLive] = useState<Box | null>(null)
   const drag = useRef<Drag | null>(null)
   const box = useRef<HTMLDivElement>(null)
-  const page = doc.page[block.page]!
+  const page = sized(doc.page[block.page]!)
   const shown = live ?? block
   const picture = block.type === 'image' ? block : undefined
   // Chosen on its own, a picture or a diagram shows its corners to resize, and a picture its caption line.

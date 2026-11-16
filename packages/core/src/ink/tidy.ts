@@ -2,7 +2,7 @@
 // levelled, as operations for apply(). The pen tidies each word as the next one starts and each line as the next one
 // starts; the Tidy button does a whole note. Strokes are named by their block, their place in it
 // and their points on the page, and one changed or taken away since is left alone.
-import type { Doc, Id, InkBlock, Stroke } from '../schema/doc.js'
+import { isEndless, type Doc, type Id, type InkBlock, type Stroke } from '../schema/doc.js'
 import type { Op } from '../schema/ops.js'
 import { boxOf, pointsOf, triplesOf, type Box, type Pt } from './geometry.js'
 import { editInk } from './group.js'
@@ -94,7 +94,8 @@ const EDGE = 1500
 function rightOf(doc: Doc, ref: InkRef | undefined): number | undefined {
   if (!ref) return undefined
   const page = doc.pages.map((id) => doc.page[id]).find((p) => p?.free.includes(ref.block))
-  return page ? page.w - EDGE : undefined
+  // A board's endless page has no right edge to keep clear of.
+  return page && !isEndless(page) ? page.w - EDGE : undefined
 }
 
 /**

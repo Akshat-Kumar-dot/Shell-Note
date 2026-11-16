@@ -2,6 +2,7 @@
 // white paper, whatever the screen shows (the seamless view, dark paper). The pages are drawn apart from the screen,
 // all of them, as only the pages near the screen are drawn there; each names its size for the printer (@page), so a
 // note of A4 and Letter pages prints each on its own size.
+import { sized } from '@shellnote/core'
 import type { Doc } from '@shellnote/core'
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
@@ -41,7 +42,7 @@ export function PrintView({ doc, assets, onDone, heading }: PrintViewProps) {
   }, [onDone])
   const sizes = new Map<string, { w: number; h: number }>()
   for (const id of doc.pages) {
-    const page = doc.page[id]!
+    const page = sized(doc.page[id]!)
     sizes.set(sizeName(page.w, page.h), { w: page.w, h: page.h })
   }
   const rules = [...sizes].map(([name, { w, h }]) => `@page ${name} { size: ${w / 100}mm ${h / 100}mm; margin: 0; }`).join('\n')
@@ -49,7 +50,7 @@ export function PrintView({ doc, assets, onDone, heading }: PrintViewProps) {
     <div className="nw-print" aria-hidden>
       <style>{rules}</style>
       {doc.pages.map((id, i) => {
-        const page = doc.page[id]!
+        const page = sized(doc.page[id]!)
         return (
           <div key={id} className="nw-print-page" style={{ page: sizeName(page.w, page.h) }}>
             <PageBox page={page} doc={doc} assets={assets}>

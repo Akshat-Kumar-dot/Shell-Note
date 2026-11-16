@@ -3,7 +3,7 @@
 // and is given.
 import { describe, expect, it } from 'vitest'
 import { apply, BLOCK_SHAPES, blockContent, editById, MAX_EDIT_OPS, outline, readBlocks, ValidationError, type Block, type Doc, type Frame, type TextBlock } from '../src/index.js'
-import { EMPTY, MIXED, PHYSICS } from './fixtures/index.js'
+import { BOARD, EMPTY, MIXED, PHYSICS } from './fixtures/index.js'
 
 const edit = (doc: Doc, ops: unknown, baseRev = doc.rev) => editById({ doc, ops, baseRev })
 /** The error an edit is refused with. */
@@ -182,13 +182,15 @@ describe('every kind of block', () => {
   // hold it to the same rules as the others.
   const frame = Object.values(MIXED.block).find((block) => block.type === 'frame')!.id
   const ALL = apply(MIXED, [{ op: 'add', block: { id: 'tb9', r: 0, type: 'table', parent: frame, rows: [['Name', 'Age'], ['**Ann**', '31']], head: true, caption: 'Ages' } }]).doc
-  const sample = (type: string): Block => Object.values(ALL.block).find((block) => block.type === type)!
+  // A node sits only on a board: its sample is the board's.
+  const noteOf = (type: string): Doc => (type === 'node' ? BOARD : ALL)
+  const sample = (type: string): Block => Object.values(noteOf(type).block).find((block) => block.type === type)!
 
   it('is in the sample notes, in the outline, and reads in full', () => {
     for (const type of kinds) {
       const block = sample(type)
       expect(block, `the sample note holds no ${type} block: add one above`).toBeDefined()
-      const doc = ALL
+      const doc = noteOf(type)
       expect(outline(doc)).toMatch(new RegExp(`^\\s*${block.id} `, 'mu'))
       expect(readBlocks(doc, [block.id]).startsWith(`${block.id} `)).toBe(true)
       expect(typeof blockContent(block)).toBe('string')
@@ -199,7 +201,7 @@ describe('every kind of block', () => {
     const content: Record<string, string> = { text: 'New words.', math: 'x^2', diagram: 'pie\n  "a" : 1', table: '| a | b |\n| --- | --- |\n| 1 | 2 |', image: 'A described picture.', ink: 'words', frame: 'x' }
     for (const type of kinds) {
       const block = sample(type)
-      const doc = ALL
+      const doc = noteOf(type)
       const other = Object.values(doc.block).find((each) => each.type === 'text' && each.id !== block.id)!.id
       const tries: unknown[] = [
         { op: 'style', ids: [block.id], set: [{ color: 'blue' }] },
@@ -226,7 +228,7 @@ describe('every kind of block', () => {
   })
 
   it('reads back as it was written: what read_blocks gives, rewrite takes with no change', () => {
-    for (const doc of [PHYSICS, ALL]) {
+    for (const doc of [PHYSICS, ALL, BOARD]) {
       for (const block of Object.values(doc.block)) {
         if (block.type === 'frame' || block.type === 'ink') continue
         const written = blockContent(block)
