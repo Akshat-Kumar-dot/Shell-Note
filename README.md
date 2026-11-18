@@ -1,6 +1,8 @@
-# ShellNote
+# Shell Note
 
-**Notes you can type, write by hand and draw on, with an AI that changes only what you select.**
+Shell Note is an AI-native note-taking workspace where humans and AI work together.
+
+🌐 Website: https://shellnote.app
 
 ShellNote is a page-based notes app. Every page is built from small pieces (text, equations, tables, pictures,
 diagrams and handwriting), so you can select exactly the part you mean, say what you want in plain words, and have
