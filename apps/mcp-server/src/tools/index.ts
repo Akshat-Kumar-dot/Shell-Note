@@ -91,7 +91,7 @@ const editNote = define({
   name: 'edit_note',
   title: 'Edit a note',
   description:
-    'Change blocks of a note by id: style, mark, rewrite, insert, delete, move, convert. Give the rev your last read of the note gave: a block changed since then is refused as "stale", and nothing changes. All operations apply together or none does; only the blocks named change. get_guide("operations") shows each operation.',
+    'Change blocks of a note by id: style, mark, rewrite, insert, delete, move, convert; on a board, link steps too. Give the rev your last read of the note gave: a block changed since then is refused as "stale", and nothing changes. All operations apply together or none does; only the blocks named change. get_guide("operations") shows each operation, get_guide("board") a board\'s.',
   input: {
     note: NoteId,
     rev: z.int().min(0).describe('The rev that read_outline or read_blocks gave.'),
@@ -149,8 +149,8 @@ const editNote = define({
 /** The longest content an operation keeps in the log: the note holds the whole of it. */
 const LOG_CONTENT = 300
 
-const WORDS = ['op', 'id', 'ref', 'at', 'kind', 'into', 'role', 'size', 'color', 'font', 'align', 'indent', 'action'] as const
-const SWITCHES = ['bold', 'italic', 'strike', 'code', 'highlight', 'underline', 'sub', 'sup', 'link', 'done'] as const
+const WORDS = ['op', 'id', 'ref', 'at', 'kind', 'into', 'role', 'size', 'color', 'font', 'align', 'indent', 'action', 'from', 'to', 'label', 'shape', 'path', 'line', 'head'] as const
+const SWITCHES = ['bold', 'italic', 'strike', 'code', 'highlight', 'underline', 'sub', 'sup', 'link', 'done', 'on'] as const
 
 /**
  * An operation as the log keeps it: the fields an operation has, and each kept short. What was sent is another
@@ -205,7 +205,7 @@ async function logged(context: Context, note: string, started: number, why: stri
 const getGuide = define({
   name: 'get_guide',
   title: 'Read the guide',
-  description: 'How to work with ShellNote notes. "index" first: what a note is, what you can do, the limits. "operations": each edit operation with an example. "text", "math", "diagram", "table": how to write each kind of content.',
+  description: 'How to work with ShellNote notes. "index" first: what a note is, what you can do, the limits. "operations": each edit operation with an example. "text", "math", "diagram", "table": how to write each kind of content. "board": a board\'s flowchart, its steps and links.',
   input: {
     topic: z.enum(TOPICS).describe('Which part of the guide.'),
   },

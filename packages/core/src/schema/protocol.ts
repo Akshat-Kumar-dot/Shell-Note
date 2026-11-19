@@ -14,13 +14,21 @@
 // fields come in schema order, so with flat fields a model that writes
 // "color" first can no longer add "size".
 // The flat shape is kept as a benchmark variant.
+//
+// Protocol v1.2 adds a board's: `link` joins one step to another, `insert` adds a step or a whole flowchart, and
+// `style` changes a step's shape. They are offered only when a request's scope says it is on a board (`board`), so a
+// request on a note of pages sees v1.1 unchanged, byte for byte.
 import { z } from 'zod'
-import { AnyColor, Color, Role } from './doc.js'
+import { AnyColor, Color, NodeShape, Role } from './doc.js'
 
 export const SIZES = ['s', 'm', 'l', 'xl'] as const
 export const FONTS = ['sans', 'serif', 'mono', 'hand'] as const
 export const ALIGNS = ['left', 'center', 'right'] as const
 export const KINDS = ['text', 'math', 'diagram', 'table'] as const
+/** What insert adds on a board besides (v1.2): one step of its flowchart, or a whole flowchart written in Mermaid. */
+export const BOARD_KINDS = ['step', 'flowchart'] as const
+/** Every kind insert adds on a board. */
+const ALL_KINDS = [...KINDS, ...BOARD_KINDS] as const
 export const INTO = ['list', 'steps', 'paragraph', 'diagram', 'math', 'table'] as const
 export const ACTIONS = ['simplify', 'solve', 'expand', 'factor', 'derive', 'check'] as const
 
@@ -30,7 +38,9 @@ export const OP_SETS = {
   full: ['style', 'mark', 'rewrite', 'insert', 'delete', 'move', 'none', 'convert', 'calc'],
 } as const
 export type OpSet = keyof typeof OP_SETS
-export type AiOpName = (typeof OP_SETS.full)[number]
+/** The operation only a board has (v1.2): one step pointed to another, or no longer. Offered only on a board. */
+export const BOARD_OPS = ['link'] as const
+export type AiOpName = (typeof OP_SETS.full)[number] | (typeof BOARD_OPS)[number]
 
 /** How style and mark carry their changes: an order-free list, or flat fields. */
 export type Shape = 'list' | 'flat'
@@ -58,6 +68,11 @@ export const MARK_FIELDS = {
   sup: z.boolean(),
   color: Color,
   link: z.boolean(),
+}
+
+/** What `style` changes on a step of a board, besides its colour (v1.2): its shape. */
+export const NODE_FIELDS = {
+  shape: NodeShape,
 }
 
 /** Word changes that only `mark` makes, or `style` in the merged shape. */
@@ -109,6 +124,11 @@ export interface Scope {
   colors?: readonly string[]
   /** The server holds the schema to Anthropic's strict mode, so it has no `maxItems` or `maxLength` (Caps.strictSchema). */
   strict?: boolean
+  /**
+   * The request is on a board (v1.2): `link` is offered, `insert` adds a step or a flowchart too, and `style` changes
+   * a step's shape. Left out, none of it is in the schema.
+   */
+  board?: boolean
 }
 
 /** The longest reason a `none` gives, in characters, where the server takes maxLength. */
@@ -139,10 +159,11 @@ function shapes(
   inline: boolean,
   shape: Shape,
   merged: boolean,
+  board: boolean,
   color: z.ZodType = Color,
 ) {
   const content = inline ? { content: z.string().optional() } : {}
-  const style = { ...STYLE_FIELDS, color }
+  const style = { ...STYLE_FIELDS, color, ...(board ? NODE_FIELDS : {}) }
   const marks = { ...MARK_FIELDS, color }
   const one = selected ?? z.string()
   const ids = z.array(one).min(1)
@@ -153,19 +174,39 @@ function shapes(
     style: z.strictObject({ op: z.literal('style'), ids, ...changes(merged ? { ...style, ...WORD_FIELDS } : style) }),
     mark: z.strictObject({ op: z.literal('mark'), id: one, ...changes(marks) }),
     rewrite: z.strictObject({ op: z.literal('rewrite'), id: one, ...content }),
-    insert: z.strictObject({ op: z.literal('insert'), at, ref: (ref ?? z.string()).optional(), kind: z.enum(KINDS), role: Role.optional(), ...content }),
+    insert: z.strictObject({
+      op: z.literal('insert'),
+      at,
+      ref: (ref ?? z.string()).optional(),
+      kind: board ? z.enum(ALL_KINDS) : z.enum(KINDS),
+      role: Role.optional(),
+      // A new step's shape; a box when left out.
+      ...(board ? { shape: NodeShape.optional() } : {}),
+      ...content,
+    }),
     delete: z.strictObject({ op: z.literal('delete'), ids }),
     move: z.strictObject({ op: z.literal('move'), id: block, at: z.enum(['after', 'before']), ref: ref ?? z.string() }),
     none: z.strictObject({ op: z.literal('none'), why: z.string() }),
     convert: z.strictObject({ op: z.literal('convert'), ids: z.array(block).min(1), into: z.enum(INTO), ...content }),
     calc: z.strictObject({ op: z.literal('calc'), id: block, action: z.enum(ACTIONS) }),
+    // A link from one step to another: its words, how it is drawn, or on: false to take it away.
+    link: z.strictObject({
+      op: z.literal('link'),
+      from: one,
+      to: ref ?? z.string(),
+      label: z.string().optional(),
+      path: z.enum(['straight', 'curved']).optional(),
+      line: z.enum(['dotted', 'thick']).optional(),
+      head: z.literal('none').optional(),
+      on: z.boolean().optional(),
+    }),
   }
 }
 
 // The flat form code works with. Style accepts the word changes too, so replies
 // in the merged shape, and from models that send them anyway, can be read.
 // A colour code reads too: parseReply checks it is one the request gave.
-const FLAT = shapes(z.string(), z.string(), z.string(), z.enum(['after', 'before', 'here']), true, 'flat', true, AnyColor)
+const FLAT = shapes(z.string(), z.string(), z.string(), z.enum(['after', 'before', 'here']), true, 'flat', true, true, AnyColor)
 
 /** Each operation's flat schema, for checking one operation with a precise hint. */
 export const AI_OP_SHAPES: Record<AiOpName, z.ZodType> = FLAT
@@ -184,23 +225,41 @@ export const AiOp = z.union([
   FLAT.none,
   FLAT.convert,
   FLAT.calc,
+  FLAT.link,
 ])
 
 export type StyleOp = { op: 'style'; ids: string[] } & Partial<{ [K in Exclude<keyof typeof STYLE_FIELDS, 'color'>]: z.infer<(typeof STYLE_FIELDS)[K]> }> &
-  Partial<{ [K in keyof typeof WORD_FIELDS]: z.infer<(typeof WORD_FIELDS)[K]> }> & { color?: AnyColor }
+  Partial<{ [K in keyof typeof WORD_FIELDS]: z.infer<(typeof WORD_FIELDS)[K]> }> & { color?: AnyColor; shape?: NodeShape }
 export type MarkOp = { op: 'mark'; id: string } & Partial<{ [K in Exclude<keyof typeof MARK_FIELDS, 'color'>]: z.infer<(typeof MARK_FIELDS)[K]> }> & { color?: AnyColor }
+/**
+ * An insert as code works with it: its kind may be a board's too, and a new step may say its shape (v1.2). Written out
+ * by hand, as style and mark are: the schema's two forms, with and without a board's, would be joined into the
+ * narrower one.
+ */
+export type InsertOp = {
+  op: 'insert'
+  at: 'after' | 'before' | 'here'
+  ref?: string
+  kind: (typeof KINDS)[number] | (typeof BOARD_KINDS)[number]
+  role?: Role
+  shape?: NodeShape
+  content?: string
+}
 export type AiOp =
   | StyleOp
   | MarkOp
-  | Exclude<z.infer<typeof AiOp>, { op: 'style' } | { op: 'mark' }>
+  | InsertOp
+  | Exclude<z.infer<typeof AiOp>, { op: 'style' } | { op: 'mark' } | { op: 'insert' }>
 export type AiOpOf<K extends AiOpName> = Extract<AiOp, { op: K }>
 
 /** The operations that make sense for this request, in the order of OP_SETS. */
 export function allowedOps(scope: Scope): AiOpName[] {
   const blocks = scope.blocks ?? scope.selected
-  return OP_SETS[scope.set].filter((name) => {
+  const names: readonly AiOpName[] = [...OP_SETS[scope.set], ...(scope.board ? BOARD_OPS : [])]
+  return names.filter((name) => {
     if (scope.only !== undefined && name !== scope.only) return false
     if (name === 'none') return true
+    if (name === 'link') return scope.selected.length > 0 && scope.refs.length > 0
     if (name === 'mark' && scope.merged) return false
     if (name === 'insert') return scope.here || scope.refs.length > 0
     if (name === 'move') return blocks.length > 0 && scope.refs.length > 1
@@ -215,7 +274,7 @@ export function replySchema(scope: Scope): z.ZodType {
   const places: ('after' | 'before' | 'here')[] = [...(scope.refs.length > 0 ? (['after', 'before'] as const) : []), ...(scope.here ? (['here'] as const) : [])]
   const at = z.enum((places.length > 0 ? places : ['after', 'before']) as ['after' | 'before' | 'here', ...('after' | 'before' | 'here')[]])
   const color = scope.colors && scope.colors.length > 0 ? z.enum([...Color.options, ...scope.colors] as [string, ...string[]]) : Color
-  const all = shapes(list(scope.selected), list(scope.blocks ?? scope.selected), list(scope.refs), at, scope.inline, scope.shape, scope.merged === true, color)
+  const all = shapes(list(scope.selected), list(scope.blocks ?? scope.selected), list(scope.refs), at, scope.inline, scope.shape, scope.merged === true, scope.board === true, color)
   // With no block to stand next to, insert has no ref at all; with no "here", it must have one.
   const insert = scope.refs.length === 0 ? all.insert.omit({ ref: true }) : scope.here ? all.insert : all.insert.required({ ref: true })
   // A reason of a few words. Anthropic's strict mode refuses maxLength and maxItems (v1.1); there, reading the reply checks them.

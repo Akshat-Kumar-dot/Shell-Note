@@ -12,6 +12,9 @@
 //   carries "href";
 // - `insert` with "at":"here" names a text column in "ref" (a frame's id):
 //   the new block goes at its end. That is how an empty note is written in.
+// - on a board (v1.2), `link` names the step it leaves in "from" (which
+//   changes) and the step it points to in "to" (a neighbour); and "at":"here"
+//   with no "ref" is where the board has room, which code finds.
 import { apply, type Applied } from '../apply.js'
 import { linearise } from '../linearise.js'
 import { checkInline } from '../markdown/inline.js'
@@ -19,7 +22,7 @@ import { parsePipeTable } from '../markdown/table.js'
 import { settle } from '../pages/settle.js'
 import type { Doc, Id } from '../schema/doc.js'
 import type { Op } from '../schema/ops.js'
-import { OP_SETS, type AiOp, type Scope } from '../schema/protocol.js'
+import { BOARD_OPS, OP_SETS, type AiOp, type Scope } from '../schema/protocol.js'
 import type { Selection } from '../select/selection.js'
 import { isRecord } from '../util.js'
 import type { ContentValidators } from '../validate/content.js'
@@ -60,8 +63,8 @@ export interface IdEdited {
 }
 
 const COLOUR_CODE = /^#[0-9a-f]{6}$/u
-/** The operations an edit may hold, and those that name several blocks. */
-const OPS = OP_SETS.full.filter((name) => name !== 'none')
+/** The operations an edit may hold (a board's link among them), and those that name several blocks. */
+const OPS = [...OP_SETS.full.filter((name) => name !== 'none'), ...BOARD_OPS]
 const MANY: readonly string[] = ['style', 'delete', 'convert']
 const NEEDS_ID = 'Use a block id that the outline of this note gives.'
 
@@ -80,6 +83,8 @@ export function editById(input: IdEdit): IdEdited {
 
   /** An error that says which operation it is about, when there are several. */
   const at = (error: ValidationError, index: number): ValidationError => (list.length > 1 ? error.inOp(index) : error)
+  /** A board's own operations are offered on a board alone (v1.2). */
+  const board = doc.kind === 'board'
 
   // What the operations name: the blocks to change, the blocks to stand next to, and one place in a text column.
   const targets = new Set<Id>()
@@ -97,19 +102,35 @@ export function editById(input: IdEdit): IdEdited {
     const op: Record<string, unknown> = { ...raw }
     const name = op.op
     if (typeof name !== 'string' || !(OPS as readonly string[]).includes(name)) throw at(teach('unknown_op', `"op" must be one of: ${OPS.join(', ')}.`, { got: name ?? null, valid: OPS }), index)
-    const named = [...(Array.isArray(op.ids) ? (op.ids as unknown[]) : []), ...(op.id === undefined ? [] : [op.id])]
-    if (name !== 'insert' && name !== 'none' && named.length === 0) throw at(teach('bad_value', `${name} needs the block it changes: add ${MANY.includes(name) ? '"ids", a list of block ids' : '"id", a block id'}.`), index)
+    // A link changes the step it leaves: that step is what it names.
+    const named = [...(Array.isArray(op.ids) ? (op.ids as unknown[]) : []), ...(op.id === undefined ? [] : [op.id]), ...(name === 'link' && op.from !== undefined ? [op.from] : [])]
+    if (name !== 'insert' && name !== 'none' && named.length === 0) {
+      throw at(teach('bad_value', name === 'link' ? 'link needs "from", the step it leaves, and "to", the step it points to: two step ids from the outline.' : `${name} needs the block it changes: add ${MANY.includes(name) ? '"ids", a list of block ids' : '"id", a block id'}.`), index)
+    }
     for (const id of named) {
       const found = block(id, index)
       if (found.type === 'frame') throw at(teach('wrong_type', `${found.id} is a text column (a frame): it holds blocks and has no words of its own. Name the blocks in it.`, { got: found.id }), index)
       if (name === 'rewrite' && found.type === 'ink') throw at(teach('wrong_type', `${found.id} is handwriting: what it says is read by ShellNote itself, and is not rewritten.`, { got: found.id }), index)
       targets.add(found.id)
     }
+    const boardKind = name === 'insert' && (op.kind === 'step' || op.kind === 'flowchart')
+    if ((name === 'link' || boardKind) && !board) {
+      throw at(teach('wrong_type', `${name === 'link' ? 'A link joins two steps' : 'A step and a flowchart go'} on a board, and this note is not one. In a note of pages, a flowchart is a diagram: insert kind "diagram".`), index)
+    }
+    if (name === 'link') {
+      if (op.to === undefined) throw at(teach('bad_value', 'link needs "to": the step it points to, an id from the outline.'), index)
+      refs.add(block(op.to, index).id)
+    }
     if ((name === 'insert' && op.at !== 'here') || name === 'move') {
       if (op.ref === undefined) throw at(teach('bad_value', name === 'move' ? 'move needs "ref": the block it goes next to.' : 'Say which block the new one goes next to: add "ref", a block id. In an empty text column, use "at":"here" with the id of the column as "ref".'), index)
       if (name === 'move' && op.ref === op.id) throw at(teach('bad_value', 'A block cannot move next to itself. Choose another block as "ref".'), index)
     }
-    if (name === 'insert' && op.at === 'here') {
+    if (name === 'insert' && op.at === 'here' && board && (op.ref === undefined || boardKind)) {
+      // On a board, "here" is where it has room, which code finds; a step or a flowchart put there takes no "ref".
+      if (op.ref !== undefined) {
+        throw at(teach('bad_value', 'A step or a flowchart put "here" goes where the board has room: leave "ref" out. To add a step next to one, give "at":"after" or "before" and that step as "ref".'), index)
+      }
+    } else if (name === 'insert' && op.at === 'here') {
       const column = op.ref === undefined ? undefined : block(op.ref, index)
       if (column?.type !== 'frame') throw at(teach('bad_value', 'With "at":"here", "ref" names a text column (a frame id from the outline): the new block goes at its end.'), index)
       if (here && here.parent !== column.id) throw at(teach('bad_value', 'One edit adds at the end of one text column only. Send the other column\'s blocks in another edit.'), index)
@@ -136,11 +157,12 @@ export function editById(input: IdEdit): IdEdited {
     selected,
     blocks: selected,
     refs: [...new Set([...selected, ...refs])],
-    here: here !== undefined,
+    here: here !== undefined || board,
     maxOps: MAX_EDIT_OPS,
     inline: true,
     shape: 'list',
     colors: [...colors],
+    ...(board ? { board: true } : {}),
   }
   const read = parseReply(JSON.stringify(cleaned), scope)
 
@@ -233,7 +255,8 @@ function contentKind(doc: Doc, op: AiOp): ContentKind | undefined {
       return block.type === 'image' ? 'alt' : block.type === 'ink' || block.type === 'node' ? 'text' : block.type
     }
     case 'insert':
-      return op.kind
+      // A step's words are a paragraph's; a flowchart is Mermaid, which the board reads itself (v1.2).
+      return op.kind === 'step' ? 'text' : op.kind === 'flowchart' ? 'diagram' : op.kind
     case 'convert':
       return op.into === 'list' || op.into === 'steps' ? 'items' : op.into === 'paragraph' ? 'text' : op.into
     default:
@@ -244,6 +267,8 @@ function contentKind(doc: Doc, op: AiOp): ContentKind | undefined {
 /** Why written content cannot be used, or null when it can: nothing left of it, a diagram of a kind not taken or that does not draw, a table that is not one. */
 function contentProblem(doc: Doc, op: AiOp, kind: ContentKind, text: string, mermaid: IdEdit['mermaid']): string | null {
   if (text === '') return 'The content is empty once tidied. Write the content itself.'
+  // A flowchart for a board is read into steps, which says line by line what does not read.
+  if (op.op === 'insert' && op.kind === 'flowchart') return null
   if (kind === 'diagram') {
     // A diagram being changed may keep the kind it has.
     const changing = op.op === 'rewrite' ? doc.block[op.id] : undefined

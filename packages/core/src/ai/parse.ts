@@ -1,7 +1,7 @@
 // Reading a model's reply. Lenient about the wrapper,
 // strict about what matters: a real mistake comes back as a teaching error,
 // which a small model can act on in its one retry without rereading the rules.
-import { AI_OP_SHAPES, allowedOps, MARK_FIELDS, STYLE_FIELDS, type AiOp, type AiOpName, type Scope } from '../schema/protocol.js'
+import { AI_OP_SHAPES, allowedOps, BOARD_KINDS, KINDS, MARK_FIELDS, NODE_FIELDS, STYLE_FIELDS, type AiOp, type AiOpName, type Scope } from '../schema/protocol.js'
 import { has, isRecord } from '../util.js'
 import { ValidationError, zodHint, type ErrorCode } from '../validate/errors.js'
 
@@ -65,7 +65,8 @@ function readOp(raw: unknown, scope: Scope): AiOp {
   // The list shape becomes flat fields.
   if ((name === 'style' || name === 'mark') && op.set !== undefined) {
     // Style also reads word changes: the merged shape sends them, and code knows where they go.
-    const fields = name === 'style' ? { ...STYLE_FIELDS, ...MARK_FIELDS } : MARK_FIELDS
+    // On a board (v1.2), style also changes a step's shape.
+    const fields = name === 'style' ? { ...STYLE_FIELDS, ...MARK_FIELDS, ...(scope.board ? NODE_FIELDS : {}) } : MARK_FIELDS
     const valid = Object.keys(fields)
     if (!Array.isArray(op.set)) throw teach('bad_value', '"set" is a list of changes, like [{"color":"blue"}].')
     for (const change of op.set) {
@@ -85,6 +86,11 @@ function readOp(raw: unknown, scope: Scope): AiOp {
       throw teach('unknown_id', 'Use an id listed under SELECTED.', { got: alias, valid: scope.selected })
     }
   }
+  // A link leaves a step that may change, and points to one that may also be a neighbour (v1.2).
+  if (name === 'link') {
+    if (!scope.selected.includes(op.from as string)) throw teach('unknown_id', 'Give "from": the step the link leaves, an id listed under SELECTED.', { got: op.from ?? null, valid: scope.selected })
+    if (!scope.refs.includes(op.to as string)) throw teach('unknown_id', 'Give "to": the step the link points to, an id listed under SELECTED or NEAR.', { got: op.to ?? null, valid: scope.refs })
+  }
   // Move, convert and calc act on whole blocks, never on words.
   const blocks = scope.blocks ?? scope.selected
   if (name === 'move' || name === 'convert' || name === 'calc') {
@@ -97,6 +103,9 @@ function readOp(raw: unknown, scope: Scope): AiOp {
     throw teach('unknown_id', 'Use an id listed under SELECTED or NEAR.', { got: op.ref, valid: scope.refs })
   }
   if (name === 'insert') {
+    if (!scope.board && (BOARD_KINDS as readonly string[]).includes(op.kind as string)) {
+      throw teach('bad_value', 'A step and a flowchart go on a board. In a note of pages, a flowchart is a diagram: kind "diagram".', { got: op.kind, valid: [...KINDS] })
+    }
     if (op.at === 'here' && !scope.here) throw teach('bad_value', 'No place was marked as "here". Insert after or before a block.', { got: 'here', valid: ['after', 'before'] })
     if (op.at !== 'here' && op.ref === undefined) throw teach('bad_value', 'Say which block to insert next to: add "ref".')
   }

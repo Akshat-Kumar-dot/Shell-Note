@@ -7,7 +7,8 @@
 // a mistake in code, or a reply that slipped through, is refused here before
 // the note changes.
 import { lettersOf } from '../markdown/range.js'
-import type { Block, Doc, Frame, Id } from '../schema/doc.js'
+import { isEndless, type Block, type Doc, type Frame, type Id, type Link } from '../schema/doc.js'
+import { same as sameValue } from '../sync/diff.js'
 import type { Here, Selection, WordRange } from '../select/selection.js'
 import { inBox, type Aliases } from './alias.js'
 
@@ -33,6 +34,7 @@ export function outsideScope(before: Doc, after: Doc, selection: Selection, alia
     const now = after.block[id]
     if (old && now) {
       if (same(old, now) || whole.has(id)) continue
+      if (madeRoom(old, now, before, after)) continue
       if (old.type === 'frame' && now.type === 'frame') {
         // A frame changes only by its blocks coming and going, which are checked one by one.
         if (same({ ...old, kids: [] }, { ...now, kids: [] })) continue
@@ -47,6 +49,8 @@ export function outsideScope(before: Doc, after: Doc, selection: Selection, alia
     }
     if (old && !now) {
       if (whole.has(id)) continue
+      // Ink written on a step that was removed goes with it.
+      if (old.type === 'ink' && old.on !== undefined && whole.has(old.on) && after.block[old.on] === undefined) continue
       const words = pieces.get(id)
       // Deleting all of a block's words takes the block along.
       if (words && old.type === 'text' && onlyWords(old.md, words)) continue
@@ -60,6 +64,33 @@ export function outsideScope(before: Doc, after: Doc, selection: Selection, alia
     }
   }
   return null
+}
+
+/**
+ * On a board, what code does around a step that comes or goes (v1.2): steps, and the ink on them, moved aside to make
+ * room; a link to a step that went, gone; a link to a new step, and a link that now runs through new steps to where
+ * it ran before (a step put between two). Never a step's words, shape or colour, nor where its links lead among the
+ * steps that stay.
+ */
+function madeRoom(old: Block, now: Block, before: Doc, after: Doc): boolean {
+  if (old.type !== now.type || (old.type !== 'node' && old.type !== 'ink') || !('page' in now) || old.page !== now.page) return false
+  const page = before.page[old.page]
+  if (!page || !isEndless(page)) return false
+  const lasts = (id: Id): boolean => before.block[id] !== undefined && after.block[id] !== undefined
+  /** The links as they lead among the steps that stay, followed through new steps; each keeps its own words. */
+  const among = (links: readonly Link[] | undefined, seen: ReadonlySet<Id>): Link[] =>
+    (links ?? []).flatMap((link) => {
+      if (lasts(link.node)) return [link]
+      const through = before.block[link.node] === undefined ? after.block[link.node] : undefined
+      if (through?.type !== 'node' || seen.has(through.id)) return []
+      return among(through.to, new Set([...seen, through.id])).map((onward) => ({ ...link, node: onward.node }))
+    })
+  const kept = (block: Block): Record<string, unknown> => {
+    const rest: Record<string, unknown> = { ...block, r: 0, x: 0, y: 0 }
+    if (block.type === 'node') rest.to = among(block.to, new Set())
+    return rest
+  }
+  return sameValue(kept(old), kept(now))
 }
 
 /** A block the same, apart from the revision it was last changed in. */

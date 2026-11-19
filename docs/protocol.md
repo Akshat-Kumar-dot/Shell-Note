@@ -22,6 +22,22 @@ A model never rewrites a note. It answers with one or a few short **operations**
 | Graphs of equations | no rule | not drawn yet: the model answers `none`, and code catches the plain requests itself |
 | Pictures | never sent | the vision request: a picture goes with the one call that writes from it, to a model that can see it |
 
+## On a board: v1.2
+
+A board is a note of one endless page holding a flowchart: steps (blocks of kind `node`), each with the steps it points to (see [file-format.md](file-format.md)). v1.2 adds what a board needs, and offers it only when a request is on a board: the schema of a request on a note of pages is v1.1's, byte for byte, and so is the prompt.
+
+| | On a board |
+|---|---|
+| `link` | points one step to another: `{"op":"link","from":"a","to":"b","label":"yes"}`. Sent again for the same two steps, it replaces that link; `"on":false` takes it away. `line` (dotted, thick), `head` (none) and `path` (straight, curved) change how it is drawn |
+| `insert` | also kind `step` (after or before a step, or "here" where the board has room; a `shape`, a box when left out) and kind `flowchart` (a whole flowchart written in Mermaid, read into steps and laid out where the board has room) |
+| `style` | also a step's `shape`, one of the fourteen a Mermaid flowchart writes with brackets |
+| Places | none in any reply: code puts a new step beside the one it follows, moves what comes after it along, and draws every link from the two steps it joins |
+| Refused, with what to do | `move` of a step (it stands where its links lead), `convert` of a step, a shape for anything but a step |
+
+The scope check knows a board too: code may move steps aside to make room, and a link may come to run through a step just put between two; a step's words, shape and colour, and where its links lead among the steps that stay, change only when the edit names that step.
+
+Assistants reach v1.2 through the [MCP server](mcp.md) now. The app's own models are offered it with the board's screen, once it has been measured on the benchmark as every change is.
+
 ## One edit, step by step
 
 1. **The selection.** Code resolves what the person selected: whole blocks, words inside a block (a typed selection or the pieces a Select box holds), and a place, "here". "All headings" or "every formula in this note" in the request becomes the selection.
@@ -139,4 +155,4 @@ One entry per AI call, kept on the device beside the note and never inside it: t
 ## Versions
 
 - **Rulebook:** a fingerprint of its text, recorded in every log entry.
-- **Protocol:** v1.1, which replaced v1 once it matched v1's results on the benchmark.
+- **Protocol:** v1.1, which replaced v1 once it matched v1's results on the benchmark; on a board, v1.2.

@@ -64,6 +64,8 @@ export function removalOps(doc: Doc, ids: readonly Id[], words: readonly WordRan
   const ops: Op[] = [...frames].map((id): Op => ({ op: 'remove', id }))
   for (const id of chosen) {
     const block = doc.block[id]!
+    // Ink written on a step of a board goes with the step, when the step goes too.
+    if (block.type === 'ink' && block.on !== undefined && chosen.has(block.on)) continue
     if (block.type !== 'frame' && !('parent' in block && frames.has(block.parent))) ops.push({ op: 'remove', id })
   }
   for (const [id, { before, after }] of cut) if (!chosen.has(id)) ops.push(spliceFor(id, 'md', before, after))

@@ -5,9 +5,11 @@
 import { parseInline, plainText, serializeInline } from '../markdown/inline.js'
 import { markRange, replaceRange, textLength, type MarkChange } from '../markdown/range.js'
 import { parsePipeTable } from '../markdown/table.js'
-import { sized, type Block, type Doc, type Frame, type FreeBlock, type Id, type InkBlock, type Role, type TextBlock } from '../schema/doc.js'
+import { chartOps, emptySpot, nodeSize, stepOps } from '../board/layout.js'
+import { readFlowchart } from '../board/mermaid.js'
+import { isEndless, MAX_LABEL, MAX_LINKS, sized, type Block, type Doc, type Frame, type FreeBlock, type Id, type InkBlock, type Link, type NodeBlock, type NodeShape, type Role, type TextBlock } from '../schema/doc.js'
 import type { Op } from '../schema/ops.js'
-import type { AiOp, AiOpOf, MarkOp, StyleOp } from '../schema/protocol.js'
+import type { AiOp, AiOpOf, InsertOp, MarkOp, StyleOp } from '../schema/protocol.js'
 import { besideFree, type Spot } from '../select/place.js'
 import { cutWords, removalOps } from '../select/remove.js'
 import type { Selection, WordRange } from '../select/selection.js'
@@ -71,6 +73,8 @@ export function compile(op: AiOp, input: CompileInput): Op[] {
       // Math actions need Compute Engine, which arrives in phase 4. Until then the
       // choice is recorded (the benchmark scores it) and the formula is left as it is.
       return []
+    case 'link':
+      return link(op, input)
   }
 }
 
@@ -83,6 +87,11 @@ function style(op: StyleOp, input: CompileInput): Op[] {
   const out: Op[] = []
   for (const alias of op.ids) {
     const block = blockOf(input, alias)
+    if (block.type === 'node') {
+      out.push(...nodeLook(op, alias, block))
+      continue
+    }
+    if (op.shape !== undefined) throw teach('bad_value', `${alias} is not a step of a flowchart: only a step of a board has a shape.`)
     const words = WORD_KEYS.filter((key) => op[key] !== undefined)
     if (wordsOf(input, alias)) {
       // Words chosen inside a block take a colour (and, in the merged shape, the word changes); the rest belongs to whole blocks.
@@ -134,6 +143,30 @@ function style(op: StyleOp, input: CompileInput): Op[] {
 }
 
 /** Recolouring handwriting replaces each stroke with a recoloured copy: exact to undo. */
+/** A step's look (v1.2): its colour and its shape. A step in a new shape fits its words again, about the same middle. */
+function nodeLook(op: StyleOp, alias: string, node: NodeBlock): Op[] {
+  const other = (['size', 'font', 'align', 'role', 'indent', 'done', ...WORD_KEYS] as const).filter((key) => op[key] !== undefined)
+  if (other.length > 0) throw teach('wrong_type', `${alias} is a step of a flowchart: style changes its shape and its color, not ${other.join(', ')}. To change its words, use rewrite.`)
+  const set: Record<string, unknown> = {}
+  if (op.color !== undefined && op.color !== (node.color ?? 'ink')) set.color = op.color === 'ink' ? null : op.color
+  const shape = op.shape ?? node.shape
+  if (shape !== node.shape) set.shape = shape
+  return [...(Object.keys(set).length > 0 ? [{ op: 'update', id: node.id, set } as Op] : []), ...(shape === node.shape ? [] : fitted(node, shape, node.md))]
+}
+
+/**
+ * A step made the size its words need in its shape, about the same middle. One a person made larger than its words
+ * needed is only ever made larger. None when it is that size already.
+ */
+function fitted(node: NodeBlock, shape: NodeShape, md: string): Op[] {
+  const was = nodeSize(node.shape, node.md)
+  const need = nodeSize(shape, md)
+  const own = was.w === node.w && was.h === node.h
+  const size = own ? need : { w: Math.max(node.w, need.w), h: Math.max(node.h, need.h) }
+  if (size.w === node.w && size.h === node.h) return []
+  return [{ op: 'move', id: node.id, to: { page: node.page, x: Math.round(node.x + (node.w - size.w) / 2), y: Math.round(node.y + (node.h - size.h) / 2), w: size.w, h: size.h } }]
+}
+
 function recolour(op: StyleOp, alias: string, block: InkBlock): Op[] {
   // (Word changes on handwriting were refused by the caller.)
   const others = (['size', 'font', 'align', 'role', 'indent', 'done'] as const).filter((key) => op[key] !== undefined)
@@ -201,9 +234,9 @@ function rewrite(op: AiOpOf<'rewrite'>, input: CompileInput): Op[] {
     case 'ink':
       return content === (block.text ?? '') ? [] : [{ op: 'update', id: block.id, set: { text: content === '' ? null : content } }]
     case 'node': {
-      // A node's words, whole: as a paragraph's.
-      const md = tidy(content)
-      return md === block.md ? [] : [spliceFor(block.id, 'md', block.md, md)]
+      // A step's words, whole, on one line; the step then fits them.
+      const md = tidy(content.replace(/\s*\n\s*/gu, ' ').trim())
+      return md === block.md ? [] : [spliceFor(block.id, 'md', block.md, md), ...fitted(block, block.shape, md)]
     }
     case 'table': {
       // The whole table comes back as a pipe table (v1.1). New columns get equal widths.
@@ -223,13 +256,16 @@ function rewrite(op: AiOpOf<'rewrite'>, input: CompileInput): Op[] {
  * or their Select box). Beside a block in a frame it joins the frame; beside one placed on the page, it goes in free
  * space near it, or on the next page when there is none.
  */
-function insert(op: AiOpOf<'insert'>, input: CompileInput): Op[] {
+function insert(op: InsertOp, input: CompileInput): Op[] {
   const { doc, selection } = input
+  if (op.kind === 'step' || op.kind === 'flowchart') return onBoard(op, input)
+  if (op.shape !== undefined) throw teach('bad_value', 'Only a step has a shape: leave "shape" out, or insert kind "step" on a board.')
   const content = written(input)
-  const kind = op.kind
+  const kind: Made = op.kind
   const role: Role = kind === 'text' ? (op.role ?? 'p') : 'p'
   if (op.at === 'here') {
     const here = selection.here
+    if (!here && doc.kind === 'board') return looseOnBoard(input, kind, content, role)
     if (!here) throw teach('bad_value', 'No place was marked as "here". Insert after or before a block.')
     if ('parent' in here) {
       const kids = (doc.block[here.parent] as Frame).kids
@@ -262,6 +298,78 @@ function insert(op: AiOpOf<'insert'>, input: CompileInput): Op[] {
   return placeFree(input, kind, content, role, spot)
 }
 
+// ----- a board (v1.2) ---------------------------------------------------------------
+
+/** A board's one page; or a teaching error, as steps and flowcharts go only on a board. */
+function boardPage(doc: Doc): Id {
+  const id = doc.pages[0]
+  const page = id === undefined ? undefined : doc.page[id]
+  if (doc.kind !== 'board' || !page || !isEndless(page)) throw teach('wrong_type', 'A step and a flowchart go on a board. In a note of pages, a flowchart is a diagram: insert kind "diagram".')
+  return id!
+}
+
+/**
+ * A step after or before a step, or on its own where the board has room; or a whole flowchart, read from its Mermaid
+ * and laid out where the board has room. Code does every place.
+ */
+function onBoard(op: InsertOp, input: CompileInput): Op[] {
+  const { doc } = input
+  const page = boardPage(doc)
+  const content = written(input)
+  if (op.kind === 'flowchart') {
+    if (op.shape !== undefined) throw teach('bad_value', 'A flowchart gives each of its steps a shape in its Mermaid: leave "shape" out.')
+    return chartOps(doc, page, readFlowchart(content), input.newId).ops
+  }
+  const md = tidy(content.replace(/\s*\n\s*/gu, ' ').trim())
+  const shape = op.shape ?? 'box'
+  if (op.at === 'here') return chartOps(doc, page, { flow: 'down', nodes: [{ key: 'step', shape, md }], links: [] }, input.newId).ops
+  const ref = blockOf(input, op.ref!)
+  if (ref.type !== 'node') {
+    const what = ref.type === 'frame' ? 'a text column' : `a ${ref.type} block`
+    throw teach('wrong_type', `${op.ref} is ${what}, not a step: a new step goes after or before a step of the flowchart. To put words beside it, insert kind "text".`)
+  }
+  return stepOps(doc, ref.id, op.at, { md, shape }, input.newId).ops
+}
+
+/** Words, a table, a formula or a diagram put "here" on a board with no place marked: where the board has room. */
+function looseOnBoard(input: CompileInput, kind: Made, content: string, role: Role): Op[] {
+  const page = boardPage(input.doc)
+  const size = kind === 'math' ? { w: 8000, h: 1500 } : kind === 'diagram' ? { w: 12000, h: 6000 } : { w: 6000, h: 1200 }
+  const at = emptySpot(input.doc, page, size)
+  return placeFree(input, kind, content, role, { page, ...at, w: size.w, h: kind === 'math' || kind === 'diagram' ? size.h : 0 })
+}
+
+/** A link from one step to another (v1.2): made, its words and look changed when sent again, taken away with on: false. */
+function link(op: AiOpOf<'link'>, input: CompileInput): Op[] {
+  const from = blockOf(input, op.from)
+  const to = blockOf(input, op.to)
+  if (from.type !== 'node') throw teach('wrong_type', `${op.from} is not a step: a link joins two steps of a board.`)
+  if (to.type !== 'node') throw teach('wrong_type', `${op.to} is not a step: a link joins two steps of a board.`)
+  if (from.id === to.id) throw teach('bad_value', 'A step does not point to itself: choose another step as "to".')
+  const list = from.to ?? []
+  const had = list.findIndex((each) => each.node === to.id)
+  if (op.on === false) {
+    if (had < 0) return []
+    const kept = list.filter((_, i) => i !== had)
+    return [{ op: 'update', id: from.id, set: { to: kept.length > 0 ? kept : null } }]
+  }
+  if (had < 0 && list.length >= MAX_LINKS) throw teach('bad_value', `${op.from} points to ${MAX_LINKS} steps already, the most a step has.`)
+  const label = cut((op.label ?? '').replace(/\s+/gu, ' ').trim(), MAX_LABEL).trim()
+  const made: Link = { node: to.id, ...(label === '' ? {} : { label }), ...(op.path ? { path: op.path } : {}), ...(op.line ? { line: op.line } : {}), ...(op.head ? { head: op.head } : {}) }
+  const next = had < 0 ? [...list, made] : list.map((each, i) => (i === had ? made : each))
+  return JSON.stringify(next) === JSON.stringify(list) ? [] : [{ op: 'update', id: from.id, set: { to: next } }]
+}
+
+/** Text at most `most` long, never cutting a character in two. */
+function cut(text: string, most: number): string {
+  let out = ''
+  for (const char of text) {
+    if (out.length + char.length > most) break
+    out += char
+  }
+  return out
+}
+
 /**
  * Blocks turned into another kind: what is made goes where the first of them was, and they are removed. A picture is
  * the exception: it stays, and the result goes right after it. Text and tables can only live in a frame, so on the
@@ -271,6 +379,8 @@ function convert(op: AiOpOf<'convert'>, input: CompileInput): Op[] {
   const { doc } = input
   const content = written(input)
   const blocks = op.ids.map((alias) => blockOf(input, alias))
+  const step = op.ids.find((_, i) => blocks[i]!.type === 'node')
+  if (step !== undefined) throw teach('wrong_type', `${step} is a step of a flowchart, which is not converted: rewrite its words, or style its shape.`)
   // A picture turned into a table or text stays, and the result goes right after it.
   const picture = [...blocks].reverse().find((block) => block.type === 'image')
   const first = picture ?? blocks[0]!
@@ -315,6 +425,7 @@ function move(op: AiOpOf<'move'>, input: CompileInput): Op[] {
   const block = blockOf(input, op.id)
   const ref = blockOf(input, op.ref)
   if (block.id === ref.id) throw teach('bad_value', 'A block cannot move next to itself. Choose another block as "ref".')
+  if (block.type === 'node' || ref.type === 'node') throw teach('wrong_type', 'A step of a board stands where its links lead, and ShellNote places it: to change where it comes, link it differently.')
   if ('parent' in ref) {
     if (block.type === 'frame' || block.type === 'ink') throw teach('wrong_type', `${op.id} is placed on the page and cannot go into a text column.`)
     const frame = doc.block[ref.parent] as Frame

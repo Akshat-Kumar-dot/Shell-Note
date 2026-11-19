@@ -1,8 +1,8 @@
 // The tools, as an assistant uses them: over a library the app keeps in a
 // folder, with the app as another device on it.
-import { apply, BLOCK_SHAPES, blockPrint, INTO, KINDS, OP_SETS, type Doc, type Frame, type TextBlock } from '@shellnote/core'
+import { apply, BLOCK_SHAPES, blockPrint, BRACKETS, INTO, KINDS, NodeShape, OP_SETS, outline, type Doc, type Frame, type TextBlock } from '@shellnote/core'
 import { describe, expect, it } from 'vitest'
-import { MIXED, PHYSICS } from '../../../packages/core/test/fixtures/index.js'
+import { BOARD, MIXED, PHYSICS } from '../../../packages/core/test/fixtures/index.js'
 import { Clock, device, edit, type Device } from '../../../packages/library/test/devices.js'
 import { FolderHost } from '../src/folderHost.js'
 import { guide, TOPICS } from '../src/guide.js'
@@ -330,5 +330,67 @@ describe('what the log is given', () => {
       expect(refused(await call('edit_note', { note, rev: PHYSICS.rev, ops: [{ op: 'delete', ids: [id] }] })), id).toMatchObject({ error: 'unknown_id' })
       expect(refused(await call('edit_note', { note, rev: PHYSICS.rev, ops: [{ op: 'insert', at: 'after', ref: id, kind: 'text', content: 'x' }] })), id).toMatchObject({ error: 'unknown_id' })
     }
+  })
+})
+
+describe('a board', () => {
+  /** A library with a board in it, and the board's id. */
+  async function onBoard(): Promise<Desk & { board: string }> {
+    const at = await desk(BOARD)
+    const listed = await at.call('list_notes')
+    const board = (listed.data as { notes: { id: string; title: string }[] }).notes.find((one) => one.title === BOARD.title)!.id
+    return { ...at, board }
+  }
+
+  it('is read as a board: its steps along their links, each with where it points; a step in full; its chart as Mermaid', async () => {
+    const { call, board } = await onBoard()
+    const outlined = await call('read_outline', { note: board })
+    expect(outlined.text).toBe(
+      [`rev ${BOARD.rev}`, 'How a post is published', 'board p1', 'n1 pill Start → n2', 'n2 box Write the draft → n3', 'n3 diamond Passed? → n4 yes, n2 no', 'k1 ink (1 stroke) on n3', 'n4 pill Publish', 'f1 frame', '  t1 p Remember the deadline'].join('\n'),
+    )
+    expect((await call('read_blocks', { note: board, ids: ['n3'] })).text).toBe(`rev ${BOARD.rev}\n\nn3 diamond color=blue → n4 yes, n2 no\nPassed?`)
+    expect((await call('export_note', { note: board, format: 'markdown' })).text).toContain('```mermaid\nflowchart TD\n  s1(["Start"])')
+  })
+
+  it('takes a link, a step and a whole flowchart in one edit, and the app has all of it', async () => {
+    const { call, board, inApp, keeper } = await onBoard()
+    const done = await call('edit_note', {
+      note: board,
+      rev: BOARD.rev,
+      why: 'Loop back and add a check',
+      ops: [
+        { op: 'link', from: 'n4', to: 'n1', label: 'next post' },
+        { op: 'insert', at: 'after', ref: 'n2', kind: 'step', content: 'Check the spelling' },
+        { op: 'insert', at: 'here', kind: 'flowchart', content: 'flowchart LR\n  A[Idea] --> B[Draft]' },
+      ],
+    })
+    expect(done.error, done.text).toBeUndefined()
+    expect(done.text).toMatch(/^rev \d+\nchanged: .*n4.*\nadded: \S+ box Check the spelling → n3\n/u)
+    const doc = await inApp(board)
+    expect(outline(doc)).toContain('n4 pill Publish → n1 next post')
+    expect(Object.values(doc.block).filter((block) => block.type === 'node')).toHaveLength(7)
+    const [item] = await keeper.logged(board)
+    expect(item!.entry.ops[0]).toEqual({ op: 'link', from: 'n4', to: 'n1', label: 'next post' })
+    expect(item!.entry.ops[1]).toMatchObject({ op: 'insert', at: 'after', ref: 'n2', kind: 'step' })
+  })
+
+  it('refuses a stale rev, an edit that names a step changed since it was read', async () => {
+    const { call, board } = await onBoard()
+    const first = await call('edit_note', { note: board, rev: BOARD.rev, ops: [{ op: 'style', ids: ['n4'], set: [{ color: 'green' }] }] })
+    expect(first.error).toBeUndefined()
+    expect(refused(await call('edit_note', { note: board, rev: BOARD.rev, ops: [{ op: 'link', from: 'n4', to: 'n1' }] }))).toMatchObject({ error: 'stale' })
+  })
+
+  it('has a guide whose own examples are edits the server takes on a board', async () => {
+    const lines = guide('board').split('\n').filter((line) => line.trim().startsWith('{"op"'))
+    expect(lines.length).toBeGreaterThanOrEqual(6)
+    for (const line of lines) {
+      const { call, board } = await onBoard()
+      const answer = await call('edit_note', { note: board, rev: BOARD.rev, ops: [JSON.parse(line.trim()) as unknown] })
+      expect(answer.error, `${line}\n${answer.text}`).toBeUndefined()
+      expect(answer.text, line).toMatch(/^rev \d+\n(changed|added|removed)/u)
+    }
+    // Every shape a step may have is named, with its brackets.
+    for (const shape of NodeShape.options) expect(guide('board')).toContain(`${shape} ${BRACKETS[shape][0]}`)
   })
 })

@@ -10,8 +10,8 @@ The [Model Context Protocol](https://modelcontextprotocol.io) (MCP) is the commo
 |---|---|
 | List the notes and folders of one library | Reach any file outside that library's folder, or anything in it that is not a note |
 | Read a note: its outline, its blocks in full, or the whole of it as Markdown or text | Read the pen's learned hand, thumbnails, your settings or an API key |
-| Change blocks: style, mark, rewrite, insert, delete, move, convert | Make, rename, move or delete a note, or change its title |
-| Add text, formulas, diagrams and tables | Add pictures, or write handwriting |
+| Change blocks: style, mark, rewrite, insert, delete, move, convert; on a board, link its steps | Make, rename, move or delete a note, or change its title |
+| Add text, formulas, diagrams and tables; on a board, steps and whole flowcharts written in Mermaid | Add pictures, or write handwriting |
 | | Reach the internet: the server has no network code at all |
 | | Touch other programs, or the program panel |
 
@@ -66,7 +66,7 @@ Only an app that runs on your computer can start the server. A website cannot: a
 | `read_outline` | One line for each block of a note, in reading order: its id, its kind, its first words. And the note's `rev` |
 | `read_blocks` | The whole content of the blocks named, in the form an edit takes it |
 | `edit_note` | Changes blocks by id, with the `rev` that was read. Answers the new `rev` and what changed |
-| `get_guide` | How to work with notes: `index`, `operations`, and how to write `text`, `math`, `diagram` and `table` |
+| `get_guide` | How to work with notes: `index`, `operations`, how to write `text`, `math`, `diagram` and `table`, and a `board`'s flowchart |
 | `export_note` | A whole note as Markdown or plain text |
 
 An edit is a list of the [edit protocol](protocol.md)'s operations, with two differences from what a model sends inside the app: blocks are named by their own ids, as the outline shows them, and the content is attached.
@@ -86,6 +86,28 @@ An edit is a list of the [edit protocol](protocol.md)'s operations, with two dif
 - **Only what is named.** An edit changes the blocks it names, and adds new blocks only next to the block it gives as `ref`. This is checked on the whole note after the edit is worked out, whatever was sent.
 - **You may be writing too.** An edit names the `rev` the assistant read. If a block it names changed since then, the edit is refused as `stale` and nothing changes; the assistant reads again. Blocks you did not touch can still be edited, and what you type in other blocks is merged with the edit, as with a change from another of your devices.
 - **Mistakes are answered, not guessed at.** A wrong call comes back as a teaching error that says what to fix: `{"error":"unknown_id","got":"t9","hint":"There is no block \"t9\" in this note. Use a block id that the outline of this note gives."}`
+
+### Boards
+
+A board is a note of one endless page holding a flowchart. Its outline gives one line for each step, in the order the flowchart runs, with where each step points and the words on each link:
+
+```
+board p1
+n1 pill Start → n2
+n2 box Write the draft → n3
+n3 diamond Passed? → n4 yes, n2 no
+n4 pill Publish
+```
+
+Besides the operations above, an edit on a board can link one step to another, add a step after or before a step, and add a whole flowchart written in Mermaid. ShellNote places every step and draws every link, so an assistant never gives a position or a size. `get_guide("board")` shows each, with an example:
+
+```json
+{ "op": "link", "from": "n4", "to": "n1", "label": "again" }
+{ "op": "insert", "at": "after", "ref": "n2", "kind": "step", "content": "Check the spelling" }
+{ "op": "insert", "at": "here", "kind": "flowchart", "content": "flowchart TD\n  A([Start]) --> B{Ready?}\n  B -->|yes| C[Go]" }
+```
+
+`export_note` writes a board's flowchart as a Mermaid block in Markdown, and as its steps, a line each, in plain text.
 
 ## How it reaches your notes
 

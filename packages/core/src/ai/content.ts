@@ -88,7 +88,9 @@ export function contentTask(input: {
       const around = aliases.near.map((n) => `${n.side}: ${blockLine(doc.block[n.id]!, 200)}`)
       const ref = op.ref !== undefined ? doc.block[aliases.id(op.ref)] : anchor ? doc.block[anchor.id] : undefined
       const context = [...(ref ? [`NEXT TO: ${blockLine(ref, 300)}`] : []), ...around].join('\n')
-      return { kind: op.kind, prompt: { system: topic(op.kind), user: `${context ? `${context}\n` : ''}${ask}` } }
+      // A step of a board is words, as a paragraph's; a flowchart is a diagram (v1.2).
+      const kind: ContentKind = op.kind === 'step' ? 'text' : op.kind === 'flowchart' ? 'diagram' : op.kind
+      return { kind, prompt: { system: topic(kind), user: `${context ? `${context}\n` : ''}${ask}` } }
     }
     case 'convert': {
       const text = op.ids.map((alias) => blockLine(doc.block[aliases.id(alias)]!, 2000)).join('\n')
