@@ -2,7 +2,7 @@
 // words in it and the nodes it points to; ink that belongs to a node. A link is kept on the node it leaves, so it is
 // made and taken away by `update`, and no operation is new. Nothing in an older note changes.
 import { describe, expect, it } from 'vitest'
-import { apply, createDoc, fromFiles, isEndless, outline, parseDoc, readBlocks, SCHEMA_VERSION, settle, structureProblems, toFiles, validateDoc, type Block, type Doc, type Op } from '../src/index.js'
+import { apply, createDoc, fromFiles, isEndless, outline, parseDoc, readBlocks, SCHEMA_VERSION, settle, startAs, structureProblems, toFiles, validateDoc, type Block, type Doc, type Op } from '../src/index.js'
 import { BOARD, PHYSICS } from './fixtures/index.js'
 import { expectError, step } from './helpers.js'
 
@@ -31,6 +31,14 @@ describe('file format version 6', () => {
     expect(doc.pages).toHaveLength(1)
     expect(doc.page[doc.pages[0]!]).toEqual({ id: doc.pages[0], endless: true, bg: 'dots', free: [] })
     expect(Object.keys(doc.block)).toHaveLength(0)
+  })
+
+  it('starts a new note as a board, keeping its id and title, as the library starts a note of a kind', () => {
+    const fresh = createDoc({ title: 'Plan' })
+    const board = startAs(fresh, 'board')
+    expect(validateDoc(board)).toBe(board)
+    expect(board).toMatchObject({ id: fresh.id, title: 'Plan', kind: 'board' })
+    expect(isEndless(board.page[board.pages[0]!]!)).toBe(true)
   })
 
   it('keeps a board through saving and opening: its page, its nodes, their links, the ink on a node', () => {
