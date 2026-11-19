@@ -31,8 +31,10 @@ export interface Route {
   label: Point
 }
 
-/** How far a link that goes back runs out from the nodes' sides before it turns: 8 mm. */
+/** How far a link that goes back runs out from the nodes' sides before it turns: 8 mm, and more the further back it goes. */
 const OUT = 800
+/** A link that goes back runs out 1 mm more for each 6 mm it goes back. */
+const BACK_STEP = 600
 /** Two nodes this close across the flow count as in line: 0.5 mm. */
 const IN_LINE = 50
 
@@ -105,9 +107,12 @@ export function routeLink(from: { shape: NodeShape; box: Box }, to: { shape: Nod
     out = into = plus ? sides.plus : sides.minus
     const [a, b] = [portOf(from.shape, from.box, out), portOf(to.shape, to.box, into)]
     const [[a1], [a2]] = [place(a), place(b)]
-    // Out past the two nodes, and past any other node lying between them that the line would run through.
+    // Out past the two nodes, and past any other node lying between them that the line would run through. Further
+    // out the further back it goes (a sixth of the way, in whole millimetres), so ways back that pass each other, as
+    // a loop inside a loop does, each run in a lane of their own.
     const between = others.map((box) => ({ a: along(box), c: across(box) })).filter(({ a }) => a[1] > toA[0] && a[0] < fromA[1])
-    let lane = plus ? Math.max(fromC[1], toC[1]) + OUT : Math.min(fromC[0], toC[0]) - OUT
+    const further = OUT + Math.round((fromA[0] - toA[1]) / BACK_STEP) * 100
+    let lane = plus ? Math.max(fromC[1], toC[1]) + further : Math.min(fromC[0], toC[0]) - further
     for (let tries = 0; tries < 20; tries++) {
       const inner = plus ? Math.min(fromC[0], toC[0]) : Math.max(fromC[1], toC[1])
       const hit = between.find(({ c }) => (plus ? c[1] > lane - OUT && c[0] < lane && c[1] > inner : c[0] < lane + OUT && c[1] > lane && c[0] < inner))

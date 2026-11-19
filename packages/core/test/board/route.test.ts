@@ -34,7 +34,8 @@ describe('a link’s path', () => {
 
   it('to a node behind goes round the side, out and back, and clear of a wider node between the two', () => {
     const back = routeLink(box(0, 8000), box(0, 0))
-    expect(back.points).toEqual([{ x: 4000, y: 8800 }, { x: 4800, y: 8800 }, { x: 4800, y: 800 }, { x: 4000, y: 800 }])
+    // 8 mm out, and 11 mm more for the 64 mm it goes back.
+    expect(back.points).toEqual([{ x: 4000, y: 8800 }, { x: 5900, y: 8800 }, { x: 5900, y: 800 }, { x: 4000, y: 800 }])
     expect([back.from, back.to]).toEqual(['right', 'right'])
     // A node between them, wider than both: the line runs outside it.
     const round = routeLink(box(0, 8000), box(0, 0), 'down', undefined, [{ x: -1000, y: 4000, w: 6500, h: 1600 }])
@@ -63,7 +64,17 @@ describe('a link’s path', () => {
     // In a chart that runs right, a way back goes round below.
     const back = routeLink(box(7000, 0), box(0, 0), 'right')
     expect([back.from, back.to]).toEqual(['bottom', 'bottom'])
-    expect(back.points[1]!.y).toBe(1600 + 800)
+    expect(back.points[1]!.y).toBe(1600 + 800 + 500)
+  })
+
+  it('gives a loop inside a loop a lane of its own: the further back a way goes, the further out it runs', () => {
+    const [start, draft, check, end] = [box(0, 0), box(0, 4000), box(0, 8000), box(0, 12_000)]
+    const inner = routeLink(check, draft)
+    const outer = routeLink(end, start)
+    expect([inner.from, outer.from]).toEqual(['right', 'right'])
+    expect(outer.points[1]!.x - inner.points[1]!.x).toBeGreaterThanOrEqual(1000)
+    // Their words, each halfway along its own lane, do not lie on each other.
+    expect(Math.abs(outer.label.x - inner.label.x)).toBeGreaterThanOrEqual(1000)
   })
 
   it('is one line when the link says straight, one curve when it says curved, between the same two sides', () => {
