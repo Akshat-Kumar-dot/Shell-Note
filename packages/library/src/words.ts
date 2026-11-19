@@ -15,7 +15,7 @@ const words = (md: string): string => plainText(parseInline(md))
 export function noteSnip(doc: Doc): string {
   let snip = ''
   for (const { block } of linearise(doc)) {
-    const said = block.type === 'text' ? words(block.md) : block.type === 'ink' ? (block.text ?? '') : block.type === 'table' ? block.rows.flat().map(words).join(' ') : ''
+    const said = block.type === 'text' || block.type === 'node' ? words(block.md) : block.type === 'ink' ? (block.text ?? '') : block.type === 'table' ? block.rows.flat().map(words).join(' ') : ''
     if (said.trim() === '') continue
     snip = `${snip} ${said}`.replace(/\s+/gu, ' ').trim()
     if (snip.length >= SNIP_LENGTH) break
@@ -38,6 +38,8 @@ export function noteWords(doc: Doc): string {
       if (block.text) parts.push(block.text)
     } else if (block.type === 'math') parts.push(block.tex)
     else if (block.type === 'diagram') parts.push(block.src)
+    // A board's step: its words, and the words on its links (yes, no).
+    else if (block.type === 'node') parts.push([words(block.md), ...(block.to ?? []).flatMap((link) => (link.label === undefined ? [] : [link.label]))].join(' '))
   }
   return parts.join('\n').toLowerCase().replace(/[ \t]+/gu, ' ').slice(0, MOST_WORDS)
 }

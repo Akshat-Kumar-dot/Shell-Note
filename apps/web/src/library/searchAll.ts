@@ -61,13 +61,13 @@ export interface Found {
 /** The last search, as the column shows it; none before one is made. */
 export const found = new Shared<Found | undefined>(undefined)
 
-/** The lines of a note, in reading order: each block's words as they read, a table's rows, a picture's words, ink's recognised words, a formula, a diagram. */
-function linesOf(doc: Doc): { block: string; frame?: string; text: string }[] {
+/** The lines of a note, in reading order: each block's words as they read, a table's rows, a picture's words, ink's recognised words, a formula, a diagram, a board's step. */
+export function linesOf(doc: Doc): { block: string; frame?: string; text: string }[] {
   const out: { block: string; frame?: string; text: string }[] = []
   const read = (md: string): string => plainText(parseInline(md))
   for (const { block } of linearise(doc)) {
     let text = ''
-    if (block.type === 'text') text = read(block.md)
+    if (block.type === 'text' || block.type === 'node') text = read(block.md)
     else if (block.type === 'table') text = block.rows.map((row) => row.map(read).join(' · ')).join(' / ')
     else if (block.type === 'ink') text = block.text ?? ''
     else if (block.type === 'image') text = [block.alt ?? '', block.caption ? read(block.caption) : ''].filter(Boolean).join(' ')

@@ -59,6 +59,7 @@ export { MAX_CHART_NODES, readFlowchart, writeFlowchart, type Chart, type ChartL
 export { leanOf, portOf, shapePath, type Side } from './board/geometry.js'
 export { chartOps, emptySpot, flowOf, GAP_ACROSS, GAP_ALONG, layoutChart, moveOps, nodesOn, nodeSize, stepOps, tidyChartOps, type NewStep } from './board/layout.js'
 export { routeLink, type Point, type Route } from './board/route.js'
+export { boardOrder, chartsIn } from './board/order.js'
 export { outsideScope, sameOutside } from './ai/scope.js'
 export { linearise, type Item } from './linearise.js'
 export { line, outline, type OutlineOptions } from './outline.js'

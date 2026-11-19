@@ -3,10 +3,13 @@
 // images as files beside the .md. Coloured words lose their colour: plain
 // Markdown has none.
 // Ink becomes an image in phase 6; until then only its transcription is kept.
+// A board's flowchart is a fenced mermaid block too, written from its nodes: Markdown readers draw it.
 import { exportMarkdown, serializeInline } from '../markdown/inline.js'
 import { pipeTable } from '../markdown/table.js'
+import { flowOf } from '../board/layout.js'
+import { writeFlowchart } from '../board/mermaid.js'
 import type { Doc, Hash, TextBlock } from '../schema/doc.js'
-import { blocksInOrder, captionBlock, joinChunks, titleToShow, type Chunk } from './common.js'
+import { blocksInOrder, captionBlock, chartsOnce, joinChunks, titleToShow, type Chunk } from './common.js'
 
 export interface MarkdownOptions {
   /** Start with the title as a level-1 heading. Default true. */
@@ -30,6 +33,7 @@ const EXTENSION: Record<string, string> = {
 export function toMarkdown(doc: Doc, options: MarkdownOptions = {}): MarkdownExport {
   const files: Record<string, Hash> = {}
   const blocks = blocksInOrder(doc)
+  const chartAt = chartsOnce(doc)
   const chunks: Chunk[] = []
   const title = options.title === false ? undefined : titleToShow(doc, blocks)
   if (title !== undefined) chunks.push({ text: heading(1, escapeLineStart(serializeInline([{ t: 'text', v: title }]))), run: 0 })
@@ -61,6 +65,11 @@ export function toMarkdown(doc: Doc, options: MarkdownOptions = {}): MarkdownExp
           chunks.push({ text: `*Handwriting:* ${serializeInline([{ t: 'text', v: block.text.trim() }])}`, run })
         }
         break
+      case 'node': {
+        const chart = chartAt(block.id)
+        if (chart) chunks.push({ text: fenced('mermaid', writeFlowchart(chart, flowOf(chart))), run })
+        break
+      }
     }
   }
   return { markdown: joinChunks(chunks), files }

@@ -4,7 +4,7 @@
 import { linearise, type Item } from './linearise.js'
 import { parseInline, plainText } from './markdown/inline.js'
 import { waysOut } from './board/lines.js'
-import type { Block, Doc, Id } from './schema/doc.js'
+import { isEndless, type Block, type Doc, type Id } from './schema/doc.js'
 
 export interface OutlineOptions {
   /** Only this page. */
@@ -29,7 +29,9 @@ export function outline(doc: Doc, options: OutlineOptions = {}): string {
   for (const item of linearise(doc, options.page === undefined ? {} : { page: options.page })) {
     if (item.page !== page) {
       page = item.page
-      lines.push(`page ${doc.pages.indexOf(page) + 1}/${doc.pages.length} ${page}`)
+      // A board has one page, and it is endless: it is named as what it is, never as page 1 of 1.
+      const sheet = doc.page[page]
+      lines.push(sheet && isEndless(sheet) ? `board ${page}` : `page ${doc.pages.indexOf(page) + 1}/${doc.pages.length} ${page}`)
     }
     lines.push(line(item, words))
   }

@@ -1,7 +1,7 @@
 // A note's words for the library's search, and its first words for the list (library/words.ts).
 import { apply, createDoc, type Doc } from '@shellnote/core'
 import { describe, expect, it } from 'vitest'
-import { MIXED } from '../../core/test/fixtures/index.js'
+import { BOARD, MIXED } from '../../core/test/fixtures/index.js'
 import { holdsWords, MOST_WORDS, noteSnip, noteWords, SNIP_LENGTH } from '../src/words.js'
 
 /** A note of one page with a frame of text for each text given, top to bottom in that order. */
@@ -35,6 +35,13 @@ describe("a note's words", () => {
     expect(holdsWords(words, '   ')).toBe(false)
   })
 
+  it("hold a board's steps and the words on their links", () => {
+    const words = noteWords(BOARD)
+    expect(words).toContain('write the draft')
+    expect(words).toContain('passed? yes no')
+    expect(holdsWords(words, 'publish deadline')).toBe(true)
+  })
+
   it('are kept to a most', () => {
     expect(noteWords(noteOf(['word '.repeat(25_000), 'more '.repeat(25_000)])).length).toBe(MOST_WORDS)
   })
@@ -52,5 +59,9 @@ describe("a note's first words", () => {
 
   it("come from a real note's blocks", () => {
     expect(noteSnip(MIXED).length).toBeGreaterThan(0)
+  })
+
+  it('of a board follow its flowchart along its links, then what lies beside it', () => {
+    expect(noteSnip(BOARD)).toBe('Start Write the draft Passed? Publish Remember the deadline')
   })
 })

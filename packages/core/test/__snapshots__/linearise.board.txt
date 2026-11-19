@@ -1,7 +1,7 @@
 p1 n1
-p1 f1
-p1   t1
 p1 n2
 p1 n3
 p1 k1
 p1 n4
+p1 f1
+p1   t1

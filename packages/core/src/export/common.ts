@@ -1,8 +1,9 @@
 // What the Markdown and text exporters share: walking the reading order and
 // numbering lists. Neither keeps the layout; they keep the reading order.
+import { chartsIn } from '../board/order.js'
 import { linearise } from '../linearise.js'
 import { parseInline, plainText } from '../markdown/inline.js'
-import type { Block, Doc, TextBlock } from '../schema/doc.js'
+import type { Block, Doc, Id, NodeBlock, TextBlock } from '../schema/doc.js'
 
 export interface Placed {
   block: Block
@@ -95,6 +96,22 @@ export function blocksInOrder(doc: Doc): Placed[] {
     out.push({ block, level: mark.level, number: mark.number, run })
   }
   return out
+}
+
+/**
+ * A board's flowcharts, each written once, whole, where its first node is read: the chart a node belongs to the first
+ * time one of its nodes comes, and undefined for the others.
+ */
+export function chartsOnce(doc: Doc): (node: Id) => NodeBlock[] | undefined {
+  const chartOf = new Map<Id, NodeBlock[]>()
+  for (const chart of chartsIn(doc)) for (const node of chart) chartOf.set(node.id, chart)
+  const written = new Set<NodeBlock[]>()
+  return (node) => {
+    const chart = chartOf.get(node)
+    if (!chart || written.has(chart)) return undefined
+    written.add(chart)
+    return chart
+  }
 }
 
 /** The title, unless the document already opens with a level-1 heading saying the same. */

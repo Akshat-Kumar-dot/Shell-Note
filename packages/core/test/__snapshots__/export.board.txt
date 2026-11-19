@@ -1,3 +1,8 @@
 How a post is published
 
+Start
+Write the draft
+Passed? → Publish (yes), Write the draft (no)
+Publish
+
 Remember the deadline

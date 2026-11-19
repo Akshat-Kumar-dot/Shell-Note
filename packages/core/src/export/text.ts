@@ -1,11 +1,14 @@
 // Plain-text export: the same walk as Markdown, text only.
 // Inline math keeps its $ signs and math blocks are written as LaTeX.
+// A board's flowchart is its steps, a line each in the order it runs, each with where it leads when that is not
+// simply the next line.
 import { parseInline, plainText } from '../markdown/inline.js'
-import type { Doc, TextBlock } from '../schema/doc.js'
-import { blocksInOrder, captionBlock, joinChunks, titleToShow, type Chunk } from './common.js'
+import type { Doc, NodeBlock, TextBlock } from '../schema/doc.js'
+import { blocksInOrder, captionBlock, chartsOnce, joinChunks, titleToShow, type Chunk } from './common.js'
 
 export function toText(doc: Doc, options: { title?: boolean } = {}): string {
   const blocks = blocksInOrder(doc)
+  const chartAt = chartsOnce(doc)
   const chunks: Chunk[] = []
   const title = options.title === false ? undefined : titleToShow(doc, blocks)
   if (title !== undefined) chunks.push({ text: title, run: 0 })
@@ -31,9 +34,31 @@ export function toText(doc: Doc, options: { title?: boolean } = {}): string {
       case 'ink':
         if (block.text !== undefined && block.text.trim() !== '') chunks.push({ text: `[handwriting: ${block.text.trim()}]`, run })
         break
+      case 'node': {
+        const chart = chartAt(block.id)
+        if (chart) chunks.push({ text: steps(chart), run })
+        break
+      }
     }
   }
   return joinChunks(chunks)
+}
+
+/**
+ * A flowchart as lines: each step's words, and where it leads unless that is only the next line, its link's words in
+ * brackets: "Passed? → Publish (yes), Write the draft (no)".
+ */
+function steps(chart: readonly NodeBlock[]): string {
+  const words = (node: NodeBlock): string => plainText(parseInline(node.md)).replace(/\s+/gu, ' ').trim() || '(an empty step)'
+  const byId = new Map(chart.map((node) => [node.id, node]))
+  return chart
+    .map((node, i) => {
+      const ways = (node.to ?? []).filter((link) => byId.has(link.node))
+      const onlyNext = ways.length === 1 && ways[0]!.label === undefined && ways[0]!.node === chart[i + 1]?.id
+      if (ways.length === 0 || onlyNext) return words(node)
+      return `${words(node)} → ${ways.map((link) => `${words(byId.get(link.node)!)}${link.label === undefined ? '' : ` (${link.label})`}`).join(', ')}`
+    })
+    .join('\n')
 }
 
 function textBlock(block: TextBlock, level: number, number: number): string {
