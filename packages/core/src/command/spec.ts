@@ -7,7 +7,7 @@
 // keeps the specs, so the finder is tested with no browser.
 import { z } from 'zod'
 import { PLACES, SPANS } from '../note/place.js'
-import { AnyColor, Font } from '../schema/doc.js'
+import { AnyColor, Font, MAX_LABEL, NodeShape } from '../schema/doc.js'
 
 /** area.verb: lowercase, the verb may be camelCase (bin.deleteForever). */
 export const COMMAND_NAME = /^[a-z]+\.[a-z][a-zA-Z]*$/u
@@ -90,8 +90,8 @@ export const FIELDS = {
   width: z.enum(['extra-fine', 'fine', 'medium', 'broad', 'extra-broad']).describe('How wide a line is'),
   erase: z.enum(['whole', 'part']).describe('The eraser takes whole strokes, or only the part of a stroke it passes over'),
   size: z.enum(['small', 'medium', 'large']).describe('How big'),
-  percent: z.int().min(25).max(400).describe('A zoom, in percent: 100 is actual size'),
-  step: z.enum(['in', 'out', 'actual']).describe('Zoom one step in, one step out, or back to actual size'),
+  percent: z.int().min(10).max(400).describe('A zoom, in percent: 100 is actual size; pages from 25, a board from 10'),
+  step: z.enum(['in', 'out', 'actual', 'fit']).describe('Zoom one step in, one step out, back to actual size, or (on a board) to show the whole board'),
   page: z.int().min(1).describe('A page number, from 1'),
   on: z.boolean().describe('On (true) or off (false)'),
   panel: z.enum(['side', 'description', 'transcript', 'web', 'timer', 'output', 'ai']).describe('The side panel, or one of its tabs'),
@@ -115,7 +115,7 @@ export const FIELDS = {
   show: z.enum(['all', 'text', 'sketch', 'mixed']).describe('Which notes the library shows: all of them, or only the text notes, the sketches or the mixed notes'),
   look: z.enum(['system', 'light', 'dark']).describe("The app's appearance; system follows Windows"),
   accent: z.enum(['graphite', 'blue', 'teal', 'green', 'amber', 'rose', 'red']).describe("The app's own colour, on its buttons and what is chosen; graphite is no colour"),
-  type: z.enum(['text', 'sketch', 'mixed']).describe('What a note is for: text (typing), sketch (the pen) or mixed (both)'),
+  type: z.enum(['text', 'sketch', 'mixed', 'board']).describe('What a note is for: text (typing), sketch (the pen), mixed (both), or board (flowcharts on an endless page: made as one, never made into one)'),
   sheet: z.enum(['a4', 'a5', 'a6', 'letter']).describe('A page size: a4, a5, a6 or letter'),
   turn: z.enum(['upright', 'across']).describe('Which way up the pages are: upright (portrait) or across (landscape)'),
   link: name.describe('A YouTube link, or a video id'),
@@ -155,11 +155,19 @@ export const FIELDS = {
   head: z.boolean().describe("A table's first row its header row (on), or a plain row (off)"),
   picture: name.describe('A picture of another note of the library: its description or caption, with its note when that helps, as "the circuit photo from my Electronics note"'),
   // Places on a page and pages (note control, step 4): words, never millimetres; code finds the spot.
-  to: z.union([z.enum(PLACES), z.int().min(1), name]).describe("Where it goes: a part of a page (top, bottom, left, right, middle, top left, top right, bottom left, bottom right), or for a page its new number"),
+  to: z.union([z.enum(PLACES), z.int().min(1), name]).describe("Where it goes: a part of a page (top, bottom, left, right, middle, top left, top right, bottom left, bottom right), for a page its new number, or for a link the step it leads to"),
   beside: name.describe('The block a block goes beside: its id, $1, or words such as "the first paragraph"'),
   below: name.describe('The block a block goes below: its id, $1, or words such as "the table"'),
   span: z.enum(SPANS).describe("How wide a block is: half, a third or the full width of the page (a table's, of its column), or wider or narrower than now"),
   paper: z.enum(['blank', 'ruled', 'squares', 'dots']).describe("A page's paper: blank, ruled lines, squares or dots"),
+  // A board's flowchart (the Board, step 2): steps named by id or in words, never a place; code does every place.
+  from: name.describe('The step a link leaves: its id, $1, or words such as "the step Review" or "the diamond"'),
+  shape: z.enum(NodeShape.options).describe("A step's shape: box, round, pill (a start or an end), subroutine, cylinder (stored data), circle, double-circle, flag, diamond (a decision), hexagon, slant (an input or output), slant-back, trapezoid, trapezoid-down"),
+  label: z.string().max(MAX_LABEL).describe("A link's words, one line (empty: none)"),
+  route: z.enum(['angled', 'straight', 'curved']).describe('How a link runs between its steps: angled (in right angles), straight, or curved'),
+  line: z.enum(['plain', 'dotted', 'thick']).describe('How a link is drawn: a plain, a dotted or a thick line'),
+  arrow: z.boolean().describe('A link with an arrow at its end (on), or a line with none (off)'),
+  flow: z.enum(['down', 'right', 'up', 'left']).describe('Which way a flowchart runs: down (top to bottom), right (left to right), up, or left'),
 } as const
 
 export type Field = keyof typeof FIELDS

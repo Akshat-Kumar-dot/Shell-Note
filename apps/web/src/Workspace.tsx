@@ -5,7 +5,7 @@
 // button to edit it here instead. A sample note (?sample=…) is never kept. The AI works on what is chosen, through
 // the ✨ button or Ctrl+K; its answers and its log show in a panel beside the pages, and the log is kept beside the
 // note in the library, never in its file.
-import { textOf, ValidationError, type Doc, type LogEntry, type Selection, type NoteKind } from '@shellnote/core'
+import { parseInline, plainText, textOf, ValidationError, type Doc, type LogEntry, type Selection, type NoteKind } from '@shellnote/core'
 import { aiEdit, AiLayer, AskPanel, AssetStore, BarMenu, BarStrip, CHANGED_SINCE, checkDiagram, commands, EditorStore, MenuItem, MovableBar, NoteBar, undoEdit, type By, type NewNote, LogPanel, PageView, PrintView, useUndoKeys, EditorArea, programHost, showSideTab, tabWord, inDesktopApp, workspace, type AiHost, type AskAnswer, type LogItem } from '@shellnote/editor'
 import { openAICompatible } from '@shellnote/providers'
 import { Check, CircleAlert, CloudCheck, CornerDownLeft, Ellipsis, FileDown, FilePlus2, FolderOpen, HardDrive, Maximize2, ScrollText, TriangleAlert } from 'lucide-react'
@@ -81,8 +81,9 @@ export async function sessionFor(doc: Doc, assets: ReadonlyMap<string, Blob>, pl
     if (asset) await store.put(hash, blob, asset.mime)
   }
   const editor = new EditorStore(doc, store)
-  // A sketch is for the pen: it opens with the pen in hand, its row of tools shown first.
+  // A sketch is for the pen: it opens with the pen in hand, its row of tools shown first. A board opens with Select.
   if (doc.kind === 'sketch') editor.setTool('pen')
+  if (doc.kind === 'board') editor.setTool('select')
   return { key: ++sessions, store: editor, ...place }
 }
 
@@ -595,6 +596,8 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
         undoAi: () => own.current.undoAi(),
         editHere: () => own.current.takeOver(),
         print: () => {
+          // A board prints by the areas drawn on it, which come in a later version.
+          if (store.doc.kind === 'board') throw new Error('Printing a board comes in a later version of ShellNote, with the areas of a board that print as pages.')
           setPrinting(true)
           return 'the print window opens: print the note, or save it as a PDF'
         },
@@ -696,6 +699,7 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
   const settled = useDeferredValue(doc)
   const words = useMemo(() => Object.values(settled.block).reduce((sum, block) => sum + wordsIn(block), 0), [settled])
   const pages = doc.pages.length
+  const steps = useMemo(() => Object.values(settled.block).filter((block) => block.type === 'node').length, [settled])
   const end = useSyncExternalStore(tabsEnd.subscribe, tabsEnd.snapshot)
   const full = useSyncExternalStore(workspace.subscribe, workspace.snapshot).layout.full === 'notes'
   // Why the note is read-only here, or a problem keeping it: under the tabs and the tool bar.
@@ -727,9 +731,15 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
         {doc.view === 'seamless' ? (doc.kind === 'sketch' ? ' · growing sheet' : ' · no page breaks') : ''}
       </span>
       {doc.kind === 'sketch' ? <span title="The paper (the note's menu, Paper)">{PAPER_WORDS[doc.page[doc.pages[0]!]?.bg ?? 'blank']}</span> : null}
-      <span>
-        {pages} {pages === 1 ? 'page' : 'pages'}
-      </span>
+      {doc.kind === 'board' ? (
+        <span>
+          {steps} {steps === 1 ? 'step' : 'steps'}
+        </span>
+      ) : (
+        <span>
+          {pages} {pages === 1 ? 'page' : 'pages'}
+        </span>
+      )}
       <span>
         {words} {words === 1 ? 'word' : 'words'}
       </span>
@@ -740,6 +750,8 @@ export function Workspace({ library, tabs, session: first, onHome, onOpen }: Wor
               ['in', 'Zoom in', 'Zoom in'],
               ['out', 'Zoom out', 'Zoom out'],
               ['actual', 'Actual size', 'Actual size, 100%'],
+              // A board: all of it in view.
+              ...(doc.kind === 'board' ? ([['fit', 'The whole board', 'The whole board']] as const) : []),
             ] as const
           ).map(([step, label, words]) => (
             <MenuItem
@@ -895,7 +907,8 @@ function wordsIn(block: Parameters<typeof textOf>[0]): number {
   if (!block) return 0
   let count = counted.get(block)
   if (count === undefined) {
-    count = textOf(block).match(/\S+/gu)?.length ?? 0
+    // A board's step holds words too.
+    count = (block.type === 'node' ? plainText(parseInline(block.md)) : textOf(block)).match(/\S+/gu)?.length ?? 0
     counted.set(block, count)
   }
   return count

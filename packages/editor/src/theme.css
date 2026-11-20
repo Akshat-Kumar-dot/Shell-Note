@@ -171,8 +171,8 @@
   overflow: auto;
   background: var(--ui-desk);
 }
-/* A board, where the view of pages would be. */
-.nw-board {
+/* A board that cannot be shown, where the board would be. */
+p.nw-board {
   margin: 0;
   padding: 4rem 1.5rem;
   text-align: center;
@@ -1168,6 +1168,173 @@ body[data-dragging] * {
   left: 100%;
   top: 100%;
   cursor: nwse-resize;
+}
+
+/*
+ * A board: its one endless page under a camera (board/BoardView.tsx). The paper's dots move with the board, never
+ * closer than 8 pixels; what is on it is drawn in the board's own millimetres, scaled as a whole.
+ */
+div.nw-board {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--nw-paper);
+  touch-action: none;
+  outline: none;
+}
+div.nw-board[data-bg='dots'] {
+  background-image: radial-gradient(circle, var(--nw-rule) 1.2px, transparent 1.7px);
+  background-size: var(--nw-dots) var(--nw-dots);
+}
+div.nw-board[data-bg='grid'] {
+  background-image:
+    linear-gradient(var(--nw-rule) 1px, transparent 1px),
+    linear-gradient(90deg, var(--nw-rule) 1px, transparent 1px);
+  background-size: var(--nw-dots) var(--nw-dots);
+}
+div.nw-board[data-bg='ruled'] {
+  background-image: linear-gradient(var(--nw-rule) 1px, transparent 1px);
+  background-size: 100% calc(var(--nw-dots) * 1.6);
+}
+.nw-board-world {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  color: var(--nw-ink);
+  font-family: var(--nw-sans);
+  font-size: 11pt;
+  line-height: 1.45;
+}
+/* A step: only its shape takes a press, so a diamond's corner is the board under it; its words never do. */
+.nw-step {
+  --nw-step-line: var(--nw-ink);
+  --nw-step-fill: color-mix(in srgb, var(--nw-ink) 4%, var(--nw-paper));
+  position: absolute;
+  pointer-events: none;
+}
+.nw-step[data-coloured] {
+  --nw-step-line: var(--nw-step-colour);
+  --nw-step-fill: color-mix(in srgb, var(--nw-step-colour) 10%, var(--nw-paper));
+}
+.nw-step-shape {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.nw-step-shape path {
+  fill: var(--nw-step-fill);
+  stroke: var(--nw-step-line);
+  stroke-width: 60;
+  stroke-linejoin: round;
+  pointer-events: visiblePainted;
+}
+/* Its words where core measured them, in letters about 2 mm wide, so they wrap as they were sized. */
+.nw-step-words {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: 3.5mm;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+.nw-step-words a {
+  pointer-events: auto;
+}
+/* The links, under the steps: a thin line, dotted or thick when it says so, its words on a patch of paper. */
+.nw-links {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+.nw-link-line {
+  fill: none;
+  stroke: var(--nw-gray);
+  stroke-width: 55;
+  stroke-linejoin: round;
+}
+.nw-link[data-line='dotted'] .nw-link-line {
+  stroke-dasharray: 120 160;
+}
+.nw-link[data-line='thick'] .nw-link-line {
+  stroke-width: 110;
+}
+.nw-link-head {
+  fill: var(--nw-gray);
+}
+/* A band wider than the line takes the press, the same on the screen at any zoom. */
+.nw-link-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 12px;
+  vector-effect: non-scaling-stroke;
+  pointer-events: stroke;
+}
+.nw-link-words rect {
+  fill: var(--nw-paper);
+  pointer-events: visiblePainted;
+}
+.nw-link-words text {
+  fill: var(--nw-gray);
+  text-anchor: middle;
+  dominant-baseline: central;
+  font-family: var(--nw-sans);
+  pointer-events: none;
+}
+.nw-link[data-chosen] .nw-link-line {
+  stroke: #1f5fbf;
+}
+.nw-link[data-chosen] .nw-link-words text {
+  fill: #1f5fbf;
+}
+/* What is chosen on a board, and the corners that size the one chosen alone. */
+.nw-chosen {
+  position: absolute;
+  box-sizing: border-box;
+  outline: calc(1.5px / var(--nw-zoom, 1)) solid #1f5fbf;
+  outline-offset: calc(3px / var(--nw-zoom, 1));
+  border-radius: calc(2px / var(--nw-zoom, 1));
+  pointer-events: none;
+}
+.nw-board-corner {
+  position: absolute;
+  width: calc(10px / var(--nw-zoom, 1));
+  height: calc(10px / var(--nw-zoom, 1));
+  box-sizing: border-box;
+  border: calc(1.5px / var(--nw-zoom, 1)) solid #1f5fbf;
+  border-radius: calc(2px / var(--nw-zoom, 1));
+  background: #fff;
+  transform: translate(-50%, -50%);
+}
+/* On a board, Select is a pointer: what can move shows it, a corner sizes, the bare board draws a box. */
+div.nw-board[data-tool='select'],
+div.nw-board[data-tool='select'] * {
+  cursor: default !important;
+}
+div.nw-board[data-tool='select'] .nw-step-shape path,
+div.nw-board[data-tool='select'] .nw-free,
+div.nw-board[data-tool='select'] .nw-free * {
+  cursor: move !important;
+}
+div.nw-board[data-tool='select'] .nw-link-hit,
+div.nw-board[data-tool='select'] .nw-link-words rect {
+  cursor: pointer !important;
+}
+div.nw-board[data-tool='select'] .nw-board-corner[data-corner='nw'],
+div.nw-board[data-tool='select'] .nw-board-corner[data-corner='se'] {
+  cursor: nwse-resize !important;
+}
+div.nw-board[data-tool='select'] .nw-board-corner[data-corner='ne'],
+div.nw-board[data-tool='select'] .nw-board-corner[data-corner='sw'] {
+  cursor: nesw-resize !important;
+}
+div.nw-board[data-panning],
+div.nw-board[data-panning] * {
+  cursor: grab !important;
 }
 
 .nw-frame .ProseMirror {

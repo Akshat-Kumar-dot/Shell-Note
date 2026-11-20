@@ -93,7 +93,7 @@ export const APP_COMMANDS: readonly CommandSpec[] = [
   // ----- notes -----
   {
     name: 'note.new',
-    does: 'Make a new, empty note and open it, with its name when one is given; type= starts it as a text note (no page breaks), a sketch (a wide growing sheet of dots, the pen in hand) or a mixed note (pages)',
+    does: 'Make a new, empty note and open it, with its name when one is given; type= starts it as a text note (no page breaks), a sketch (a wide growing sheet of dots, the pen in hand), a mixed note (pages) or a board (one endless page for flowcharts)',
     says: ['new note', 'create a note', 'make a new note', 'start a blank note', 'add a note to the folder', 'start a new {type} note'],
     input: inputs([], ['name', 'into', 'type']),
     example: { name: 'Waves', into: 'Physics' },
@@ -121,7 +121,7 @@ export const APP_COMMANDS: readonly CommandSpec[] = [
   },
   {
     name: 'note.kind',
-    does: 'Say what the open note is for: text (typing), sketch (the pen) or mixed (both). It chooses the tools shown first and the paper of new pages, never what the note holds',
+    does: 'Say what the open note is for: text (typing), sketch (the pen) or mixed (both). It chooses the tools shown first and the paper of new pages, never what the note holds. A board is made as one (note.new type=board) and stays one',
     says: ['make it a {type} note', 'turn this into a {type} note', 'change the note kind to {type}', 'this note is a {type} note'],
     input: inputs(['type']),
     example: { type: 'sketch' },
@@ -359,8 +359,8 @@ export const APP_COMMANDS: readonly CommandSpec[] = [
   // ----- the screen (the area was view until pick fv) -----
   {
     name: 'screen.zoom',
-    does: 'Zoom the note: to a percent, one step in or out, or actual size',
-    says: ['zoom {step}', 'zoom to {percent}', 'zoom to {percent} percent', 'actual size', 'make the page bigger on screen', 'make the page smaller on screen'],
+    does: 'Zoom the note: to a percent, one step in or out, actual size, or on a board the whole board in view (step=fit)',
+    says: ['zoom {step}', 'zoom to {percent}', 'zoom to {percent} percent', 'actual size', 'make the page bigger on screen', 'make the page smaller on screen', 'show the whole board'],
     input: inputs([], ['percent', 'step']),
     example: { percent: 150 },
   },

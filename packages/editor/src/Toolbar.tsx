@@ -51,6 +51,7 @@ import {
 import { Fragment, useReducer, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { BarMenu, keepFocus, MenuItem } from './BarMenu.js'
 import { RedoButton, UndoButton, usePictures } from './BarParts.js'
+import { BoardRow } from './board/BoardRow.js'
 import { activeEditor } from './frame/active.js'
 import { onWords } from './frame/words.js'
 import { FontLibrary } from './FontLibrary.js'
@@ -161,6 +162,8 @@ function runner(store: EditorStore) {
 export function NoteBar({ store }: { store: EditorStore }) {
   const tool = useSyncExternalStore(store.subscribeTool, store.toolSnapshot)
   const both = useSyncExternalStore(bothRows.subscribe, bothRows.snapshot)
+  // A board has a row of its own (a board stays a board, so this never changes while the note is open).
+  if (store.doc.kind === 'board') return <div className="sh-rows"><BoardRow store={store} /></div>
   // The Hand is the pen's row's: with it in hand, that row stays.
   const ink = isInkTool(tool) || tool === 'hand'
   return (

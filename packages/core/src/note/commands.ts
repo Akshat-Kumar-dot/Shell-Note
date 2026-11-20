@@ -20,7 +20,7 @@ export const NOTE_COMMANDS: readonly CommandSpec[] = [
   },
   {
     name: 'text.rewrite',
-    does: "Rewrite a block's words: the new words on the lines under the line, then end; what stayed keeps its marks",
+    does: "Rewrite a block's words, a board's step's too: the new words on the lines under the line, then end; what stayed keeps its marks",
     says: ['rewrite the paragraph', 'reword the heading', 'make the paragraph shorter', 'fix the wording of', 'rephrase this sentence'],
     input: inputs(['block', 'words']),
     example: { block: 'the second paragraph', words: 'A wave carries energy from place to place.' },
@@ -129,7 +129,7 @@ export const NOTE_COMMANDS: readonly CommandSpec[] = [
   },
   {
     name: 'block.remove',
-    does: 'Take a block out of the note (Undo brings it back)',
+    does: "Take a block out of the note, a board's step with its links and the ink on it (Undo brings it back)",
     says: ['delete the paragraph', 'remove the heading', 'take out the empty line', 'get rid of the quote'],
     input: inputs(['block']),
     example: { block: 'the quote' },
@@ -286,5 +286,48 @@ export const NOTE_COMMANDS: readonly CommandSpec[] = [
     says: ['describe the picture', 'write a description of the photo', 'add alt text to', 'change the description of the image', 'say what the picture shows'],
     input: inputs(['block', 'words']),
     example: { block: 'the picture', words: 'Ripples spreading from a dipper in a shallow tank' },
+  },
+  // ----- a board's flowchart (the Board, step 2): steps named by id or in words; code does every place -----
+  {
+    name: 'board.add',
+    does: "Add a step to a board's flowchart: after= or before= a step (between it and its next, the rest moving along; after a decision, one more branch), or on its own where there is room; its words on the lines under the line, then end; shape= and colour= when not a plain box",
+    says: ['add a step after', 'put a new step before', 'add a {shape} step', 'insert a step between', 'add another box to the flowchart'],
+    input: inputs([], ['words', 'after', 'before', 'shape', 'colour']),
+    example: { after: 'n2', words: 'Spell check' },
+  },
+  {
+    name: 'board.link',
+    does: "Join two steps of a board with a link: from= the step it leaves, to= the step it leads to; or change one: label= its words, route= angled, straight or curved, line= plain, dotted or thick, arrow=on|off",
+    says: ['link the step to', 'join the two steps', 'connect the box to', 'draw an arrow from', 'make the link {route}'],
+    input: inputs(['from', 'to'], ['label', 'route', 'line', 'arrow']),
+    example: { from: 'n3', to: 'n2', label: 'no' },
+  },
+  {
+    name: 'board.unlink',
+    does: 'Take away the link between two steps of a board: from= the step it leaves, to= the step it leads to',
+    says: ['unlink the steps', 'remove the arrow between', 'disconnect the box from', 'cut the link from', 'take away the connection'],
+    input: inputs(['from', 'to']),
+    example: { from: 'n3', to: 'n2' },
+  },
+  {
+    name: 'board.look',
+    does: 'Change how a step of a board looks: its shape (shape=) and its colour (colour=); its words fit it again',
+    says: ['make the step a {shape}', 'colour the step {colour}', 'turn the box into a diamond', 'change the shape of the step', 'make the decision red'],
+    input: inputs(['block'], ['shape', 'colour']),
+    example: { block: 'n3', shape: 'diamond', colour: 'blue' },
+  },
+  {
+    name: 'board.draw',
+    does: 'Draw a whole flowchart on a board from its Mermaid under the line (flowchart TD or LR, then its steps and links), then end; laid out where the board has room',
+    says: ['draw a flowchart of', 'make a flowchart on the board', 'build the chart from', 'sketch the process as a flowchart', 'lay these steps out as a chart'],
+    input: inputs(['words']),
+    example: { words: 'flowchart TD\n  A([Start]) --> B{Passed?}\n  B -->|yes| C[Publish]\n  B -->|no| A' },
+  },
+  {
+    name: 'board.tidy',
+    does: "Lay a board's flowchart out again in layers, each step keeping its size: flow= down, right, up or left (left out: the way it runs now)",
+    says: ['tidy the flowchart', 'lay out the chart again', 'arrange the steps neatly', 'clean up the board', 'line up the steps {flow}'],
+    input: inputs([], ['flow']),
+    example: { flow: 'right' },
   },
 ]

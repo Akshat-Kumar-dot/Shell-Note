@@ -6,6 +6,7 @@
 // words, and none that fits says what the page has.
 import { blockOf, wordsOf } from '../command/page.js'
 import type { Doc } from '../schema/doc.js'
+import { referOnBoard } from './board.js'
 import { pageFacts, type Drawn, type Placed } from './picture.js'
 import { tableWords } from './table.js'
 
@@ -69,6 +70,8 @@ export function referTo(doc: Doc, written: string, context: ReferContext): Refer
     return id !== undefined && doc.block[id] ? { ok: true, id } : { ok: false, why: `${said} names the block made by line ${made[1]} of this request, and ${context.made?.length ? `only ${context.made.length} made one` : 'no line before it made one'}.` }
   }
   if (doc.block[said]) return { ok: true, id: said }
+  // A board has no pages to count blocks on: its steps by their order, shape and words (board.ts).
+  if (doc.kind === 'board') return referOnBoard(doc, said)
 
   const facts = (page: number): Placed[] | string => {
     try {

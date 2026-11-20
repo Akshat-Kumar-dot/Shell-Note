@@ -97,6 +97,47 @@ export function nodeSize(shape: NodeShape, md: string): Size {
   return { w: Math.ceil(w / 100) * 100, h: Math.ceil(h / 100) * 100 }
 }
 
+/**
+ * A step made the size its words need in its shape, about the same middle. One a person made larger than its words
+ * needed is only ever made larger. None when it is that size already.
+ */
+export function fitOps(node: NodeBlock, shape: NodeShape, md: string): Op[] {
+  const was = nodeSize(node.shape, node.md)
+  const need = nodeSize(shape, md)
+  const own = was.w === node.w && was.h === node.h
+  const size = own ? need : { w: Math.max(node.w, need.w), h: Math.max(node.h, need.h) }
+  if (size.w === node.w && size.h === node.h) return []
+  return [{ op: 'move', id: node.id, to: { page: node.page, x: Math.round(node.x + (node.w - size.w) / 2), y: Math.round(node.y + (node.h - size.h) / 2), w: size.w, h: size.h } }]
+}
+
+/**
+ * Where a step's words lie in its box: the box less the room `nodeSize` gave round them, about its middle, so words
+ * drawn there wrap as they were measured. A diamond's and a circle's in the middle of the shape.
+ */
+export function wordsArea(shape: NodeShape, box: Box): Box {
+  let w: number
+  let h: number
+  switch (shape) {
+    case 'diamond':
+      w = box.w / 1.5 - 2 * PAD_X
+      h = box.h / 1.7 - 2 * PAD_Y
+      break
+    case 'circle':
+    case 'double-circle':
+      w = box.w * 0.68
+      h = box.h * 0.68
+      break
+    default: {
+      const aside = shape === 'hexagon' ? box.h / 2 : shape === 'slant' || shape === 'slant-back' || shape === 'trapezoid' || shape === 'trapezoid-down' ? box.h * 0.4 : shape === 'pill' || shape === 'flag' ? box.h / 4 : shape === 'subroutine' ? 300 : 0
+      w = box.w - 2 * (PAD_X + aside)
+      h = box.h - 2 * (PAD_Y + (shape === 'cylinder' ? 300 : 0))
+    }
+  }
+  w = Math.max(0, Math.round(w))
+  h = Math.max(0, Math.round(h))
+  return { x: Math.round(box.x + (box.w - w) / 2), y: Math.round(box.y + (box.h - h) / 2), w, h }
+}
+
 // ----- which way a chart runs ---------------------------------------------------
 
 /** Places along the way a chart runs and across it, whichever way that is. */
@@ -435,15 +476,15 @@ export function stepOps(doc: Doc, ref: Id, side: 'after' | 'before', step: NewSt
 
 /**
  * The moves that lay a board's flowchart out again, each node keeping its size, the whole keeping its first corner:
- * none when every node is where the layout puts it.
+ * none when every node is where the layout puts it. It runs `flow` when given, else the way it runs now.
  */
-export function tidyChartOps(doc: Doc, pageId: Id): Op[] {
+export function tidyChartOps(doc: Doc, pageId: Id, flow?: Flow): Op[] {
   const nodes = nodesOn(doc, pageId)
   if (nodes.length === 0) return []
   const boxes = layoutChart(
     nodes.map((node) => ({ key: node.id, w: node.w, h: node.h })),
     nodes.flatMap((node) => (node.to ?? []).map((link) => ({ from: node.id, to: link.node }))),
-    flowOf(nodes),
+    flow ?? flowOf(nodes),
   )
   const left = Math.min(...nodes.map((node) => node.x))
   const top = Math.min(...nodes.map((node) => node.y))

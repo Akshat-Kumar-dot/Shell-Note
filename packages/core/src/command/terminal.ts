@@ -8,6 +8,7 @@
 // apply), look and block (reading). Anything else is read as plain words: do.
 // This is the part with no browser; the editor runs the lines.
 import { z } from 'zod'
+import { SHAPE_WORDS } from '../board/shape.js'
 import { COMMANDS } from './all.js'
 import { AREAS, areaOf, operationOf } from './lexicon.js'
 import { bare, FIELDS, isNumber, valuesOf, type CommandSpec } from './spec.js'
@@ -268,9 +269,10 @@ export const linesOf = (block: readonly string[]): string[] =>
 
 /**
  * The areas whose lines take words on the lines under them, up to a line `end` (note control):
- * text and lists, and since step 3 a table (a Markdown table), a formula (LaTeX), a diagram (Mermaid), a caption.
+ * text and lists, and since step 3 a table (a Markdown table), a formula (LaTeX), a diagram (Mermaid), a caption; and a
+ * board's (a step's words, a whole flowchart's Mermaid).
  */
-export const WORD_AREAS: ReadonlySet<string> = new Set(['text', 'list', 'table', 'maths', 'diagram', 'picture', 'box', 'recipe', 'write'])
+export const WORD_AREAS: ReadonlySet<string> = new Set(['text', 'list', 'table', 'maths', 'diagram', 'picture', 'box', 'recipe', 'write', 'board'])
 
 /** A line to run, with the words written under it, when it takes words. */
 export interface TerminalStep {
@@ -531,6 +533,8 @@ export function typed(spec: CommandSpec, input: Record<string, unknown>): Record
     if (isNumber(schema) && /^-?\d+(?:\.\d+)?$/u.test(value)) out[field] = Number(value)
     else if (inner instanceof z.ZodBoolean && SWITCH[value.toLowerCase()] !== undefined) out[field] = SWITCH[value.toLowerCase()]
     else if (inner instanceof z.ZodArray) out[field] = value.split(',').map((item) => item.trim()).filter(Boolean)
+    // A step's shape in a flowchart's own words: a rectangle is a box, a decision a diamond (board/shape.ts).
+    else if (field === 'shape') out[field] = SHAPE_WORDS[value.trim().toLowerCase().replace(/\s+/gu, '-')] ?? value
     else out[field] = value
   }
   return out

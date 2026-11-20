@@ -1,6 +1,8 @@
 // The view, the panels and choosing blocks, as commands (app control, step
 // 3a): each does what its button did, and the buttons now call them.
 import { blockDetail, blockOf, blocksList, type Box, type Doc, type PenButton, type TypingButton, sized, sizedPage } from '@shellnote/core'
+import { boardScreen } from '../board/active.js'
+import { clampBoardZoom, stepBoardZoom } from '../board/camera.js'
 import { clampZoom, stepZoom } from '../geometry.js'
 import { placesReset, putButton, resetCustom, setAppLook, type AppLook } from '../layout/custom.js'
 import { dockPanel, workspace as layout, resetWorkspace, setBar, setSideOpen, type BarId } from '../layout/state.js'
@@ -13,7 +15,14 @@ const pct = (zoom: number): string => `${Math.round(zoom * 100)} %`
 export function defineView(commands: Commands): void {
   commands.define('screen.zoom', ['workspace'], ({ percent, step }, { workspace }) => {
     const now = workspace.zoom()
-    const next = typeof percent === 'number' ? clampZoom(percent / 100) : step === 'in' ? stepZoom(now, 1) : step === 'out' ? stepZoom(now, -1) : step === 'actual' ? 1 : undefined
+    // A board zooms further out than a page, and to the whole board.
+    const board = boardScreen()
+    if (step === 'fit') {
+      if (!board) throw new Error('The whole board is for a board: this note has pages (zoom step=in, out or actual).')
+      return `zoom ${pct(board.fit())}, the whole board in view`
+    }
+    const [clamp, steps] = board ? [clampBoardZoom, stepBoardZoom] : [clampZoom, stepZoom]
+    const next = typeof percent === 'number' ? clamp(percent / 100) : step === 'in' ? steps(now, 1) : step === 'out' ? steps(now, -1) : step === 'actual' ? 1 : undefined
     if (next === undefined) throw new Error('Give a percent (zoom to 150) or a step: in, out or actual.')
     workspace.setZoom(next)
     return `zoom ${pct(next)}`

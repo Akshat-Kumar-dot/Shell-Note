@@ -229,9 +229,10 @@ export const inkColour = (color: AnyColor, highlighter = false): string => (isCo
  * The drawing is the size of the page, at the page's own scale, held still
  * against the page however the block's box grows or moves its corner as
  * strokes join it: a new letter adds its own lines, and the letters before it
- * are never drawn again (they would land a hair off and flicker).
+ * are never drawn again (they would land a hair off and flicker). A board has
+ * no page size: it gives an area of its own round the block (`page.x`, `page.y`).
  */
-export const InkView = memo(function InkView({ block, page }: { block: InkBlock; page: { w: number; h: number } }) {
+export const InkView = memo(function InkView({ block, page }: { block: InkBlock; page: { w: number; h: number; x?: number; y?: number } }) {
   const under: ReactNode[] = []
   const over: ReactNode[] = []
   // Each stroke's drawing keyed by what it is on the page, not its place in the block, so erasing one draws no other again.
@@ -251,9 +252,10 @@ export const InkView = memo(function InkView({ block, page }: { block: InkBlock;
     )
     ;(look.under ? under : over).push(group)
   })
-  const box = `0 0 ${page.w} ${page.h}`
+  const [x0, y0] = [page.x ?? 0, page.y ?? 0]
+  const box = `${x0} ${y0} ${page.w} ${page.h}`
   // The page's corner, from the block's: where the page-sized drawing sits inside the block's box.
-  const place: CSSProperties = { left: mm(-block.x), top: mm(-block.y), width: mm(page.w), height: mm(page.h) }
+  const place: CSSProperties = { left: mm(x0 - block.x), top: mm(y0 - block.y), width: mm(page.w), height: mm(page.h) }
   const lines = { fill: 'none', strokeLinecap: 'round', strokeLinejoin: 'round' } as const
   return (
     <>

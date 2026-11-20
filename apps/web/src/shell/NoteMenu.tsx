@@ -173,23 +173,29 @@ export function NoteMenu({ store, close, editing, children, after }: NoteMenuPro
       </>
     )
 
+  // A board is made as one and stays one, and its one page is endless: it has no kind to change and no page size.
+  const board = kind === 'board'
   return (
     <>
       <div className="sh-menu-head">This note</div>
-      <MenuItem label="Kind" title="What this note is for: text, sketch or mixed" onChoose={() => setLevel('kind')}>
-        <Layers size={18} aria-hidden />
-        Kind
-        <em>{KINDS.find(([value]) => value === kind)![1]} ›</em>
-      </MenuItem>
-      <MenuItem label="Page" title="The pages' size, which way up, and whether they show as pages or as one sheet" onChoose={() => setLevel('page')}>
-        <Ruler size={18} aria-hidden />
-        Page
-        <em>
-          {sheetWord}
-          {turn === 'across' ? ' across' : ''} · {shownWord} ›
-        </em>
-      </MenuItem>
-      <MenuItem label="Paper" title="Blank, lines, squares or dots, on every page" onChoose={() => setLevel('paper')}>
+      {board ? null : (
+        <MenuItem label="Kind" title="What this note is for: text, sketch or mixed" onChoose={() => setLevel('kind')}>
+          <Layers size={18} aria-hidden />
+          Kind
+          <em>{KINDS.find(([value]) => value === kind)?.[1] ?? kind} ›</em>
+        </MenuItem>
+      )}
+      {board ? null : (
+        <MenuItem label="Page" title="The pages' size, which way up, and whether they show as pages or as one sheet" onChoose={() => setLevel('page')}>
+          <Ruler size={18} aria-hidden />
+          Page
+          <em>
+            {sheetWord}
+            {turn === 'across' ? ' across' : ''} · {shownWord} ›
+          </em>
+        </MenuItem>
+      )}
+      <MenuItem label="Paper" title={board ? 'Blank, lines, squares or dots, on the board' : 'Blank, lines, squares or dots, on every page'} onChoose={() => setLevel('paper')}>
         <LayoutGrid size={18} aria-hidden />
         Paper
         <em>{(PAPERS.find(([value]) => value === paperNow)?.[1] ?? 'Mixed') + ' ›'}</em>
@@ -223,18 +229,20 @@ export function NoteMenu({ store, close, editing, children, after }: NoteMenuPro
       ) : null}
       <hr />
       {children}
-      <MenuItem
-        label="Export"
-        title="Print the note, or save it as a PDF from the print window: each page on its own sheet, on white paper"
-        command="note.print"
-        onChoose={() => {
-          close()
-          commands.press('note.print')
-        }}
-      >
-        <Printer size={18} aria-hidden />
-        Export…
-      </MenuItem>
+      {board ? null : (
+        <MenuItem
+          label="Export"
+          title="Print the note, or save it as a PDF from the print window: each page on its own sheet, on white paper"
+          command="note.print"
+          onChoose={() => {
+            close()
+            commands.press('note.print')
+          }}
+        >
+          <Printer size={18} aria-hidden />
+          Export…
+        </MenuItem>
+      )}
       {after}
     </>
   )

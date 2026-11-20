@@ -39,7 +39,7 @@ export interface OpenNote {
   kind?: NoteKind
 }
 
-const KINDS: ReadonlySet<unknown> = new Set(['text', 'sketch', 'mixed'])
+const KINDS: ReadonlySet<unknown> = new Set(['text', 'sketch', 'mixed', 'board'])
 
 const OPEN = 'shellnote:open-notes'
 const SHOWN = 'shellnote:shown-note'

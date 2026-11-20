@@ -4,15 +4,17 @@
 // model says them (refer.ts); words come as written under the command and are rewritten by diff
 // (rewrite.ts).
 import { diagramHint, diagramKind, mendFlowchart } from '../ai/mermaid.js'
+import type { Flow } from '../board/mermaid.js'
 import { newId } from '../ids.js'
 import { parseInline, plainText } from '../markdown/inline.js'
-import { sized, type AnyColor, type Block, type BlockType, type Doc, type Role } from '../schema/doc.js'
+import { sized, type AnyColor, type Block, type BlockType, type Doc, type NodeShape, type Role } from '../schema/doc.js'
 import type { Op } from '../schema/ops.js'
 import { MARGIN } from '../units.js'
 import { texHint, texOf } from './maths.js'
 import { compareRows, definitionMd, featuresOf, qaParts, sectionParts, shapeOf, stepParts, type Features, type Part } from './recipes.js'
 import { boxesOn, placeWord, PLACES, roomyPlaces, sizeOutOfText, spanned, spotIn, spotNear, type PlaceWord, type Span } from './place.js'
 import { kindOf, pageFacts, quoted } from './picture.js'
+import { compileOnBoard } from './board.js'
 import { pictureFrom, type PictureSource } from './pictures.js'
 import { referTo, type ReferContext } from './refer.js'
 import { rewriteBlocks } from './rewrite.js'
@@ -48,6 +50,14 @@ export interface NoteInput {
   below?: string
   span?: Span
   paper?: 'blank' | 'ruled' | 'squares' | 'dots'
+  // A board's flowchart (the Board, step 2).
+  from?: string
+  shape?: NodeShape
+  label?: string
+  route?: 'angled' | 'straight' | 'curved'
+  line?: 'plain' | 'dotted' | 'thick'
+  arrow?: boolean
+  flow?: Flow
 }
 
 /**
@@ -57,6 +67,8 @@ export interface NoteInput {
 export interface NoteContext extends ReferContext {
   taken?: (id: string) => boolean
   pictures?: readonly PictureSource[]
+  /** On a board, where new things go when nothing names a place: the middle of the view, as the door knows it. */
+  near?: { x: number; y: number }
 }
 
 /**
@@ -280,6 +292,9 @@ export function compileNote(doc: Doc, command: string, input: NoteInput, context
   // Nothing here changes `doc`: the ops go back to the door, which applies them. New blocks carry `r: 0` only because
   // the type needs one: apply sets it.
   const fresh = ids(doc, context)
+  // A board's own commands, and those that work otherwise on a board (board.ts).
+  const onBoard = compileOnBoard(doc, command, input, context, fresh)
+  if (onBoard) return onBoard
   switch (command) {
     case 'text.add': {
       const role = roleOf(input)

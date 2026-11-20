@@ -171,6 +171,12 @@ export const AREAS: Readonly<Record<string, Area>> = {
     hint: 'content written under the line, its shape chosen by the app (a list, steps, a table, a definition, a formula, a diagram or paragraphs)',
     words: ['write'],
   },
+  // ----- a board's flowchart (the Board, step 2) -----
+  board: {
+    hint: "a board's flowchart: steps (each a shape with words) and the links joining them: add a step after or before one, join or unjoin two, a step's shape and colour, a whole flowchart from Mermaid, lay the chart out again (a step's words are text: rewrite; take one out with block: remove)",
+    // Not link, which is the web's, nor flowchart or chart, which stay the diagram's: diagram: add of a flowchart on a board draws steps.
+    words: ['board', 'boards', 'canvas', 'whiteboard', 'step', 'steps', 'node', 'nodes', 'card', 'cards', 'shape', 'shapes', 'connector', 'connectors', 'arrow', 'arrows'],
+  },
 }
 
 /** Words for showing or opening something, shared by many commands. */
@@ -365,6 +371,13 @@ export const VERBS: Readonly<Record<string, readonly string[]>> = {
   'recipe.steps': ['steps', 'how to', 'method', 'procedure', 'instructions', 'process', 'step by step'],
   'recipe.definition': ['define', 'definition', 'meaning', 'what it means', 'glossary', 'term', 'explain the term'],
   'write.add': [...MAKE, 'write', 'put', 'insert', 'put in', 'note down', 'jot down', 'type'],
+  // A board's flowchart: a step named as the words say it, never a place.
+  'board.add': ['add', 'insert', 'put', 'put in', 'append', 'new', 'create', 'make', 'another', 'add a step', 'add a box', 'next step', 'one more step', 'extend'],
+  'board.link': ['link', 'join', 'connect', 'wire', 'point to', 'lead to', 'go to', 'arrow to', 'attach', 'hook up', 'tie', 'chain', 'relabel', 'label the link', 'change the link', 'curve the link', 'make the link'],
+  'board.unlink': ['unlink', 'disconnect', 'detach', 'unjoin', 'separate', 'cut the link', 'remove the link', 'delete the link', 'remove the arrow', 'delete the arrow', 'break the link', 'take away the link', 'take the arrow away'],
+  'board.look': ['shape', 'reshape', 'colour', 'color', 'recolour', 'recolor', 'paint', 'tint', 'make it a', 'turn into', 'change the shape', 'change the colour', 'change the color', 'restyle', 'style', 'look'],
+  'board.draw': ['draw', 'sketch', 'chart', 'diagram', 'map out', 'plot', 'draw a flowchart', 'build a flowchart', 'make a flowchart', 'generate a flowchart'],
+  'board.tidy': ['tidy', 'arrange', 'rearrange', 'lay out', 'layout', 'auto layout', 'organize', 'organise', 'clean up', 'line up', 'align', 'neaten', 'sort out', 'space out', 'redo the layout'],
 }
 
 /** Words that say nothing of the operation: a, the, please. Prepositions stay: "play from", "go to", "turn on". */

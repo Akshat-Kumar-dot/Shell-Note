@@ -25,6 +25,9 @@ export function pagesLine(store: EditorStore | undefined): string | undefined {
 export function defineSheets(commands: Commands): void {
   commands.define('note.kind', ['note'], ({ type }, { note }) => {
     const doc = note.store.doc
+    // A board's page is endless and a note's pages have a size: a board is made as one and stays one (pick bd10a).
+    if (doc.kind === 'board') throw new Error('This note is a board, and a board stays a board: note.new type=text, sketch or mixed makes a note of pages.')
+    if (type === 'board') throw new Error('A note does not become a board: note.new type=board makes a new board.')
     if ((doc.kind ?? 'mixed') !== type) note.store.apply([{ op: 'update', id: doc.id, set: { kind: type } }], { origin: 'toolbar' })
     // The kind's own tools come first: the pen for a sketch, typing for a text note; a mixed note keeps the one in hand.
     if (type === 'sketch') chooseTool(note.store, 'pen')

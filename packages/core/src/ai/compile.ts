@@ -5,9 +5,9 @@
 import { parseInline, plainText, serializeInline } from '../markdown/inline.js'
 import { markRange, replaceRange, textLength, type MarkChange } from '../markdown/range.js'
 import { parsePipeTable } from '../markdown/table.js'
-import { chartOps, emptySpot, nodeSize, stepOps } from '../board/layout.js'
+import { chartOps, emptySpot, fitOps as fitted, stepOps } from '../board/layout.js'
 import { readFlowchart } from '../board/mermaid.js'
-import { isEndless, MAX_LABEL, MAX_LINKS, sized, type Block, type Doc, type Frame, type FreeBlock, type Id, type InkBlock, type Link, type NodeBlock, type NodeShape, type Role, type TextBlock } from '../schema/doc.js'
+import { isEndless, MAX_LABEL, MAX_LINKS, sized, type Block, type Doc, type Frame, type FreeBlock, type Id, type InkBlock, type Link, type NodeBlock, type Role, type TextBlock } from '../schema/doc.js'
 import type { Op } from '../schema/ops.js'
 import type { AiOp, AiOpOf, InsertOp, MarkOp, StyleOp } from '../schema/protocol.js'
 import { besideFree, type Spot } from '../select/place.js'
@@ -152,19 +152,6 @@ function nodeLook(op: StyleOp, alias: string, node: NodeBlock): Op[] {
   const shape = op.shape ?? node.shape
   if (shape !== node.shape) set.shape = shape
   return [...(Object.keys(set).length > 0 ? [{ op: 'update', id: node.id, set } as Op] : []), ...(shape === node.shape ? [] : fitted(node, shape, node.md))]
-}
-
-/**
- * A step made the size its words need in its shape, about the same middle. One a person made larger than its words
- * needed is only ever made larger. None when it is that size already.
- */
-function fitted(node: NodeBlock, shape: NodeShape, md: string): Op[] {
-  const was = nodeSize(node.shape, node.md)
-  const need = nodeSize(shape, md)
-  const own = was.w === node.w && was.h === node.h
-  const size = own ? need : { w: Math.max(node.w, need.w), h: Math.max(node.h, need.h) }
-  if (size.w === node.w && size.h === node.h) return []
-  return [{ op: 'move', id: node.id, to: { page: node.page, x: Math.round(node.x + (node.w - size.w) / 2), y: Math.round(node.y + (node.h - size.h) / 2), w: size.w, h: size.h } }]
 }
 
 function recolour(op: StyleOp, alias: string, block: InkBlock): Op[] {

@@ -5,6 +5,7 @@
 // before anything is applied: Mermaid reads each diagram (as the AI box has it read), and a picture of another note
 // has its bytes brought from the library.
 import { compileNote, idTaken, NOTE_COMMANDS, type Doc, type NoteInput, type PictureSource } from '@shellnote/core'
+import { boardScreen } from '../board/active.js'
 import { checkDiagram } from '../diagram.js'
 import { logChoice } from './choices.js'
 import { drawnBoxes } from './view.js'
@@ -50,12 +51,18 @@ export function defineContent(commands: Commands): void {
       const doc = store.doc
       // $n: after names the last block line n made (after a whole list), any other the first.
       const after = input.after !== undefined && /^\$\d+$/u.test(String(input.after)) ? request.made[Number(String(input.after).slice(1)) - 1]?.at(-1) : undefined
-      const compiled = compileNote(doc, spec.name, { ...(input as NoteInput), ...(after ? { after } : {}) }, {
+      // On a board: a step added with no place named goes after the one step chosen; anything else new near the
+      // middle of the view.
+      const board = doc.kind === 'board' ? boardScreen() : undefined
+      const chosen = store.selectionKind === 'objects' && store.selection.blocks.length === 1 && doc.block[store.selection.blocks[0]!]?.type === 'node' ? store.selection.blocks[0] : undefined
+      const afterChosen = spec.name === 'board.add' && input.after === undefined && input.before === undefined && chosen !== undefined ? { after: chosen } : {}
+      const compiled = compileNote(doc, spec.name, { ...(input as NoteInput), ...afterChosen, ...(after ? { after } : {}) }, {
         page: request.page ?? inView(places),
         drawn: drawnBoxes(doc),
         made: request.made.map((ids) => ids[0]!),
         taken: (id) => idTaken(doc, id),
         ...(pictures ? { pictures } : {}),
+        ...(board ? { near: board.middle() } : {}),
       })
       // Mermaid reads each diagram before it goes in: one it cannot read is refused with why, nothing applied.
       for (const src of compiled.diagrams ?? []) {

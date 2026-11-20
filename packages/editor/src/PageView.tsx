@@ -15,6 +15,7 @@ import { Plus, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { pictureFiles } from './assets.js'
+import { BoardView } from './board/BoardView.js'
 import { FreeView, PageBox, type AssetUrls, type FreeRenderer } from './blocks.js'
 import { MADE_TYPE, putMade, roomAt } from './layout/side/made.js'
 import { ProgramMarks } from './program/ProgramMarks.js'
@@ -103,14 +104,8 @@ function insertPage(store: EditorStore, at: number, desk: HTMLElement | null): v
 export function PageView(props: PageViewProps) {
   const { store, doc: given } = props
   const doc = useSyncExternalStore(store?.subscribe ?? NO_STORE, () => (store ? store.doc : given))
-  // A board is one endless page, which the view of pages cannot draw: it is said, never drawn wrong.
-  if (doc.kind === 'board') {
-    return (
-      <p className="nw-board" role="note">
-        This note is a board. This version of ShellNote cannot show boards yet.
-      </p>
-    )
-  }
+  // A board is one endless page under a camera, which the view of pages cannot draw (board/BoardView.tsx).
+  if (doc.kind === 'board') return <BoardView doc={props.doc} zoom={props.zoom} onZoom={props.onZoom} assets={props.assets} store={store} />
   return <Pages {...props} />
 }
 
