@@ -35,7 +35,7 @@ async function newFrom(page: Page, item: 'Mixed' | 'Text note' | 'Sketch' | 'Fol
 async function settingsAt(page: Page, section: string): Promise<Locator> {
   await page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Settings', exact: true }).click()
   await page.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: section, exact: true }).click()
-  await expect(page.getByRole('heading', { name: section, level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: section, level: 1, exact: true })).toBeVisible()
   return page.locator('.set')
 }
 

@@ -55,14 +55,23 @@ const forDesktop: Plugin = {
 }
 
 /**
- * The website as built (`pnpm build`): the policy as the page's first tag. Not while developing: the dev server
- * writes a script of its own into the page to reload it as code changes, which the policy would refuse.
+ * The website as built (`pnpm build`): the page's encoding, then the policy, as its first tags. Not while developing:
+ * the dev server writes a script of its own into the page to reload it as code changes, which the policy would refuse.
  */
 export const forWebsite: Plugin = {
   name: 'shellnote:website-policy',
   apply: 'build',
-  // Tags asked for the same place go in as listed: the policy first, so it holds for everything after it.
-  transformIndexHtml: () => [{ tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: websitePolicy() }, injectTo: 'head-prepend' }, noCompiledChecks],
+  // Tags asked for the same place go in as listed. The encoding first, moved from its place in index.html: HTML wants
+  // it whole within the page's first 1024 bytes, and the policy is long. Then the policy, so it holds for everything
+  // after it (scripts/check-site.mjs checks both).
+  transformIndexHtml: (html) => ({
+    html: html.replace(/^[^\S\n]*<meta\s+charset\b[^>]*>[^\S\n]*\r?\n|<meta\s+charset\b[^>]*>/imu, ''),
+    tags: [
+      { tag: 'meta', attrs: { charset: 'UTF-8' }, injectTo: 'head-prepend' },
+      { tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: websitePolicy() }, injectTo: 'head-prepend' },
+      noCompiledChecks,
+    ],
+  }),
 }
 
 export default defineConfig({

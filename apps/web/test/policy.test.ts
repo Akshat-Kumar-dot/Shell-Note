@@ -53,11 +53,18 @@ describe('the content security policy', () => {
     expect(websitePolicy()).not.toMatch(/["<>]/u)
   })
 
-  it('the website as built carries it in its page, before anything else, and only as built', () => {
+  it('the website as built carries it in its page, after its encoding and before anything else, and only as built', () => {
     expect(forWebsite.apply).toBe('build')
-    const tags = (forWebsite.transformIndexHtml as () => { tag: string; attrs: Record<string, string | boolean>; injectTo: string }[])()
-    expect(tags[0]).toEqual({ tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: websitePolicy() }, injectTo: 'head-prepend' })
+    type Tag = { tag: string; attrs: Record<string, string | boolean>; injectTo: string }
+    const build = forWebsite.transformIndexHtml as (html: string) => { html: string; tags: Tag[] }
+    const { html, tags } = build('<!doctype html>\r\n<html lang="en">\r\n  <head>\r\n    <meta charset="UTF-8" />\r\n    <title>t</title>\r\n  </head>\r\n</html>')
+    // The encoding first, moved from its place in the page, its line and all: HTML wants it within the first 1024 bytes.
+    expect(tags[0]).toEqual({ tag: 'meta', attrs: { charset: 'UTF-8' }, injectTo: 'head-prepend' })
+    expect(html).toBe('<!doctype html>\r\n<html lang="en">\r\n  <head>\r\n    <title>t</title>\r\n  </head>\r\n</html>')
+    // Sharing a line with other tags, the tag alone goes.
+    expect(build('<head><meta charset="utf-8"><title>t</title></head>').html).toBe('<head><title>t</title></head>')
+    expect(tags[1]).toEqual({ tag: 'meta', attrs: { 'http-equiv': 'Content-Security-Policy', content: websitePolicy() }, injectTo: 'head-prepend' })
     // Then Zod is told not to make code at run time, which the policy refuses (public/no-compiled-checks.js).
-    expect(tags[1]).toMatchObject({ tag: 'script', attrs: { src: '/no-compiled-checks.js' }, injectTo: 'head-prepend' })
+    expect(tags[2]).toMatchObject({ tag: 'script', attrs: { src: '/no-compiled-checks.js' }, injectTo: 'head-prepend' })
   })
 })

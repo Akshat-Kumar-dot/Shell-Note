@@ -14,8 +14,6 @@
 
     <meta name="theme-color" content="#0b0b0b" />
     <meta name="application-name" content="Shell Note" />
-    <meta name="author" content="Shell Note" />
-    <meta name="robots" content="index, follow" />
     <link rel="icon" type="image/png" sizes="512x512" href="/favicon-512.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
@@ -35,8 +33,8 @@
     />
     <meta property="og:url" content="https://shellnote.app/" />
     <meta property="og:image" content="https://shellnote.app/og-image.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
+    <meta property="og:image:width" content="1774" />
+    <meta property="og:image:height" content="887" />
     <meta
       property="og:image:alt"
       content="Shell Note — Note-Taking App for Humans and AI Agents"
@@ -58,17 +56,53 @@
       name="twitter:image:alt"
       content="Shell Note — Note-Taking App for Humans and AI Agents"
     />
+
+    <!-- Structured Data: the site's name and the app. Data for search engines, which a browser never runs. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://shellnote.app/#website",
+            "name": "Shell Note",
+            "alternateName": "ShellNote",
+            "url": "https://shellnote.app/"
+          },
+          {
+            "@type": "WebApplication",
+            "@id": "https://shellnote.app/#app",
+            "name": "Shell Note",
+            "url": "https://shellnote.app/",
+            "description": "Shell Note is an AI-native note-taking workspace where humans and AI work together. Use local LLMs, AI agents and your apps in one place.",
+            "applicationCategory": "BusinessApplication",
+            "operatingSystem": "Any",
+            "browserRequirements": "Requires JavaScript",
+            "image": "https://shellnote.app/og-image.png",
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+          }
+        ]
+      }
+    </script>
   </head>
 
   <body>
-    <div id="root"></div>
+    <!-- The page's own heading, outside the app's root so the app never draws over it; kept off the screen (app.css). -->
+    <h1 class="page-heading">Shell Note: a note-taking app for humans and AI agents</h1>
 
+    <!-- Before the app's root, which fills the window: without JavaScript these words are what shows, at the top. -->
     <noscript>
       <p>
-        Shell Note requires JavaScript to run.
-        Please enable JavaScript to use the application.
+        Shell Note is a note-taking app for humans and AI agents: type, write by hand and draw on real pages, with
+        local LLMs, AI agents and your apps in one place.
+      </p>
+      <p>
+        It runs in your browser and needs JavaScript.
+        Its code is on <a href="https://github.com/Akshat-Kumar-dot/Shell-Note">GitHub</a>.
       </p>
     </noscript>
+
+    <div id="root"></div>
 
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -12,6 +12,25 @@ body,
 }
 
 /*
+ * The page's own heading (index.html), outside the app's root, so the app never draws over it: off the screen, it
+ * names the site for a screen reader, and for a search engine, which reads the page as it is drawn.
+ */
+.page-heading {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+/* Without JavaScript, the page's words in the app's place (index.html). */
+noscript p {
+  max-width: 40rem;
+  margin: 16px 20px;
+}
+
+/*
  * The app, above the terminal while it is open (docked along the bottom, packages/editor theme.css). What the app
  * opens over itself, fixed to the window (dialogs, menus, toasts), stays in its own part then: the terminal is never
  * under any of it. With the terminal closed the wrapper has no box at all, and the app is laid out as it always was.

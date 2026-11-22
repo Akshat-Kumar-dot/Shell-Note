@@ -92,7 +92,7 @@ async function walk(page: Page): Promise<void> {
   await page.getByRole('navigation', { name: 'Places' }).getByRole('button', { name: 'Settings', exact: true }).click()
   for (const section of ['General', 'Appearance', 'Customise', 'Pen', 'AI', 'Assistants', 'Sync and storage', 'About']) {
     await page.getByRole('navigation', { name: 'Settings' }).getByRole('button', { name: section, exact: true }).click()
-    await expect(page.getByRole('heading', { name: section, level: 1 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: section, level: 1, exact: true })).toBeVisible()
     await look(page, `Settings, ${section}`)
   }
   await page.getByRole('button', { name: 'Close Settings' }).click()
