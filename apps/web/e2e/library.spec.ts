@@ -269,7 +269,8 @@ test('Home: the top as a home, its starts, the three notes to go on with, the fo
 
   // A start makes a note of its kind.
   await starts.getByRole('button', { name: /^Text note/u }).click()
-  await expect(page.getByRole('textbox', { name: 'Title' })).toBeVisible()
+  // The tab's title: a text note also shows its own at the top of its page.
+  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toBeVisible()
   await toLibrary(page)
   await expect(page.getByRole('region', { name: 'Go on with' }).locator('.card').first()).toHaveAttribute('data-note', 'text')
 
