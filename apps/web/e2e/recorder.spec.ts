@@ -91,15 +91,16 @@ test('the alphabet: a letter of two strokes is kept as one, and the recorder goe
 })
 
 test('Teach my pen makes the pen profile from what is recorded, and the library keeps it', async ({ page }) => {
-  await page.goto('/?record=strokes')
-  await page.evaluate(() => {
+  // The progress is there before the page's own code runs: the recorder reads it on its first look at the library
+  // alone, which can be over before a script run after the page has opened.
+  await page.addInitScript(() => {
     const stroke = (points: [number, number][]) => ({ type: 'pen', samples: points.map(([x, y], i) => [x, y, 0.5, 0, 0, i * 8, 1, 1]) })
     const word = (k: number) => stroke(Array.from({ length: 30 }, (_, i): [number, number] => [1000 + i * 60, 3000 + 200 * Math.sin(i / 2 + k)]))
     const comma = (k: number) => stroke(Array.from({ length: 12 }, (_, i): [number, number] => [2000 + 80 * Math.cos(i / 4) - i * 10 + k, 2000 + i * 60]))
     const items = [...[0, 1, 2].map((k) => ({ kind: 'comma', strokes: [comma(k)] })), ...Array.from({ length: 25 }, (_, k) => ({ kind: 'word', strokes: [word(k)] }))]
     localStorage.setItem('shellnote:recorded-strokes', JSON.stringify({ v: 1, device: { userAgent: 'test', dpr: 1 }, started: '2026-10-16T00:00:00.000Z', items }))
   })
-  await page.reload()
+  await page.goto('/?record=strokes')
   await page.getByRole('button', { name: 'Teach my pen' }).click()
   await expect(page.getByRole('status')).toContainText('Your pen now goes by your own strokes: 1 of 8 symbols, 0 of 13 shapes, and 25 strokes of your writing')
   // In the library.
@@ -126,12 +127,12 @@ test('Teach my pen makes the pen profile from what is recorded, and the library 
 })
 
 test('progress kept in localStorage before is carried into the library once, and Back one never brings it back', async ({ page }) => {
-  await page.goto('/?record=strokes')
-  await page.evaluate(() => {
+  // There before the page's own code runs, and again at every load after: only the first load carries it.
+  await page.addInitScript(() => {
     const line = { type: 'pen', samples: Array.from({ length: 10 }, (_, i) => [1000 + i * 300, 2000, 0.5, 0, 0, i * 8, 1, 1]) }
     localStorage.setItem('shellnote:recorded-strokes', JSON.stringify({ v: 1, device: { userAgent: 'test', dpr: 1 }, started: '2026-10-16T00:00:00.000Z', items: [{ kind: 'line', strokes: [line] }, { kind: 'line', strokes: [line] }] }))
   })
-  await page.reload()
+  await page.goto('/?record=strokes')
   await expect(page.getByText(/· 3 of 12 · 2 of \d+ in all/)).toBeVisible()
   await expect.poll(async () => (await recorded(page)).length).toBe(2)
   // Back twice, to nothing: what localStorage still holds is not read again.
