@@ -78,6 +78,5 @@ export function stepBoardZoom(zoom: number, direction: 1 | -1): number {
   return next ?? (direction > 0 ? BOARD_MAX_ZOOM : BOARD_MIN_ZOOM)
 }
 
-/** The middle of a board point to the nearest dot of its paper (5 mm), as a moved or drawn step is placed. */
-export const DOT = 500
-export const toDot = (value: number): number => Math.round(value / DOT) * DOT
+/** The middle of a board point to the nearest dot of its paper (5 mm), as a moved or drawn step is placed: core's. */
+export { DOT, toDot } from '@shellnote/core'

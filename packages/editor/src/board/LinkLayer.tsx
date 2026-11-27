@@ -1,6 +1,7 @@
 // A board's links, under its steps: each one's line as core runs it (route.ts), an arrow at its end unless it has none,
 // dotted or thick when it says so, and its words on a patch of paper where core placed them (labels.ts). Only the links
-// near the view are drawn. Each takes a press along a band wider than its line, so a thin line is easy to choose.
+// near the view are drawn. Each takes a press along a band wider than its line, so a thin line is easy to choose. A link
+// whose end is being moved is drawn faint until it is let go.
 import { LABEL_SIZE, overlaps, routeBox, type Box, type DrawnLink, type Route } from '@shellnote/core'
 import { memo } from 'react'
 import { mm } from '../geometry.js'
@@ -16,7 +17,7 @@ export function pathData(route: Pick<Route, 'kind' | 'points'>): string {
   return `M${first.x} ${first.y}${rest.map((point) => `L${point.x} ${point.y}`).join('')}`
 }
 
-export const LinkLayer = memo(function LinkLayer({ links, view, chosen, arrow }: { links: readonly DrawnLink[]; view: Box; chosen: string | undefined; arrow: string }) {
+export const LinkLayer = memo(function LinkLayer({ links, view, chosen, moving, arrow }: { links: readonly DrawnLink[]; view: Box; chosen: string | undefined; moving?: string | undefined; arrow: string }) {
   const near = links.filter((link) => overlaps(routeBox(link.route), view) || (link.label !== undefined && overlaps(link.label, view)))
   return (
     <svg className="nw-links" viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} style={{ left: mm(view.x), top: mm(view.y), width: mm(view.w), height: mm(view.h) }}>
@@ -29,7 +30,7 @@ export const LinkLayer = memo(function LinkLayer({ links, view, chosen, arrow }:
         const d = pathData(link.route)
         const key = `${link.from}>${link.to}`
         return (
-          <g key={key} className="nw-link" data-from={link.from} data-to={link.to} data-line={link.link.line} data-chosen={chosen === key ? '' : undefined}>
+          <g key={key} className="nw-link" data-from={link.from} data-to={link.to} data-line={link.link.line} data-chosen={chosen === key ? '' : undefined} data-moving={moving === key ? '' : undefined}>
             <path className="nw-link-hit" d={d} />
             <path className="nw-link-line" d={d} markerEnd={link.link.head === 'none' ? undefined : `url(#${arrow})`} />
             {link.label ? (

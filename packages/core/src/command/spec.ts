@@ -64,8 +64,19 @@ export type PenButton = (typeof PEN_BUTTONS)[number]
 export const PEN_START: readonly PenButton[] = PEN_BUTTONS.slice(0, 16)
 /** The pen's row's buttons that always stay in it, though they can be moved along it: the pen, how the row starts, and Type, the way back to the row for words. */
 export const PEN_KEPT: readonly PenButton[] = ['pen', 'type']
+/**
+ * The buttons a board's row can hold, in the order they are offered: the first ten are in it as it starts (Select, the
+ * Hand, the Step tool, the Text tool, the pen and the eraser, undo and redo, Tidy, the whole board), the highlighter and
+ * a picture under its More.
+ */
+export const BOARD_BUTTONS = ['select', 'hand', 'step', 'text', 'pen', 'eraser', 'undo', 'redo', 'tidy', 'fit', 'highlighter', 'picture'] as const
+export type BoardButton = (typeof BOARD_BUTTONS)[number]
+/** The board's row as it starts. */
+export const BOARD_START: readonly BoardButton[] = BOARD_BUTTONS.slice(0, 10)
+/** The board's row's buttons that always stay in it, though they can be moved along it: Select, which a board opens with. */
+export const BOARD_KEPT: readonly BoardButton[] = ['select']
 /** Every button a row of tools can hold, each name once. */
-const ROW_BUTTONS = [...new Set<string>([...TYPING_BUTTONS, ...PEN_BUTTONS])] as [string, ...string[]]
+const ROW_BUTTONS = [...new Set<string>([...TYPING_BUTTONS, ...PEN_BUTTONS, ...BOARD_BUTTONS])] as [string, ...string[]]
 /** The sections of Settings, in the order its column lists them. */
 export const SETTINGS_SECTIONS = ['general', 'appearance', 'customise', 'pen', 'ai', 'assistants', 'storage', 'about'] as const
 export type SettingsSection = (typeof SETTINGS_SECTIONS)[number]
@@ -84,7 +95,9 @@ export const FIELDS = {
   text: z.string().max(200).describe('Words to look for'),
   transcript: z.string().min(1).max(500_000).describe("A video's transcript with its times, as YouTube shows it, or a subtitle file (SRT, WebVTT)"),
   path: name.describe('A file on this computer: its full path, ending in .shellnote'),
-  tool: z.enum(['type', 'select', 'free', 'pen', 'highlighter', 'eraser', 'hand']).describe('A tool: type, select, free (the free cursor: type anywhere), pen, highlighter, eraser, or hand (a drag moves the sheet)'),
+  tool: z
+    .enum(['type', 'select', 'free', 'pen', 'highlighter', 'eraser', 'hand', 'step'])
+    .describe('A tool: type, select, free (the free cursor: type anywhere; on a board, a text box where it clicks), pen, highlighter, eraser, hand (a drag moves the sheet), or step (on a board: a drag draws a step, a drag from a step a link)'),
   kind: z.enum(['pen', 'pencil', 'fountain', 'marker']).describe("The pen's kind: the plain pen, a pencil, a fountain pen or a marker"),
   colour: AnyColor.describe('A colour: ink (the usual near-black), gray, red, orange, yellow, green, blue or purple, or a code such as #e0563a'),
   width: z.enum(['extra-fine', 'fine', 'medium', 'broad', 'extra-broad']).describe('How wide a line is'),
@@ -105,13 +118,13 @@ export const FIELDS = {
   button: z
     .enum(ROW_BUTTONS)
     .describe(
-      "A button of a row of tools. The bar for typing's: undo, redo, style, font (font and size), bold, italic, underline, colour, align, link, picture, table, strike (strikethrough), highlight, code, sub (subscript), sup (superscript), todo (to-do list), diagram, select (select with a box). The pen's row's (tools=pen): select, hand (move the sheet), pen, highlighter, eraser, black, blue, red, green, grey, orange, yellow, purple (the colours in reach), colour (more colours), width, undo, redo, tidy, type, picture",
+      "A button of a row of tools. The bar for typing's: undo, redo, style, font (font and size), bold, italic, underline, colour, align, link, picture, table, strike (strikethrough), highlight, code, sub (subscript), sup (superscript), todo (to-do list), diagram, select (select with a box). The pen's row's (tools=pen): select, hand (move the sheet), pen, highlighter, eraser, black, blue, red, green, grey, orange, yellow, purple (the colours in reach), colour (more colours), width, undo, redo, tidy, type, picture. A board's row's (tools=board): select, hand (move the board), step, text, pen, eraser, undo, redo, tidy (the flowchart laid out again), fit (the whole board in view), highlighter, picture",
     ),
-  tools: z.enum(['typing', 'pen']).describe("Which row of tools a button is of: the bar for typing (typing; left out, this one) or the pen's row (pen)"),
-  position: z.int().min(1).max(Math.max(TYPING_BUTTONS.length, PEN_BUTTONS.length)).describe('A place in a row of tools, counted from 1 at its start'),
+  tools: z.enum(['typing', 'pen', 'board']).describe("Which row of tools a button is of: the bar for typing (typing; left out, this one), the pen's row (pen), or a board's row (board)"),
+  position: z.int().min(1).max(Math.max(TYPING_BUTTONS.length, PEN_BUTTONS.length, BOARD_BUTTONS.length)).describe('A place in a row of tools, counted from 1 at its start'),
   side: z.enum(['left', 'right', 'hidden']).describe('Which side of the window something sits on, left or right, or hidden'),
   view: z.enum(['cards', 'list', 'home']).describe('How the library shows its folders and notes: as cards, as a list, or, at its top, as Home (start a note, the three notes to go on with, the folders, then every other note)'),
-  part: z.enum(['all', 'look', 'tools', 'pen', 'places']).describe("What goes back as it started: the places of the panels, the bars and the library's column (places), the app's look (look), the bar for typing's buttons (tools), the pen's row's buttons (pen), or all of it (all)"),
+  part: z.enum(['all', 'look', 'tools', 'pen', 'board', 'places']).describe("What goes back as it started: the places of the panels, the bars and the library's column (places), the app's look (look), the bar for typing's buttons (tools), the pen's row's buttons (pen), a board's row's buttons and the points where links join (board), or all of it (all)"),
   show: z.enum(['all', 'text', 'sketch', 'mixed']).describe('Which notes the library shows: all of them, or only the text notes, the sketches or the mixed notes'),
   look: z.enum(['system', 'light', 'dark']).describe("The app's appearance; system follows Windows"),
   accent: z.enum(['graphite', 'blue', 'teal', 'green', 'amber', 'rose', 'red']).describe("The app's own colour, on its buttons and what is chosen; graphite is no colour"),

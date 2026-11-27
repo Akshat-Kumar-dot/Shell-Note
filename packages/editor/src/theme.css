@@ -1176,7 +1176,8 @@ body[data-dragging] * {
  */
 div.nw-board {
   position: relative;
-  overflow: hidden;
+  /* Clipped, never scrolled: the camera moves the board, and the caret of words typed on it scrolls nothing. */
+  overflow: clip;
   background-color: var(--nw-paper);
   touch-action: none;
   outline: none;
@@ -1331,6 +1332,126 @@ div.nw-board[data-tool='select'] .nw-board-corner[data-corner='se'] {
 div.nw-board[data-tool='select'] .nw-board-corner[data-corner='ne'],
 div.nw-board[data-tool='select'] .nw-board-corner[data-corner='sw'] {
   cursor: nesw-resize !important;
+}
+/* The Step tool draws: a cross on the bare board and on the steps a link is drawn from. The Text tool types. */
+div.nw-board[data-tool='step'],
+div.nw-board[data-tool='step'] * {
+  cursor: crosshair !important;
+}
+div.nw-board[data-tool='free'],
+div.nw-board[data-tool='free'] * {
+  cursor: text !important;
+}
+div.nw-board[data-tool='free'] .nw-link-hit,
+div.nw-board[data-tool='free'] .nw-link-words rect,
+div.nw-board[data-tool='step'] .nw-link-hit,
+div.nw-board[data-tool='step'] .nw-link-words rect {
+  cursor: pointer !important;
+}
+/*
+ * A text box's words take presses only while they are typed in, or with the Text tool in hand: else a press on it
+ * chooses and moves it, as everything on a board does.
+ */
+div.nw-board .nw-frame .ProseMirror {
+  pointer-events: none;
+}
+div.nw-board .nw-frame .ProseMirror-focused,
+div.nw-board .nw-draft .ProseMirror,
+div.nw-board[data-tool='free'] .nw-frame .ProseMirror {
+  pointer-events: auto;
+}
+div.nw-board .nw-frame .ProseMirror-focused,
+div.nw-board .nw-frame .ProseMirror-focused * {
+  cursor: text !important;
+}
+div.nw-board .nw-board-corner[data-across] {
+  border-radius: 50%;
+}
+/* A step's words typed in place, over where they are drawn: centred, as they are shown. */
+.nw-step-words[data-typing] {
+  visibility: hidden;
+}
+.nw-step-edit {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  font-size: 3.5mm;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.nw-step-edit .ProseMirror {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  outline: none;
+}
+div.nw-board .nw-step-edit .ProseMirror,
+div.nw-board .nw-step-edit .ProseMirror * {
+  cursor: text !important;
+}
+/* A shape drawn small in the board's row and its menus, by the same outline a step of it takes; a link's line, small. */
+.nw-shape-icon {
+  flex: none;
+  overflow: visible;
+}
+.nw-shape-icon path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.nw-line-icon line {
+  stroke: currentColor;
+  stroke-linecap: round;
+}
+.sh-item .sh-later {
+  margin-left: auto;
+  font-size: 11px;
+  font-style: normal;
+  opacity: 0.7;
+}
+/* The points where links join: on the chosen step, every step while the Step tool is in hand, a chosen link's ends. */
+.nw-point {
+  position: absolute;
+  width: calc(10px / var(--nw-zoom, 1));
+  height: calc(10px / var(--nw-zoom, 1));
+  box-sizing: border-box;
+  border: calc(1.5px / var(--nw-zoom, 1)) solid #1f5fbf;
+  border-radius: 50%;
+  background: #fff;
+  transform: translate(-50%, -50%);
+  cursor: crosshair !important;
+}
+/* The point a link being drawn will join, as code will run it once it is let go. */
+.nw-point[data-marked] {
+  width: calc(12px / var(--nw-zoom, 1));
+  height: calc(12px / var(--nw-zoom, 1));
+  background: #1f5fbf;
+  pointer-events: none;
+}
+/* While a link is drawn: only a straight line from where it began to the pointer, never a step to come. */
+.nw-drag-line {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+.nw-drag-line line {
+  stroke: #1f5fbf;
+  stroke-width: 1.5px;
+  stroke-dasharray: 5 4;
+  vector-effect: non-scaling-stroke;
+}
+div.nw-board[data-drawing] .nw-point:not([data-marked]) {
+  pointer-events: none;
+}
+.nw-link[data-moving] {
+  opacity: 0.3;
+}
+/* The box a step is drawn over, as it is dragged. */
+.nw-marquee[data-step] {
+  border-style: dashed;
+  background: transparent;
 }
 div.nw-board[data-panning],
 div.nw-board[data-panning] * {

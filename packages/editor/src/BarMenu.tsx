@@ -18,6 +18,8 @@ export interface BarMenuProps {
   className?: string
   /** The button shown as in use, as a tool chosen is. */
   pressed?: boolean
+  /** The command the button's own press runs, when it runs one before its menu is wanted (a tool taken up). */
+  command?: string
   /** Called before the menu opens: false leaves it closed (the press did something else). */
   onPress?: () => boolean
   /** The menu closed by a choice or Escape: the text takes the focus back. */
@@ -28,7 +30,7 @@ export interface BarMenuProps {
   children: (close: () => void) => ReactNode
 }
 
-export function BarMenu({ label, title, button, className = 'sh-b', pressed, onPress, onDone, width, disabled, children }: BarMenuProps) {
+export function BarMenu({ label, title, button, className = 'sh-b', pressed, command, onPress, onDone, width, disabled, children }: BarMenuProps) {
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLSpanElement>(null)
   const done = useRef(onDone)
@@ -50,6 +52,7 @@ export function BarMenu({ label, title, button, className = 'sh-b', pressed, onP
         aria-pressed={pressed}
         title={title ?? label}
         disabled={disabled}
+        data-command={command}
         onMouseDown={keepFocus}
         onClick={() => {
           if (open) return close()

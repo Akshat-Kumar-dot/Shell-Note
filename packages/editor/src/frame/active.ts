@@ -5,7 +5,7 @@
 import type { Editor } from '@tiptap/core'
 import { Selection } from '@tiptap/pm/state'
 
-/** Whose editor it is: a frame's id, or `caption:` and a picture's id. */
+/** Whose editor it is: a frame's id, `caption:` and a picture's id, or `step:` and a board's step's id. */
 let active: { owner: string; editor: Editor } | undefined
 let version = 0
 const listeners = new Set<() => void>()
@@ -17,8 +17,8 @@ function changed(): void {
 
 export const activeEditor = {
   get: (): Editor | undefined => (active?.editor.isDestroyed ? undefined : active?.editor),
-  /** The frame the active editor belongs to; undefined for a caption's editor. */
-  frame: (): string | undefined => (active === undefined || active.editor.isDestroyed || active.owner.startsWith('caption:') ? undefined : active.owner),
+  /** The frame the active editor belongs to; undefined for a caption's editor, or a step's words. */
+  frame: (): string | undefined => (active === undefined || active.editor.isDestroyed || active.owner.startsWith('caption:') || active.owner.startsWith('step:') ? undefined : active.owner),
   /** Called when an editor gets the focus. */
   set: (owner: string, editor: Editor): void => {
     active = { owner, editor }

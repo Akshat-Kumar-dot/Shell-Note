@@ -36,7 +36,7 @@ describe('lines', () => {
     const out = await runLines(['tool.choose tool=crayon', 'tool.choose pen'], { commands, ask: yes })
     expect(out).toHaveLength(1)
     expect(out[0]!.ok).toBe(false)
-    expect(out[0]!.text).toContain('Its inputs: tool (type|select|free|pen|highlighter|eraser|hand)')
+    expect(out[0]!.text).toContain('Its inputs: tool (type|select|free|pen|highlighter|eraser|hand|step), shape? (box|round|pill|')
     expect(out[0]!.text).toContain('Write it as: tool.choose tool=select')
     expect(store.tool).toBe('type')
     // A value under a field the command lacks, that one of its fields lists, is read there (note control, step 4).

@@ -3,7 +3,7 @@
 // asks first for what cannot be undone, and reports the state before and after.
 import { inputs, type CommandSpec } from '@shellnote/core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { PHYSICS } from '../../core/test/fixtures/index.js'
+import { BOARD, PHYSICS } from '../../core/test/fixtures/index.js'
 import { commands, Commands, type HomePlace, type WorkspacePlace } from '../src/commands/index.js'
 import { CHOICE_DEFAULTS, penChoice } from '../src/ink/settings.js'
 import { EditorStore } from '../src/store.js'
@@ -30,6 +30,35 @@ describe('the tools as commands', () => {
       expect(commands.state()).toContain('tool eraser · pen pencil, extra-fine, blue')
     } finally {
       stop()
+    }
+  })
+
+  it('take up the Step tool on a board with the shape it draws, and refuse it, and the pen, where they have no place', async () => {
+    const board = new EditorStore(BOARD)
+    const stop = commands.provide('note', { store: board })
+    try {
+      expect(commands.do('tool.choose', { tool: 'step', shape: 'diamond' })).toBe('tool: step, drawing diamond steps')
+      expect(board.tool).toBe('step')
+      expect(board.stepShape).toBe('diamond')
+      // The shape stays until another is chosen; free is the board's text box.
+      commands.do('tool.choose', { tool: 'free' })
+      commands.do('tool.choose', { tool: 'step' })
+      expect(board.stepShape).toBe('diamond')
+      expect(commands.state()).toContain('tool step (diamond)')
+      expect(await commands.run('tool.choose', { tool: 'select', shape: 'box' }, yes)).toMatchObject({ ok: false, why: expect.stringContaining("shape= is the Step tool's") })
+      expect(await commands.run('tool.choose', { tool: 'type' }, yes)).toMatchObject({ ok: false, why: expect.stringContaining('A board has no Type tool') })
+      expect(await commands.run('pen.set', { colour: 'red' }, yes)).toMatchObject({ ok: false, why: expect.stringContaining('The pen on a board comes later') })
+      expect(board.tool).toBe('step')
+    } finally {
+      stop()
+    }
+    const pages = new EditorStore(PHYSICS)
+    const again = commands.provide('note', { store: pages })
+    try {
+      expect(await commands.run('tool.choose', { tool: 'step' }, yes)).toMatchObject({ ok: false, why: expect.stringContaining('The Step tool is for a board') })
+      expect(pages.tool).toBe('type')
+    } finally {
+      again()
     }
   })
 

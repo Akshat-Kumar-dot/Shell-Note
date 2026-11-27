@@ -1,9 +1,10 @@
-// Customise: the look, the buttons of the two rows of tools (the bar for typing's and the pen's row's), where the bars,
-// the panels and the library's column sit, and the way back to how each started, all of it or each part. Every
+// Customise: the look, the buttons of the three rows of tools (the bar for typing's, the pen's row's and a board's, with
+// whether a board shows the points where links join), where the bars, the panels and the library's column sit, and the
+// way back to how each started, all of it or each part. Every
 // control calls its command, as every button does, so a line typed in the terminal does what a click does; a change
 // shows at once, and is kept on this device only.
 import type { Color } from '@shellnote/core'
-import { appLook, commands, panelSide, PEN_LOOK, penRow, TYPING_LOOK, typingBar, underMore, underPenMore, workspace, type AppLook, type ToolRow } from '@shellnote/editor'
+import { appLook, BOARD_LOOK, boardPoints, boardRow, commands, panelSide, PEN_LOOK, penRow, TYPING_LOOK, typingBar, underBoardMore, underMore, underPenMore, workspace, type AppLook, type ToolRow } from '@shellnote/editor'
 import { Ellipsis, GripVertical, Minus, Plus, Undo2, type LucideIcon } from 'lucide-react'
 import { useState, useSyncExternalStore, type KeyboardEvent, type ReactNode } from 'react'
 import { libraryLook } from '../library/look.js'
@@ -60,7 +61,7 @@ function Choices<T extends string>({ label, value, choices, command, onChoose }:
 }
 
 /** A part's own way back to how it started. */
-function Reset({ part, what }: { part: 'look' | 'tools' | 'pen' | 'places'; what: string }) {
+function Reset({ part, what }: { part: 'look' | 'tools' | 'pen' | 'board' | 'places'; what: string }) {
   return (
     <button type="button" className="set-reset" title={`${what} as it started`} data-command="layout.reset" onClick={() => commands.tap('layout.reset', { part })}>
       Reset
@@ -74,6 +75,22 @@ interface ButtonLook {
   icon: LucideIcon
   colour?: Color | undefined
   kept?: true | undefined
+  /** A button whose tool comes to its row later: shown, saying so. */
+  later?: true | undefined
+}
+
+/** Each row's words, where they differ. */
+const ROW_WORDS: Readonly<Record<ToolRow, { name: string; shows: string; inIt: string; under: string; heading: string }>> = {
+  typing: { name: 'the bar', shows: 'The bar as it shows', inIt: 'In the bar', under: 'Under More', heading: 'In the bar' },
+  pen: { name: 'the row', shows: "The pen's row as it shows", inIt: "In the pen's row", under: "Under the pen's row's More", heading: 'In the row' },
+  board: { name: "a board's row", shows: "A board's row as it shows", inIt: "In a board's row", under: "Under a board's row's More", heading: 'In the row' },
+}
+
+/** Why a button always stays in its row. */
+const KEPT_WHY: Readonly<Record<string, string>> = {
+  pen: 'Always in the row: the pen is how it starts',
+  type: 'Always in the row: the way back to the row for words',
+  select: 'Always in the row: a board opens with it',
 }
 
 /**
@@ -83,9 +100,10 @@ interface ButtonLook {
 function ToolLists<T extends string>({ tools, row, more, lookOf }: { tools: ToolRow; row: readonly T[]; more: readonly T[]; lookOf: (button: T) => ButtonLook }) {
   const [dragged, setDragged] = useState<T>()
   const [over, setOver] = useState<number>()
-  const name = tools === 'pen' ? 'the row' : 'the bar'
+  const words = ROW_WORDS[tools]
+  const name = words.name
   /** A button put in the row, at a place counted from 1 or at its end, or taken out to More (bar.button). */
-  const put = (button: T, on: boolean, position?: number): void => commands.tap('bar.button', { button, on, ...(position === undefined ? {} : { position }), ...(tools === 'pen' ? { tools: 'pen' } : {}) })
+  const put = (button: T, on: boolean, position?: number): void => commands.tap('bar.button', { button, on, ...(position === undefined ? {} : { position }), ...(tools === 'typing' ? {} : { tools }) })
   /** Alt with an arrow moves the button one place, for whoever does not drag. */
   const moveByKey = (event: KeyboardEvent, button: T, index: number): void => {
     if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
@@ -107,7 +125,7 @@ function ToolLists<T extends string>({ tools, row, more, lookOf }: { tools: Tool
   }
   return (
     <>
-      <div className="set-bar" aria-label={tools === 'pen' ? "The pen's row as it shows" : 'The bar as it shows'} role="img">
+      <div className="set-bar" aria-label={words.shows} role="img">
         {row.map((button) => (
           <span key={button} className="set-bar-b" title={lookOf(button).label}>
             {mark(button, 18)}
@@ -122,10 +140,10 @@ function ToolLists<T extends string>({ tools, row, more, lookOf }: { tools: Tool
       <div className="set-cols">
         <div>
           <h3>
-            {tools === 'pen' ? 'In the row' : 'In the bar'}
+            {words.heading}
             <small>drag to put in order</small>
           </h3>
-          <ol className="set-tools" aria-label={tools === 'pen' ? "In the pen's row" : 'In the bar'}>
+          <ol className="set-tools" aria-label={words.inIt}>
             {row.map((button, index) => {
               const look = lookOf(button)
               return (
@@ -162,8 +180,9 @@ function ToolLists<T extends string>({ tools, row, more, lookOf }: { tools: Tool
                   <GripVertical className="set-grip" size={14} aria-hidden />
                   {mark(button, 16)}
                   <span>{look.label}</span>
+                  {look.later ? <em className="set-kept" title="It comes to a board later: its button shows greyed until then">later</em> : null}
                   {look.kept ? (
-                    <em className="set-kept" title={button === 'pen' ? 'Always in the row: the pen is how it starts' : 'Always in the row: the way back to the row for words'}>
+                    <em className="set-kept" title={KEPT_WHY[button] ?? 'Always in the row'}>
                       always here
                     </em>
                   ) : (
@@ -183,13 +202,14 @@ function ToolLists<T extends string>({ tools, row, more, lookOf }: { tools: Tool
           {more.length === 0 ? (
             <p className="set-quiet">Every button is in {name}.</p>
           ) : (
-            <ul className="set-tools" aria-label={tools === 'pen' ? "Under the pen's row's More" : 'Under More'}>
+            <ul className="set-tools" aria-label={words.under}>
               {more.map((button) => {
                 const look = lookOf(button)
                 return (
                   <li key={button} className="set-tool">
                     {mark(button, 16)}
                     <span>{look.label}</span>
+                    {look.later ? <em className="set-kept" title="It comes to a board later: its button shows greyed until then">later</em> : null}
                     <button type="button" className="sh-b" aria-label={`Put ${look.label} in ${name}`} title={look.colour ? `Put in ${name}, with the colours in reach` : `Put in ${name}, at its end`} data-command="bar.button" onClick={() => put(button, true, joinAt(button))}>
                       <Plus size={15} aria-hidden />
                     </button>
@@ -217,6 +237,8 @@ export function Customise() {
   const look = useSyncExternalStore(appLook.subscribe, appLook.snapshot)
   const bar = useSyncExternalStore(typingBar.subscribe, typingBar.snapshot)
   const pens = useSyncExternalStore(penRow.subscribe, penRow.snapshot)
+  const boards = useSyncExternalStore(boardRow.subscribe, boardRow.snapshot)
+  const points = useSyncExternalStore(boardPoints.subscribe, boardPoints.snapshot)
   const space = useSyncExternalStore(workspace.subscribe, workspace.snapshot)
   const shown = useSyncExternalStore(treeShown.subscribe, treeShown.snapshot)
   const at = useSyncExternalStore(treeAt.subscribe, treeAt.snapshot)
@@ -253,6 +275,20 @@ export function Customise() {
 
       <SettingsPart title="Pen's row" hint="while the pen, the highlighter or the eraser is in hand" reset={<Reset part="pen" what="The pen's row" />}>
         <ToolLists tools="pen" row={pens} more={underPenMore(pens)} lookOf={(button) => PEN_LOOK[button]} />
+      </SettingsPart>
+
+      <SettingsPart title="Board's row" hint="on a board, in place of the bar for typing" reset={<Reset part="board" what="A board's row, and its points" />}>
+        <ToolLists tools="board" row={boards} more={underBoardMore(boards)} lookOf={(button) => BOARD_LOOK[button]} />
+        <div className="set-advanced" role="group" aria-label="Advanced">
+          <h3>Advanced</h3>
+          <label className="set-switch">
+            <input type="checkbox" role="switch" checked={points} data-command="settings.points" onChange={(event) => commands.tap('settings.points', { on: event.target.checked })} />
+            <span>
+              Show the points where links join
+              <small>On the chosen step, on every step while the Step tool is in hand, on the step a link being drawn would join, and at the two ends of a chosen link. Off, a link is still drawn with the Step tool, from a step to a step.</small>
+            </span>
+          </label>
+        </div>
       </SettingsPart>
 
       <SettingsPart title="Where things sit" hint="or drag any bar or panel by its grip" reset={<Reset part="places" what="Where things sit" />}>

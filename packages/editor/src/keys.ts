@@ -68,6 +68,19 @@ export const KEYS: readonly KeyGroup[] = [
     keys: [...MARK_WORDS.map(([mark, does]) => ({ keys: MARK_KEY[mark], does })), { keys: 'Tab', does: 'Indent more' }, { keys: 'Shift+Tab', does: 'Indent less' }],
   },
   {
+    name: 'On a board',
+    keys: [
+      { keys: 'Space and a drag', does: 'Move the board, with any tool' },
+      { keys: 'Tab', does: 'Add a step after the chosen one, and type its words', command: 'board.add' },
+      { keys: 'Enter', does: "Type the chosen step's words, or a chosen link's" },
+      { keys: 'Enter or Escape', does: "Stop typing a step's words" },
+      { keys: 'Escape', does: 'Let go of what is chosen' },
+      { keys: 'Delete', does: 'Remove what is chosen: a step with its links' },
+      { keys: 'Arrow keys', does: 'Move what is chosen 1 mm; with Shift, 5 mm' },
+      { keys: 'Alt and a drag', does: 'Place a step freely, off the dots' },
+    ],
+  },
+  {
     name: 'The terminal',
     keys: [
       { keys: 'Enter', does: 'Run the line' },

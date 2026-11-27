@@ -1,12 +1,12 @@
 // The view, the panels and choosing blocks, as commands (app control, step
 // 3a): each does what its button did, and the buttons now call them.
-import { blockDetail, blockOf, blocksList, type Box, type Doc, type PenButton, type TypingButton, sized, sizedPage } from '@shellnote/core'
+import { blockDetail, blockOf, blocksList, type BoardButton, type Box, type Doc, type PenButton, type TypingButton, sized, sizedPage } from '@shellnote/core'
 import { boardScreen } from '../board/active.js'
 import { clampBoardZoom, stepBoardZoom } from '../board/camera.js'
 import { clampZoom, stepZoom } from '../geometry.js'
-import { placesReset, putButton, resetCustom, setAppLook, type AppLook } from '../layout/custom.js'
+import { boardPoints, placesReset, putButton, resetCustom, setAppLook, setBoardPoints, type AppLook } from '../layout/custom.js'
 import { dockPanel, workspace as layout, resetWorkspace, setBar, setSideOpen, type BarId } from '../layout/state.js'
-import { PEN_LOOK, TYPING_LOOK } from '../typingButtons.js'
+import { BOARD_LOOK, PEN_LOOK, TYPING_LOOK } from '../typingButtons.js'
 import { showSideTab, sideTab, type SideTab } from '../layout/sideTab.js'
 import type { Commands } from './run.js'
 
@@ -89,20 +89,28 @@ export function defineView(commands: Commands): void {
     if (all || part === 'look') resetCustom('look')
     if (all || part === 'tools') resetCustom('tools')
     if (all || part === 'pen') resetCustom('pen')
-    if (all) return "everything as it starts: the look, the bar for typing, the pen's row, the panels, the bars and the library's column"
+    if (all || part === 'board') resetCustom('board')
+    if (all) return "everything as it starts: the look, the bar for typing, the pen's row, a board's row and its points, the panels, the bars and the library's column"
     if (part === 'look') return 'the look as it starts: flat'
     if (part === 'tools') return 'the bar for typing as it starts'
     if (part === 'pen') return "the pen's row as it starts"
+    if (part === 'board') return "a board's row as it starts, the points where links join shown"
     return 'panels and bars where they start'
   })
   commands.define('bar.button', [], ({ button, on, position, tools }) => {
-    const pen = tools === 'pen'
+    const row = tools === 'pen' ? 'pen' : tools === 'board' ? 'board' : 'typing'
     const which = String(button)
     // A button the row has not is refused there, with the row's own buttons named.
-    const row = putButton(which as TypingButton | PenButton, on !== false, position as number | undefined, pen ? 'pen' : 'typing')
-    const label = pen ? PEN_LOOK[which as PenButton].label : TYPING_LOOK[which as TypingButton].label
-    if (on === false) return `${label} is under ${pen ? "the pen's row's" : "the bar's"} More, one click away`
-    return `${label} is in ${pen ? "the pen's row" : 'the bar for typing'}, ${row.indexOf(which) + 1} of ${row.length}`
+    const now = putButton(which as TypingButton | PenButton | BoardButton, on !== false, position as number | undefined, row)
+    const label = row === 'pen' ? PEN_LOOK[which as PenButton].label : row === 'board' ? BOARD_LOOK[which as BoardButton].label : TYPING_LOOK[which as TypingButton].label
+    const name = row === 'pen' ? "the pen's row" : row === 'board' ? "a board's row" : 'the bar for typing'
+    if (on === false) return `${label} is under ${row === 'pen' ? "the pen's row's" : row === 'board' ? "a board's row's" : "the bar's"} More, one click away`
+    return `${label} is in ${name}, ${now.indexOf(which) + 1} of ${now.length}`
+  })
+  // Kept on this device, as the rest of Customise: no note need be open.
+  commands.define('settings.points', [], ({ on }) => {
+    setBoardPoints(on !== false)
+    return boardPoints.value ? 'the points where links join show on a board' : 'no points show on a board: a link is still drawn with the Step tool, from a step to a step'
   })
   commands.define('layout.look', [], ({ shell }) => {
     const look = shell as AppLook

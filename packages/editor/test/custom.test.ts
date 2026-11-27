@@ -1,21 +1,42 @@
 // The rows of tools as the person sets them (layout/custom.ts), and the panel beside the notes on either side
-// (layout/tree.ts): a button out waits under its row's More, the pen and Type never leave the pen's row, a button a row
-// has not is refused, and the panel moves with what is docked with it.
-import { PEN_START, TYPING_START } from '@shellnote/core'
+// (layout/tree.ts): a button out waits under its row's More, the pen and Type never leave the pen's row, nor Select a
+// board's, a button a row has not is refused, a board's points are shown until switched off, and the panel moves with
+// what is docked with it.
+import { BOARD_START, PEN_START, TYPING_START } from '@shellnote/core'
 import { afterEach, describe, expect, it } from 'vitest'
-import { penRow, putButton, resetCustom, typingBar, underMore, underPenMore } from '../src/layout/custom.js'
+import { boardPoints, boardRow, penRow, putButton, resetCustom, setBoardPoints, typingBar, underBoardMore, underMore, underPenMore } from '../src/layout/custom.js'
 import { DEFAULT_LAYOUT, panelTo, sideOfPanel } from '../src/layout/tree.js'
 
 describe('the rows of tools as the person sets them', () => {
   afterEach(() => {
     resetCustom('tools')
     resetCustom('pen')
+    resetCustom('board')
   })
 
   it('start as the design has them', () => {
     expect(typingBar.value).toEqual(TYPING_START)
     expect(penRow.value).toEqual(PEN_START)
     expect(underPenMore(penRow.value)).toEqual(['grey', 'orange', 'yellow', 'purple'])
+    expect(boardRow.value).toEqual(BOARD_START)
+    expect(underBoardMore(boardRow.value)).toEqual(['highlighter', 'picture'])
+    expect(boardPoints.value).toBe(true)
+  })
+
+  it("a board's row: a button out waits under its More, one put in goes where asked, and Select never leaves it", () => {
+    putButton('hand', false, undefined, 'board')
+    expect(boardRow.value).not.toContain('hand')
+    expect(underBoardMore(boardRow.value)).toEqual(['hand', 'highlighter', 'picture'])
+    putButton('tidy', true, 1, 'board')
+    expect(boardRow.value[0]).toBe('tidy')
+    expect(() => putButton('select', false, undefined, 'board')).toThrow(/Select always stays/u)
+    expect(() => putButton('bold' as never, true, undefined, 'board')).toThrow(/board's row has no bold/u)
+    // Its part goes back as it started, the points where links join shown again.
+    setBoardPoints(false)
+    expect(boardPoints.value).toBe(false)
+    resetCustom('board')
+    expect(boardRow.value).toEqual(BOARD_START)
+    expect(boardPoints.value).toBe(true)
   })
 
   it('a button taken out of the bar for typing waits under its More, and comes back at the place asked', () => {

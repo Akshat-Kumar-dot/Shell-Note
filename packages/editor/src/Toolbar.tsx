@@ -51,6 +51,7 @@ import {
 import { Fragment, useReducer, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { BarMenu, keepFocus, MenuItem } from './BarMenu.js'
 import { RedoButton, UndoButton, usePictures } from './BarParts.js'
+import { typingStep } from './board/active.js'
 import { BoardRow } from './board/BoardRow.js'
 import { activeEditor } from './frame/active.js'
 import { onWords } from './frame/words.js'
@@ -163,7 +164,7 @@ export function NoteBar({ store }: { store: EditorStore }) {
   const tool = useSyncExternalStore(store.subscribeTool, store.toolSnapshot)
   const both = useSyncExternalStore(bothRows.subscribe, bothRows.snapshot)
   // A board has a row of its own (a board stays a board, so this never changes while the note is open).
-  if (store.doc.kind === 'board') return <div className="sh-rows"><BoardRow store={store} /></div>
+  if (store.doc.kind === 'board') return <BoardRows store={store} />
   // The Hand is the pen's row's: with it in hand, that row stays.
   const ink = isInkTool(tool) || tool === 'hand'
   return (
@@ -173,6 +174,23 @@ export function NoteBar({ store }: { store: EditorStore }) {
     </div>
   )
 }
+
+/**
+ * A board's row, or, in its place while words are typed, the row for words, as everywhere: for a text box (its words
+ * chosen as text, which a press on the board lets go of) all of it but what is for pages; for a step's words, their
+ * marks. Typing done, the board's row is back.
+ */
+function BoardRows({ store }: { store: EditorStore }) {
+  useSyncExternalStore(store.subscribeSelection, store.selectionSnapshot)
+  useSyncExternalStore(activeEditor.subscribe, activeEditor.snapshot)
+  const step = useSyncExternalStore(typingStep.subscribe, typingStep.snapshot)
+  const frame = activeEditor.frame()
+  const words = step !== undefined && store.doc.block[step]?.type === 'node' ? 'step' : store.selectionKind === 'text' && frame !== undefined && store.doc.block[frame]?.type === 'frame' ? 'box' : undefined
+  return <div className="sh-rows">{words ? <TextRow store={store} onBoard={words} /> : <BoardRow store={store} />}</div>
+}
+
+/** What the row for words holds for a step's words, one line of words: undo, redo and the word marks. */
+const FOR_STEP: ReadonlySet<TypingButton> = new Set(['undo', 'redo', 'bold', 'italic', 'underline', 'strike', 'highlight', 'code', 'sub', 'sup'])
 
 /**
  * What a picture or a table shows, for whoever cannot see it: a field at the row's end while one is chosen. Down a side,
@@ -197,7 +215,11 @@ function DescribeField({ kind, value, onChange }: { kind: 'picture' | 'table'; v
   )
 }
 
-function TextRow({ store }: { store: EditorStore }) {
+/**
+ * The row for words. On a board (`onBoard`), without what is for pages (the ways a press goes, the paper, the pen):
+ * for a text box all the rest, for a step's words only their marks.
+ */
+function TextRow({ store, onBoard }: { store: EditorStore; onBoard?: 'box' | 'step' | undefined }) {
   const doc = useSyncExternalStore(store.subscribe, store.snapshot)
   const selection = useSyncExternalStore(store.subscribeSelection, store.selectionSnapshot)
   const tool = useSyncExternalStore(store.subscribeTool, store.toolSnapshot)
@@ -306,8 +328,10 @@ function TextRow({ store }: { store: EditorStore }) {
   // A table or a picture chosen: its own tools take the place of those for text blocks, which do not apply to it.
   const textTools = picture === undefined
   // The buttons the person keeps in the bar, in their order; More holds the rest, in the order they are offered.
-  const inTheBar = bar.filter((button) => textTools || !FOR_TEXT.has(button))
-  const inTheMore = underMore(bar).filter((button) => textTools || !FOR_TEXT.has(button))
+  // On a board, Select is the board's own tool, in its row; a step's words take only their marks.
+  const shows = (button: TypingButton): boolean => (onBoard === 'step' ? FOR_STEP.has(button) : (textTools || !FOR_TEXT.has(button)) && !(onBoard && button === 'select'))
+  const inTheBar = bar.filter(shows)
+  const inTheMore = underMore(bar).filter(shows)
   // Select with a box is a button of its own when it is in the bar; under More it stays with the other ways a press on the page goes.
   const pointers = POINTERS.filter(([value]) => value !== 'select' || !bar.includes('select'))
   const canTable = typing || lastCaretSpot(store) !== undefined
@@ -694,53 +718,18 @@ function TextRow({ store }: { store: EditorStore }) {
                 Tick the to-do
               </MenuItem>
             ) : null}
-            <hr />
-            <div className="sh-menu-head">A press on the page</div>
-            {pointers.map(([value, label, hint, Icon]) => (
-              <MenuItem
-                key={value}
-                label={label}
-                title={hint}
-                checked={tool === value}
-                command="tool.choose"
-                onChoose={() => {
-                  void commands.do('tool.choose', { tool: value })
-                  close()
-                }}
-              >
-                <Icon size={ICON} aria-hidden />
-                {value === 'select' ? 'Select with a box' : value === 'type' ? 'Type in the text' : 'Free cursor: write anywhere'}
-              </MenuItem>
-            ))}
-            <hr />
-            <div className="sh-menu-head">Paper</div>
-            <div className="sh-seg" role="radiogroup" aria-label="Paper">
-              {PAPERS.map(([kind, label]) => (
-                <button key={kind} type="button" role="radio" aria-checked={paperNow === kind} onMouseDown={keepFocus} onClick={() => paper(kind)}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="sh-seg" role="radiogroup" aria-label="Pages">
-              <button type="button" role="radio" aria-checked={everyPage} onMouseDown={keepFocus} onClick={() => setEveryPage(true)}>
-                All pages
-              </button>
-              <button type="button" role="radio" aria-checked={!everyPage} onMouseDown={keepFocus} onClick={() => setEveryPage(false)}>
-                This page
-              </button>
-            </div>
-            <hr />
-            <MenuItem kind="checkbox" label="Show both rows" checked={both} title="The row for words and the pen's row, one under the other" onChoose={() => showBothRows(!both)}>
-              <Rows2 size={ICON} aria-hidden />
-              Show both rows
-            </MenuItem>
+            {onBoard ? null : pageChoices(close)}
           </>
         )}
       </BarMenu>
-      <span className="sh-sep" />
-      <button type="button" className="sh-b" aria-label="Pen" aria-pressed={false} title="Pen: write and draw; the pen's row takes this one's place" data-command="tool.choose" onMouseDown={keepFocus} onClick={() => void commands.do('tool.choose', { tool: 'pen' })}>
-        <PenLine size={ICON} aria-hidden />
-      </button>
+      {onBoard ? null : (
+        <>
+          <span className="sh-sep" />
+          <button type="button" className="sh-b" aria-label="Pen" aria-pressed={false} title="Pen: write and draw; the pen's row takes this one's place" data-command="tool.choose" onMouseDown={keepFocus} onClick={() => void commands.do('tool.choose', { tool: 'pen' })}>
+            <PenLine size={ICON} aria-hidden />
+          </button>
+        </>
+      )}
       {table ? (
         <>
           <span className="sh-sep" />
@@ -755,4 +744,52 @@ function TextRow({ store }: { store: EditorStore }) {
       ) : null}
     </div>
   )
+
+  /** Under More, what a note of pages has besides: the ways a press on the page goes, the paper, both rows. */
+  function pageChoices(close: () => void): ReactNode {
+    return (
+      <>
+        <hr />
+        <div className="sh-menu-head">A press on the page</div>
+        {pointers.map(([value, label, hint, Icon]) => (
+          <MenuItem
+            key={value}
+            label={label}
+            title={hint}
+            checked={tool === value}
+            command="tool.choose"
+            onChoose={() => {
+              void commands.do('tool.choose', { tool: value })
+              close()
+            }}
+          >
+            <Icon size={ICON} aria-hidden />
+            {value === 'select' ? 'Select with a box' : value === 'type' ? 'Type in the text' : 'Free cursor: write anywhere'}
+          </MenuItem>
+        ))}
+        <hr />
+        <div className="sh-menu-head">Paper</div>
+        <div className="sh-seg" role="radiogroup" aria-label="Paper">
+          {PAPERS.map(([kind, label]) => (
+            <button key={kind} type="button" role="radio" aria-checked={paperNow === kind} onMouseDown={keepFocus} onClick={() => paper(kind)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="sh-seg" role="radiogroup" aria-label="Pages">
+          <button type="button" role="radio" aria-checked={everyPage} onMouseDown={keepFocus} onClick={() => setEveryPage(true)}>
+            All pages
+          </button>
+          <button type="button" role="radio" aria-checked={!everyPage} onMouseDown={keepFocus} onClick={() => setEveryPage(false)}>
+            This page
+          </button>
+        </div>
+        <hr />
+        <MenuItem kind="checkbox" label="Show both rows" checked={both} title="The row for words and the pen's row, one under the other" onChoose={() => showBothRows(!both)}>
+          <Rows2 size={ICON} aria-hidden />
+          Show both rows
+        </MenuItem>
+      </>
+    )
+  }
 }

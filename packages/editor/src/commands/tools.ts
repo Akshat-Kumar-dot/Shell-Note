@@ -1,7 +1,7 @@
 // The tools, the pens and undo, as commands (app control, step 2): each does
 // exactly what its button did, and the buttons now call them. The command's
 // words (a "fine" width, a "whole"-stroke eraser) map to the app's own here.
-import type { AnyColor, StrokeWidth } from '@shellnote/core'
+import type { AnyColor, NodeShape, StrokeWidth } from '@shellnote/core'
 import { choosePen, penChoice, type EraserSize, type PenChoice } from '../ink/settings.js'
 import type { EditorStore, Tool } from '../store.js'
 import type { Commands, Places } from './run.js'
@@ -17,27 +17,54 @@ export function chooseTool(store: EditorStore, tool: Tool): void {
   store.setTool(tool)
 }
 
+/**
+ * Why a tool cannot be taken up on a board, or undefined when it can: a board has no Type (Select chooses, free puts
+ * a text box where it clicks), and the pen, the highlighter and the eraser come to boards later.
+ */
+function notOnBoard(store: EditorStore, tool: Tool): string | undefined {
+  if (store.doc.kind !== 'board') return undefined
+  if (tool === 'type') return 'A board has no Type tool: select chooses and moves what is on it, free puts a text box where it clicks, step draws steps and links.'
+  if (tool === 'pen' || tool === 'highlighter' || tool === 'eraser') return `The ${tool} on a board comes later: for now draw steps with the Step tool (tool.choose tool=step), and words in a text box with free.`
+  return undefined
+}
+
 /** A choice of the pen's, with only what was given. */
 function change(parts: { [K in keyof PenChoice]?: PenChoice[K] | undefined }): Partial<PenChoice> {
   return Object.fromEntries(Object.entries(parts).filter(([, value]) => value !== undefined)) as Partial<PenChoice>
 }
 
 export function defineTools(commands: Commands): void {
-  commands.define('tool.choose', ['note'], ({ tool }, { note }) => {
+  commands.define('tool.choose', ['note'], ({ tool, shape }, { note }) => {
+    const board = note.store.doc.kind === 'board'
+    // The Step tool draws a board's steps and links: a note of pages has none.
+    if (tool === 'step' && !board) throw new Error('The Step tool is for a board: steps and links go on a board (note.new type=board). In a note of pages, a flowchart is a diagram (diagram: add).')
+    if (shape !== undefined && tool !== 'step') throw new Error('shape= is the Step tool\'s: tool.choose tool=step shape=… chooses the shape its steps take.')
+    const refused = notOnBoard(note.store, tool as Tool)
+    if (refused) throw new Error(refused)
+    if (shape !== undefined) note.store.setStepShape(shape as NodeShape)
     chooseTool(note.store, tool as Tool)
-    return `tool: ${String(tool)}`
+    if (tool === 'step') return `tool: step, drawing ${note.store.stepShape === 'box' ? 'boxes' : `${note.store.stepShape} steps`}`
+    return `tool: ${String(tool)}${board && tool === 'free' ? ' (a text box where it clicks)' : ''}`
   })
+  /** Refused on a board, for now, before anything changes. */
+  const inkHere = (store: EditorStore, tool: Tool): void => {
+    const refused = notOnBoard(store, tool)
+    if (refused) throw new Error(refused)
+  }
   commands.define('pen.set', ['note'], ({ kind, colour, width }, { note }) => {
+    inkHere(note.store, 'pen')
     choosePen(change({ kind: kind as PenChoice['kind'] | undefined, color: colour as AnyColor | undefined, width: width === undefined ? undefined : WIDTHS[width as string] }))
     chooseTool(note.store, 'pen')
     return `pen: ${penLine()}`
   })
   commands.define('highlighter.set', ['note'], ({ colour, width }, { note }) => {
+    inkHere(note.store, 'highlighter')
     choosePen(change({ highlighterColor: colour as AnyColor | undefined, highlighterWidth: width === undefined ? undefined : WIDTHS[width as string] }))
     chooseTool(note.store, 'highlighter')
     return `highlighter: ${highlighterLine()}`
   })
   commands.define('eraser.set', ['note'], ({ erase, size }, { note }) => {
+    inkHere(note.store, 'eraser')
     choosePen(change({ eraser: erase === undefined ? undefined : erase === 'whole' ? 'stroke' : 'part', eraserSize: size === undefined ? undefined : ERASER_SIZES[size as string] }))
     chooseTool(note.store, 'eraser')
     return `eraser: ${eraserLine()}`
@@ -75,5 +102,6 @@ const eraserLine = (): string => `${penChoice.value.eraser === 'stroke' ? 'whole
 /** The tools' line of the app-state map: the tool in use, and how each pen is set. */
 export function toolsLine(store: EditorStore | undefined): string | undefined {
   if (!store) return undefined
-  return `tool ${store.tool} · pen ${penLine()} · highlighter ${highlighterLine()} · eraser ${eraserLine()} · undo ${store.canUndo ? 'yes' : 'no'}, redo ${store.canRedo ? 'yes' : 'no'}`
+  const tool = store.tool === 'step' ? `step (${store.stepShape})` : store.tool
+  return `tool ${tool} · pen ${penLine()} · highlighter ${highlighterLine()} · eraser ${eraserLine()} · undo ${store.canUndo ? 'yes' : 'no'}, redo ${store.canRedo ? 'yes' : 'no'}`
 }

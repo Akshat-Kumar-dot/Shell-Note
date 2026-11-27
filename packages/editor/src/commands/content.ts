@@ -42,9 +42,12 @@ const ownPictures = (doc: Doc): PictureSource[] =>
 
 export function defineContent(commands: Commands): void {
   for (const spec of NOTE_COMMANDS) {
-    commands.define(spec.name, ['note'], async (input, places) => {
+    commands.define(spec.name, ['note'], async (input, places, by) => {
       // Read-only here (another window edits the note), as every command that changes the note is.
       if (places.workspace && !places.workspace.editing()) throw new Error('This note is read-only here: it is being edited in another window.')
+      // A person's click (a board's buttons, the Diagram button) is a request of its own: one step of Undo, never
+      // joined to the terminal's request before it.
+      if (by === 'person') beginNoteRequest()
       const store = places.note.store
       // The library's pictures, read only for a line that places one.
       const pictures = spec.name === 'picture.add' ? [...ownPictures(store.doc), ...((await places.pictures?.list()) ?? [])] : undefined

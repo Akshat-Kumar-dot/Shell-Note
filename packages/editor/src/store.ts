@@ -3,7 +3,7 @@
 // it comes from typing, the toolbar, undo, or later an AI edit, and each
 // listener hears which blocks changed and who made the change, so the frame
 // being typed in does not redraw what it already shows.
-import { apply, become, emptyHistory, merge, rebase, record, redo, settle, settleMerged, undo, type Applied, type Doc, type History, type Id, type Op, type Selection } from '@shellnote/core'
+import { apply, become, emptyHistory, merge, rebase, record, redo, settle, settleMerged, undo, type Applied, type Doc, type History, type Id, type NodeShape, type Op, type Selection } from '@shellnote/core'
 import { AssetStore } from './assets.js'
 
 export interface Change {
@@ -60,10 +60,11 @@ export type SelectionKind = 'text' | 'objects'
  * The tool in use, chosen in the bar: Type, the usual one; Select, a box that
  * takes only what is inside it; Free cursor, a click on
  * empty paper to start typing there; the ink tools (phase 3): Pen,
- * Highlighter and Eraser (ink/PenLayer.tsx); and the Hand, in the pen's row, a
- * drag of which moves the sheet and writes nothing.
+ * Highlighter and Eraser (ink/PenLayer.tsx); the Hand, in the pen's row, a
+ * drag of which moves the sheet and writes nothing; and on a board the Step
+ * tool, a drag of which draws a step, or from a step a link (board/BoardView.tsx).
  */
-export type Tool = 'type' | 'select' | 'free' | 'pen' | 'highlighter' | 'eraser' | 'hand'
+export type Tool = 'type' | 'select' | 'free' | 'pen' | 'highlighter' | 'eraser' | 'hand' | 'step'
 
 /** The tools that put ink on the page or take it off. */
 export const INK_TOOLS: readonly Tool[] = ['pen', 'highlighter', 'eraser']
@@ -75,6 +76,7 @@ export class EditorStore {
   #selection: Selection = NOTHING
   #kind: SelectionKind = 'text'
   #tool: Tool = 'type'
+  #stepShape: NodeShape = 'box'
   readonly #listeners = new Set<(change: Change) => void>()
   readonly #selectionListeners = new Set<() => void>()
   readonly #toolListeners = new Set<() => void>()
@@ -125,6 +127,20 @@ export class EditorStore {
     this.#tool = tool
     for (const listener of [...this.#toolListeners]) listener()
   }
+
+  /** The shape the Step tool draws its steps in: a box until another is chosen. Its listeners are the tool's. */
+  get stepShape(): NodeShape {
+    return this.#stepShape
+  }
+
+  setStepShape(shape: NodeShape): void {
+    if (shape === this.#stepShape) return
+    this.#stepShape = shape
+    for (const listener of [...this.#toolListeners]) listener()
+  }
+
+  /** The Step tool's shape now, for React's useSyncExternalStore. */
+  stepShapeSnapshot = (): NodeShape => this.#stepShape
 
   /** Listen for the tool changing. Returns the function that stops listening. */
   subscribeTool = (listener: () => void): (() => void) => {

@@ -1,7 +1,7 @@
 // App control's parity check (what Playwright can reach, a command can do): every visible
-// control on every screen calls a command, marked data-command with a command of the table, or is on the list of
-// what stays the person's, with the reason.
-import { APP_COMMANDS } from '@shellnote/core'
+// control on every screen calls a command, marked data-command with a command of the table (the app's or the note's:
+// a board's buttons carry the note's own), or is on the list of what stays the person's, with the reason.
+import { COMMANDS } from '@shellnote/core'
 import { expect, inApp, test, type Page } from './fixtures.js'
 import { standInForYouTube } from './youtube.js'
 import { chooseTool, openPart, openPenSettings, openVideoMenu, penRow, textRow } from './shell.js'
@@ -203,6 +203,42 @@ async function walk(page: Page): Promise<void> {
   await terminal(page, 'ai.close', 'settings.open')
   await look(page, 'note, Settings')
   await page.keyboard.press('Escape')
+  // A board: its row and each tool, the Step tool's shapes, the row's More, a chosen step and a chosen link with their
+  // menus, and a text box typed in.
+  await terminal(page, 'note.new type=board name=Flow', ['board.draw', 'flowchart TD', '  A([Start]) --> B{Passed?}', '  B -->|no| A', 'end'].join('\n'))
+  const board = page.locator('div.nw-board')
+  const boardRow = page.getByRole('toolbar', { name: 'Board' })
+  await expect(board.locator('.nw-step')).toHaveCount(2)
+  await look(page, 'board')
+  for (const tool of ['Move the board', 'Text', 'Step'] as const) {
+    await boardRow.getByRole('button', { name: tool, exact: true }).click()
+    await look(page, `board, ${tool}`)
+  }
+  await boardRow.getByRole('button', { name: 'Step', exact: true }).click()
+  await expect(page.getByRole('menu', { name: 'Step' })).toBeVisible()
+  await look(page, "board, the Step tool's shapes")
+  await page.keyboard.press('Escape')
+  await boardRow.getByRole('button', { name: 'More', exact: true }).click()
+  await look(page, "board, the row's More")
+  await page.keyboard.press('Escape')
+  await boardRow.getByRole('button', { name: 'Select', exact: true }).click()
+  await board.locator('.nw-step', { hasText: 'Passed?' }).locator('path').click()
+  await look(page, 'board, a chosen step')
+  for (const menu of ['Shape', 'Colour'] as const) {
+    await boardRow.getByRole('button', { name: menu, exact: true }).click()
+    await look(page, `board, a chosen step, ${menu}`)
+    await page.keyboard.press('Escape')
+  }
+  await board.locator('.nw-link-words', { hasText: 'no' }).locator('rect').click()
+  await expect(boardRow.getByRole('textbox', { name: 'Words' })).toBeVisible()
+  await look(page, 'board, a chosen link')
+  await boardRow.getByRole('button', { name: 'Text', exact: true }).click()
+  const bare = (await board.boundingBox())!
+  await page.mouse.click(bare.x + bare.width - 160, bare.y + 60)
+  await page.keyboard.type('A box of words')
+  await expect(page.getByRole('toolbar', { name: 'Formatting' })).toBeVisible()
+  await look(page, 'board, a text box typed in')
+  await page.keyboard.press('Escape')
   // The stroke recorder.
   await page.goto('/?record=strokes')
   await expect(page.getByRole('button', { name: 'Next' })).toBeVisible()
@@ -227,7 +263,7 @@ const PERSON: { why: string; name?: RegExp; cls?: RegExp; within?: RegExp }[] = 
   { why: 'Reading: pages about ShellNote, opened in the browser', name: /^(The source code, on GitHub|The other projects ShellNote is built with.*|The fonts, and their licences|the guide to the MCP server)$/u },
   { why: 'Still to come, greyed with its later: boards', name: /^Boards, cards joined by arrows, come later$/u },
   { why: 'Where the person looks: both rows of tools at once, or the one in hand', name: /^Show both rows$/u },
-  { why: "Opens a menu, a field or a dialog, whose own controls carry the commands (the pen's colours, a bar's places, a card's actions, the name typed, the folder chosen)", name: /^(New|Actions for .*|Pen settings|Video|Move the tool bar|Colour|More colours|Move to…|Rename|Paste again|Style|Font and size|Align and indent|More|Width|This note|Zoom|Sort and place|Where the video sits|Description|Kind|Page|Paper|Back to This note)$/u },
+  { why: "Opens a menu, a field or a dialog, whose own controls carry the commands (the pen's colours, a bar's places, a card's actions, the name typed, the folder chosen, a step's shapes)", name: /^(New|Actions for .*|Pen settings|Video|Move the tool bar|Colour|More colours|Move to…|Rename|Paste again|Style|Font and size|Align and indent|More|Width|This note|Zoom|Sort and place|Where the video sits|Description|Kind|Page|Paper|Back to This note|Shape)$/u },
   { why: "The pen and the eraser: a press takes it in hand (tool.choose, from the words' row's Pen); in hand, a press opens its kinds or its ways", name: /^(Pen|Eraser)$/u, within: /Pen|Highlighter|Eraser/u },
   { why: "In Recently deleted a card's click opens its menu, whose Restore and Delete for good carry the commands", name: /^(Folder|Note): .*Deleted /u },
   { why: "The terminal is where the agent's lines run: the person opens and closes it, from the rail or with Ctrl+Shift+P", cls: /rail-terminal/u },
@@ -253,7 +289,7 @@ const label = (c: Control): string => `${c.within} | ${c.tag} "${c.name}"`
 
 test('every control on every screen calls a command of the table, or is on the list of what stays the person\'s', async ({ page }) => {
   await walk(page)
-  const known = new Set(APP_COMMANDS.map((c) => c.name))
+  const known = new Set(COMMANDS.map((c) => c.name))
   expect(seen.length).toBeGreaterThan(200)
   // Each mark names a command of the table.
   expect([...new Set(seen.filter((c) => c.command !== undefined && !known.has(c.command)).map(label))]).toEqual([])

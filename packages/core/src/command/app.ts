@@ -237,9 +237,9 @@ export const APP_COMMANDS: readonly CommandSpec[] = [
   // ----- tools -----
   {
     name: 'tool.choose',
-    does: 'Choose a tool in the open note',
+    does: 'Choose a tool in the open note. On a board, step draws steps (shape= the shape they take, a box until another is chosen) and links from a step, and free puts a text box where it clicks',
     says: ['choose the {tool}', 'use the {tool} tool', 'switch to {tool}', 'pick the {tool}', '{tool} tool', 'turn on the free cursor', 'write anywhere on the page'],
-    input: inputs(['tool']),
+    input: inputs(['tool'], ['shape']),
     example: { tool: 'select' },
   },
   {
@@ -416,7 +416,7 @@ export const APP_COMMANDS: readonly CommandSpec[] = [
   },
   {
     name: 'bar.button',
-    does: "Put a button in a row of tools (on), at a place counted from its start (position; left out, at its end), or take it out (off) to that row's More menu, where it stays one click away: the bar for typing's (tools left out), or the pen's row's (tools=pen), where the pen and Type always stay",
+    does: "Put a button in a row of tools (on), at a place counted from its start (position; left out, at its end), or take it out (off) to that row's More menu, where it stays one click away: the bar for typing's (tools left out), the pen's row's (tools=pen), where the pen and Type always stay, or a board's row's (tools=board), where Select always stays",
     says: ['put the {button} button in the toolbar', 'take the {button} button out of the toolbar', 'add the {button} button to the bar', 'remove the {button} button from the toolbar'],
     input: inputs(['button', 'on'], ['position', 'tools']),
     example: { button: 'table', on: false },
@@ -430,7 +430,7 @@ export const APP_COMMANDS: readonly CommandSpec[] = [
   },
   {
     name: 'layout.reset',
-    does: "Put things back as they started, on this device: the places of the panels, the bars and the library's column, and the library as cards (places, or left out); the app's look (look); the bar for typing's buttons (tools); the pen's row's buttons (pen); or all of it (all)",
+    does: "Put things back as they started, on this device: the places of the panels, the bars and the library's column, and the library as cards (places, or left out); the app's look (look); the bar for typing's buttons (tools); the pen's row's buttons (pen); a board's row's buttons and the points where links join, shown (board); or all of it (all)",
     says: ['reset the layout', 'put the panels back', 'default layout', 'restore the workspace'],
     input: inputs([], ['part']),
     example: { part: 'all' },
@@ -765,6 +765,13 @@ export const APP_COMMANDS: readonly CommandSpec[] = [
     says: ['dark paper', 'make the paper dark', 'white paper in dark mode', 'paper colour in the dark'],
     input: inputs(['on']),
     example: { on: true },
+  },
+  {
+    name: 'settings.points',
+    does: "On a board, show the points where links join (on: on the chosen step, on every step while the Step tool is in hand, on the step a link being drawn would join, at the two ends of a chosen link) or hide them all (off), on this device. Off, a link is still drawn with the Step tool's drag from a step",
+    says: ['show the points where links join', 'hide the connection points', 'turn off the points on the steps', 'show the link points on the board'],
+    input: inputs(['on']),
+    example: { on: false },
   },
   {
     name: 'settings.keepStorage',

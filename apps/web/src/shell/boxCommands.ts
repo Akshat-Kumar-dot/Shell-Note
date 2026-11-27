@@ -5,6 +5,7 @@
 import {
   ArrowUpDown,
   Captions,
+  CircleDot,
   ClipboardList,
   Clock,
   Columns2,
@@ -144,6 +145,7 @@ export const BOX: Readonly<Record<string, BoxLine | readonly BoxLine[]>> = {
   // a board
   'board.add': { title: 'Board: add a step after the chosen one', icon: SquarePlus },
   'board.tidy': { title: 'Board: tidy the flowchart', icon: Workflow },
+  'settings.points': { title: 'Board: show or hide the points where links join', icon: CircleDot },
   'screen.fullscreen': { title: 'Full screen', icon: Maximize },
   'panel.full': { title: 'Full view: one panel fills the window', icon: Maximize2 },
   'panel.show': { title: 'Panel: open a part (AI, description, transcript, web, timer…)', icon: PanelRight },

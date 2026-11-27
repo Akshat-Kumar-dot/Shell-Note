@@ -1,7 +1,7 @@
-// The buttons the two rows of tools can hold, the bar for typing's and the pen's row's: each one's name, its icon, and
+// The buttons the rows of tools can hold, the bar for typing's, the pen's row's and a board's: each one's name, its icon, and
 // the group it sits with (a thin line is drawn where one group meets another). A row draws those the person keeps in
 // it, in their order; its More holds the rest.
-import type { Color, PenButton, TypingButton } from '@shellnote/core'
+import type { BoardButton, Color, PenButton, TypingButton } from '@shellnote/core'
 import {
   AlignLeft,
   ALargeSmall,
@@ -17,9 +17,12 @@ import {
   Lasso,
   Link,
   ListChecks,
+  Maximize,
+  MousePointer2,
   Palette,
   PenLine,
   Pilcrow,
+  RectangleHorizontal,
   Redo2,
   SquareDashedMousePointer,
   Strikethrough,
@@ -86,4 +89,25 @@ export const PEN_LOOK: Readonly<Record<PenButton, { label: string; icon: LucideI
   tidy: { label: 'Tidy handwriting', icon: WandSparkles, group: 'end' },
   type: { label: 'Type', icon: Type, group: 'end', kept: true },
   picture: { label: 'Picture', icon: Image, group: 'end' },
+}
+
+export type BoardGroup = 'move' | 'make' | 'ink' | 'history' | 'end'
+
+/**
+ * A board's row's buttons. Select is kept: a board opens with it. The pen, the eraser, the highlighter and a picture
+ * come to a board later: until then their buttons show greyed, saying so.
+ */
+export const BOARD_LOOK: Readonly<Record<BoardButton, { label: string; icon: LucideIcon; group: BoardGroup; kept?: true; later?: true }>> = {
+  select: { label: 'Select', icon: MousePointer2, group: 'move', kept: true },
+  hand: { label: 'Move the board', icon: Hand, group: 'move' },
+  step: { label: 'Step', icon: RectangleHorizontal, group: 'make' },
+  text: { label: 'Text', icon: Type, group: 'make' },
+  pen: { label: 'Pen', icon: PenLine, group: 'ink', later: true },
+  eraser: { label: 'Eraser', icon: Eraser, group: 'ink', later: true },
+  undo: { label: 'Undo', icon: Undo2, group: 'history' },
+  redo: { label: 'Redo', icon: Redo2, group: 'history' },
+  tidy: { label: 'Tidy the flowchart', icon: Workflow, group: 'end' },
+  fit: { label: 'The whole board', icon: Maximize, group: 'end' },
+  highlighter: { label: 'Highlighter', icon: Highlighter, group: 'ink', later: true },
+  picture: { label: 'Picture', icon: Image, group: 'end', later: true },
 }

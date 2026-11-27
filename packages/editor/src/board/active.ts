@@ -24,3 +24,9 @@ export function onScreen(screen: BoardScreen | undefined): void {
 
 /** The link chosen on the board, by the step it leaves and the step it leads to; none while no link is. */
 export const chosenLink = new Shared<{ from: Id; to: Id } | undefined>(undefined)
+
+/** The step whose words are being typed in place (StepWords.tsx); none while none is. */
+export const typingStep = new Shared<Id | undefined>(undefined)
+
+/** Asked to type the chosen link's words (Enter, a double-click): the row's Words field takes the caret. */
+export const linkWordsAsked = new Shared(0)

@@ -257,6 +257,37 @@
   outline-offset: -2px;
 }
 
+/* ----- Customise: a board's advanced switch, the points where links join ----- */
+.set-advanced {
+  margin-top: 16px;
+}
+.set-advanced h3 {
+  margin: 0 0 8px;
+  color: var(--sh-text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+.set-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  color: var(--sh-text);
+  cursor: pointer;
+}
+.set-switch input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--ui-hue);
+}
+.set-switch small {
+  display: block;
+  margin-top: 2px;
+  color: var(--sh-text-3);
+  font-size: 12px;
+}
+
 /* ----- Customise: where things sit ----- */
 .set-places {
   display: grid;

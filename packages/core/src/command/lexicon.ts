@@ -38,7 +38,7 @@ export const AREAS: Readonly<Record<string, Area>> = {
     words: ['file', 'files', 'disk', 'drive', 'computer', 'shellnote file', 'copy on disk', 'export', 'import', 'download', 'hard drive'],
   },
   tool: {
-    hint: "the note's tool: type, select, free cursor, pen, highlighter or eraser (pen, highlighter and eraser have areas of their own for their settings)",
+    hint: "the note's tool: type, select, free cursor, pen, highlighter or eraser, and on a board the Step tool with the shape it draws (pen, highlighter and eraser have areas of their own for their settings)",
     words: ['tool', 'tools', 'mode', 'cursor', 'typing', 'keyboard', 'text mode', 'pointer'],
   },
   pen: {
@@ -117,7 +117,7 @@ export const AREAS: Readonly<Record<string, Area>> = {
     words: ['pad', 'scratch pad', 'scratchpad', 'drafts', 'draft', 'staging', 'waiting area'],
   },
   settings: {
-    hint: "the app's settings: open them, the theme, the pen's settings, developer mode, keeping the notes in storage",
+    hint: "the app's settings: open them, the theme, the pen's settings, developer mode, keeping the notes in storage, the points where a board's links join",
     words: ['settings', 'setting', 'preferences', 'options', 'config', 'configuration', 'setup', 'theme', 'appearance', 'look', 'dark mode', 'light mode'],
   },
   recorder: {
@@ -244,6 +244,7 @@ export const VERBS: Readonly<Record<string, readonly string[]>> = {
   'settings.theme': [...PICK, 'turn', 'toggle', 'apply', 'go', 'make it', 'switch the theme', 'change the theme', 'dark', 'light'],
   'settings.accent': ['accent', 'accent colour', 'accent color', 'tint', 'recolour', 'recolor'],
   'settings.paper': ['dark paper', 'white paper', 'paper colour', 'paper color', 'darken the paper', 'night paper'],
+  'settings.points': ['points', 'connection points', 'link points', 'join points', 'connector points', 'anchor points', 'ports', 'show the points', 'hide the points', 'points where links join'],
   'note.kind': ['kind', 'kind of note', 'note kind', 'turn into', 'make it a', 'sketch note', 'text note', 'mixed note'],
   'note.seamless': ['seamless', 'page breaks', 'one sheet', 'one long sheet', 'continuous', 'show the pages'],
   'page.size': ['size', 'page size', 'paper size', 'landscape', 'portrait', 'upright', 'across', 'turn the pages'],
